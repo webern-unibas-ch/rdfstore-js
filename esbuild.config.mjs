@@ -5,14 +5,10 @@ import { dirname, resolve } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-await esbuild.build({
-  entryPoints: ['src/store.js'],
+const common = {
   bundle: true,
-  format: 'iife',
-  globalName: 'rdfstore',
   platform: 'browser',
   target: 'es2022',
-  outfile: 'dist/rdfstore.js',
   alias: {
     'http': resolve(__dirname, 'stubs/empty.js'),
     'https': resolve(__dirname, 'stubs/empty.js'),
@@ -20,6 +16,23 @@ await esbuild.build({
     'fs': resolve(__dirname, 'stubs/empty.js'),
     'path': resolve(__dirname, 'stubs/empty.js')
   }
+};
+
+// Script-tag build: defines the global `rdfstore`
+await esbuild.build({
+  ...common,
+  entryPoints: ['src/store.js'],
+  format: 'iife',
+  globalName: 'rdfstore',
+  outfile: 'dist/rdfstore.js'
 });
 
-console.log('✅ Bundle created successfully');
+// ES module build for bundlers: named exports Store, create, connect (plus default)
+await esbuild.build({
+  ...common,
+  entryPoints: ['src/index.mjs'],
+  format: 'esm',
+  outfile: 'dist/rdfstore.mjs'
+});
+
+console.log('✅ Bundles created successfully');

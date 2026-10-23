@@ -32,7 +32,7 @@
     "\n---HELPER---": "",
     "clean-dist": "rimraf ./dist",
     "build:bundle": "yarn node esbuild.config.mjs",
-    "build:minify": "esbuild dist/rdfstore.js --minify --outfile=dist/rdfstore_min.js",
+    "build:minify": "esbuild dist/rdfstore.js --minify --outfile=dist/rdfstore_min.js && esbuild dist/rdfstore.mjs --minify --outfile=dist/rdfstore_min.mjs",
     "build:browser": "yarn clean-dist && yarn build:bundle && yarn build:minify || exit 1",
     "e2e:basic": "yarn node e2e/test-basic.js",
     "e2e:comprehensive": "yarn node e2e/test-comprehensive.js",
