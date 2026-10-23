@@ -1064,12 +1064,12 @@ __metadata:
   linkType: hard
 
 "n3@npm:^2.0.3":
-  version: 2.13.11
-  resolution: "n3@npm:2.13.11"
+  version: 2.13.12
+  resolution: "n3@npm:2.13.12"
   dependencies:
     buffer: "npm:^6.0.3"
     readable-stream: "npm:^4.0.0"
-  checksum: 10c0/e234695fe10068e14c690ba2c31bf0c13a550e91ed5e87b1bef5cad1265edbb121bec8cb9777cdf1157e71522e7e1aedf5a5c4e5d9a3f6eca9fe6010459da617
+  checksum: 10c0/d852f15f93055998e11e144238df9e7050dad05f8ac4de06d4fd65b316d32bc5881d7ddd0ecc7c8c7d2e30cf08a2d38d31e4b6c173be32847a5de65925ccf1be
   languageName: node
   linkType: hard
 
