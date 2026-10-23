@@ -26,9 +26,9 @@ yarn jasmine spec/store_spec.js
 yarn jasmine spec/query_engine_spec.js --filter="some describe/it text"
 ```
 
-A single e2e script: `yarn e2e:basic`, `yarn e2e:comprehensive`, `yarn e2e:readme`, `yarn e2e:esm`. `e2e:esm` imports `dist/rdfstore_min.js`, so run `yarn build` first if `src/` changed.
+A single e2e script: `yarn e2e:basic`, `yarn e2e:comprehensive`, `yarn e2e:readme`, `yarn e2e:esm`. `e2e:esm` imports the package as Node does (`src/store.js`), checks that the `browser` condition resolves to `dist/rdfstore.mjs`, and runs queries against that bundle. Run `yarn build` before `yarn e2e` or `yarn test`: otherwise the test fails (no bundle) or checks a stale one.
 
-CI ([.github/workflows/main.yml](.github/workflows/main.yml)) runs `yarn lint`, `yarn unit`, `yarn e2e`, then `yarn build` on Node 22.22, 24.16 and 26.x.
+CI ([.github/workflows/main.yml](.github/workflows/main.yml)) runs `yarn lint`, `yarn unit`, `yarn build`, then `yarn e2e` on Node 22.22, 24.16 and 26.x.
 
 ## Generated / committed artifacts
 

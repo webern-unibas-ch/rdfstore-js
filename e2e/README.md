@@ -25,12 +25,14 @@ Comprehensive integration test covering:
 **Run:** `yarn e2e:comprehensive` or `node e2e/test-comprehensive.js`
 
 ### `test-esm.mjs`
-ESM compatibility test covering:
-- Dual package configuration validation
-- File structure verification
-- Dynamic ES module import testing
-- UMD format compatibility check
-- Modern bundler integration readiness
+ES module test covering:
+- Node.js entry: `import('rdfstore')` resolves to `src/store.js` and provides named exports
+- Browser export condition (used by bundlers) resolves to `dist/rdfstore.mjs`
+- ES module bundle: named and default exports
+- In both entries: Turtle loading, a SELECT and a CONSTRUCT query with checked results
+- A 15 s watchdog, so a store that never calls back fails the test instead of hanging
+
+Needs the ES module bundle: run `yarn build` first.
 
 **Run:** `yarn e2e:esm` or `node e2e/test-esm.mjs`
 
@@ -57,6 +59,6 @@ node e2e/test-esm.mjs
 
 - **Basic**: Quick smoke test for essential functionality
 - **Comprehensive**: Full SPARQL feature validation
-- **ESM**: Modern module system compatibility
+- **ESM**: Node.js and bundler entry points, ES module bundle
 
-These tests validate that all components work together correctly and serve as integration validation for the entire rdfstore-js system. The ESM test specifically ensures compatibility with modern JavaScript frameworks and bundlers.
+These tests validate that all components work together correctly and serve as integration validation for the entire rdfstore-js system. The ESM test checks that Node.js and browser bundlers each get a working entry point.
