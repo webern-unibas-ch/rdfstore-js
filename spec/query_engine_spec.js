@@ -1549,6 +1549,30 @@ describe("QueryEngine", function(){
         });
     });
 
+    it("Test GroupByFunctionCall", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var query = "PREFIX : <http://example/>\
+                            INSERT DATA {\
+                            :s1 :p 1 .\
+                            :s2 :p 2 .\
+                            :s3 :p 2 }";
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) {  ?s :p ?v . } GROUP BY STR(?v)', function(err, results){
+                        expect(err).toBeNull();
+                        expect(results.length).toBe(2);
+                        var counts = [results[0].count.value, results[1].count.value].sort();
+                        expect(counts).toEqual(['1', '2']);
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
     it("Test DisjointUnion", function(done) {
         new Lexicon(function(lexicon){
             new QuadBackend({treeOrder: 15}, function(backend){

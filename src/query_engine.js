@@ -290,10 +290,11 @@ QueryEngine.prototype.removeDefaultGraphBindings = function(bindingsList, datase
 
 
 QueryEngine.prototype.aggregateBindings = function(projection, bindingsGroup, dataset, env, callback) {
+    var that = this;
     this.copyDenormalizedBindings(bindingsGroup, env.outCache, function(denormBindings){
         var aggregatedBindings = {};
         for(var i=0; i<projection.length; i++) {
-            var aggregatedValue = QueryFilters.runAggregator(projection[i], denormBindings, this, dataset, env);
+            var aggregatedValue = QueryFilters.runAggregator(projection[i], denormBindings, that, dataset, env);
             if(projection[i].alias) {
                 aggregatedBindings[projection[i].alias.value] = aggregatedValue;
             } else {
@@ -858,10 +859,11 @@ QueryEngine.prototype.groupSolution = function(bindings, group, dataset, queryEn
                 } else {
                     // In this case, we create an additional variable in the binding to hold the group variable value
                     that.copyDenormalizedBindings([currentBindings], queryEnv.outCache, function(denormBindings){
-                        var filterResultEbv = QueryFilters.runFilter(currentOrderClause, denormBindings[0], that, queryEnv);
+                        var filterResultEbv = QueryFilters.runFilter(currentOrderClause, denormBindings[0], that, dataset, queryEnv);
                         if(!QueryFilters.isEbvError(filterResultEbv)) {
-                            currentBindings["groupCondition"+env._i] = filterResultEbv;
-                            orderVariable = "groupCondition"+env._i;
+                            // one variable per group clause, so equal values of the same clause end up in the same group
+                            orderVariable = "groupCondition"+group.indexOf(currentOrderClause);
+                            currentBindings[orderVariable] = filterResultEbv;
                             if(initialized == false) {
                                 order.push(orderVariable);
                             }

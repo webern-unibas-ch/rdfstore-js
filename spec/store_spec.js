@@ -1194,6 +1194,40 @@ describe("Store", function () {
 
     });
 
+    it("Should pass integration test RegisterCustomFunction inside an aggregate", function (done) {
+        new Store.Store({name: 'test', overwrite: true}, function (err, store) {
+            store.load(
+                'text/n3',
+                '@prefix test: <http://test.com/> .\
+                 test:A test:prop 1.\
+                 test:A test:prop 2.\
+                 test:B test:prop 5.',
+                function (err) {
+
+                    store.registerCustomFunction('http://test.com/my_double', function (engine, args) {
+                        var v = engine.effectiveTypeValue(args[0]);
+                        return {token: 'literal', type: 'http://www.w3.org/2001/XMLSchema#integer', value: '' + (v * 2)};
+                    });
+                    store.execute(
+                        'PREFIX test: <http://test.com/> SELECT ?x (SUM(test:my_double(?v)) AS ?sum) { ?x test:prop ?v } GROUP BY ?x',
+                        function (err, results) {
+                            expect(err).toBeNull();
+                            expect(results.length).toBe(2);
+                            var sums = {};
+                            for (var i = 0; i < results.length; i++) {
+                                sums[results[i].x.value] = results[i].sum.value;
+                            }
+                            expect(sums['http://test.com/A']).toBe('6');
+                            expect(sums['http://test.com/B']).toBe('10');
+                            done();
+                        }
+                    );
+
+                });
+        });
+
+    });
+
     it("Should be able to use GRAPH variables", function (done) {
         new Store.Store({name: 'test', overwrite: true}, function (err, store) {
             store.load(
