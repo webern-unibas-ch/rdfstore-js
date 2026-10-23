@@ -16,7 +16,7 @@ var utils = require('./utils');
  * @param configuration['treeOrder'] Tree order for the indices that are going to be created
  * @return The newly created backend.
  */
-QuadBackend = function (configuration, callback) {
+var QuadBackend = function (configuration, callback) {
     this.indexMap = {};
     this.treeOrder = configuration['treeOrder'];
     this.indices = (configuration["index"] || QuadBackend.allIndices);

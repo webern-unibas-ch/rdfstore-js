@@ -20,7 +20,7 @@ function BindExpressionError(message, bind, error) {
 BindExpressionError.prototype = new Error();
 BindExpressionError.constructor = BindExpressionError;
 
-QueryEngine = function(params) {
+var QueryEngine = function(params) {
     if(arguments.length != 0) {
         this.backend = params.backend;
         this.lexicon = params.lexicon;

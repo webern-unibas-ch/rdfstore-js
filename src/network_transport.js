@@ -4,7 +4,7 @@ if(!utils.isWorker()) {
     var https = require("https");
     var url = require("url");
 
-    NetworkTransport = {
+    var NetworkTransport = {
 
         load: function (uri, accept, callback, redirect) {
             var redirection = redirect == null ? 3 : redirect;

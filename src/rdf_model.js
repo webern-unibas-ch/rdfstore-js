@@ -2,7 +2,7 @@
 var _ = require("./utils");
 var QueryFilters = require("./query_filters").QueryFilters;
 
-RDFModel = {};
+var RDFModel = {};
 
 /**
  * Implementation of <http://www.w3.org/TR/rdf-interfaces/>

@@ -49,7 +49,7 @@ var hashTerm = function(term) {
     } catch(e) {
         if(typeof(term) === 'object') {
             var key = "";
-            for(p in term) {
+            for(var p in term) {
                 key = key + p + term[p];
             }
 
@@ -96,7 +96,7 @@ var lexicalFormBaseUri = function(term, env) {
 };
 
 
-parseISO8601 = function (str) {
+var parseISO8601 = function (str) {
     return Date.parse(str);
 };
 
@@ -124,11 +124,11 @@ if (!Date.prototype.toISOString) {
     }());
 }
 
-iso8601 = function(date) {
+var iso8601 = function(date) {
     return date.toISOString();
 };
 
-compareDateComponents = function(stra,strb) {
+var compareDateComponents = function(stra,strb) {
     var dateA = parseISO8601(stra);
     var dateB = parseISO8601(strb);
 
@@ -141,7 +141,7 @@ compareDateComponents = function(stra,strb) {
     }
 };
 
-lexicalFormLiteral = function(term, env) {
+var lexicalFormLiteral = function(term, env) {
     var value = term.value;
     var lang = term.lang;
     var type = term.type;
@@ -181,7 +181,7 @@ lexicalFormLiteral = function(term, env) {
     return indexedValue;
 };
 
-normalizeUnicodeLiterals = function (string) {
+var normalizeUnicodeLiterals = function (string) {
     var escapedUnicode = string.match(/\\u[0-9abcdefABCDEF]{4,4}/g) || [];
     var dups = {};
     for (var i = 0; i < escapedUnicode.length; i++) {
@@ -195,7 +195,7 @@ normalizeUnicodeLiterals = function (string) {
 };
 
 // Persistence relies on the native IndexedDB of the runtime (browser window or worker).
-registerIndexedDB = function(that) {
+var registerIndexedDB = function(that) {
     // In the following line, you should include the prefixes of implementations you want to test.
     var context = globalThis;
 
@@ -211,7 +211,7 @@ registerIndexedDB = function(that) {
     }
 };
 
-guid = function() {
+var guid = function() {
     function s4() {
         return Math.floor((1 + Math.random()) * 0x10000)
             .toString(16)
@@ -239,7 +239,7 @@ hashTerm = function(term) {
     } catch(e) {
         if(typeof(term) === 'object') {
             var key = "";
-            for(p in term) {
+            for(var p in term) {
                 key = key + p + term[p];
             }
 
@@ -315,7 +315,7 @@ var size = function(xs) {
     }
 };
 
-clone = function(value) {
+var clone = function(value) {
     return JSON.parse(JSON.stringify(value));
 };
 

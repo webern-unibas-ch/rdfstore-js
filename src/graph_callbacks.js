@@ -6,7 +6,7 @@ var Pattern = require('./quad_index').Pattern;
 var RDFModel = require('./rdf_model');
 var AbstractQueryTree = require('./abstract_query_tree').AbstractQueryTree;
 
-Callbacks = {};
+var Callbacks = {};
 
 Callbacks.ANYTHING = {
     'token': 'var',

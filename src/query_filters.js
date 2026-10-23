@@ -2,7 +2,7 @@ var Utils = require('./utils');
 var     _ = Utils;
 var async = require('./utils');
 
-QueryFilters = {};
+var QueryFilters = {};
 
 var xmlSchema = "http://www.w3.org/2001/XMLSchema#";
 

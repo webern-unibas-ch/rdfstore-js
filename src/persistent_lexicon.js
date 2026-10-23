@@ -8,7 +8,7 @@ var InMemoryLexicon = require('./lexicon').Lexicon;
  */
 
 
-PersistentLexicon = function(callback, dbName){
+var PersistentLexicon = function(callback, dbName){
     var that = this;
 
     utils.registerIndexedDB(that);
@@ -199,7 +199,7 @@ PersistentLexicon.prototype.resolveUriCost = function(uri, callback) {
  * @returns {string}
  */
 PersistentLexicon.prototype.registerBlank = function(callback) {
-    var oidStr = guid();
+    var oidStr = utils.guid();
     var that = this;
 
     var objectStore = that.db.transaction(["components"],"readwrite").objectStore("components");

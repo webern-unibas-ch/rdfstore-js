@@ -25,7 +25,7 @@ SparqlParserError.constructor = SparqlParserError;
  * Based on <http://www.w3.org/2001/sw/DataAccess/rq23/rq24-algebra.html>
  * W3C's note
  */
-AbstractQueryTree = function() {
+var AbstractQueryTree = function() {
 };
 
 AbstractQueryTree.prototype.parseQueryString = function(query_string) {

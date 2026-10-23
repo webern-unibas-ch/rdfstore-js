@@ -6,7 +6,7 @@ var Tree = require('./btree').Tree;
  */
 
 
-Lexicon = function(callback){
+var Lexicon = function(callback){
     var that = this;
     this.defaultGraphOid = 0;
     this.defaultGraphUri = "https://github.com/antoniogarrote/rdfstore-js#default_graph";
