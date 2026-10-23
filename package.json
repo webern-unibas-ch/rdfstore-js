@@ -52,9 +52,11 @@
   "type": "commonjs",
   "exports": {
     ".": {
-      "require": "./src/store.js",
-      "import": "./dist/rdfstore_min.js"
-    }
+      "browser": "./dist/rdfstore.mjs",
+      "default": "./src/store.js"
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
   },
   "dependencies": {
     "jsonld": "^9.0.0",

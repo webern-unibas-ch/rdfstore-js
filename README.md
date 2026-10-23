@@ -145,11 +145,35 @@ $ corepack enable
 $ yarn install
 ```
 
-The browser version (`dist/rdfstore.js` and `dist/rdfstore_min.js`) can be built using the `build` script:
+The browser versions can be built using the `build` script:
 
 ```bash
 $ yarn run build
 ```
+
+It writes a script-tag bundle (`dist/rdfstore.js`, `dist/rdfstore_min.js`) and an ES module bundle (`dist/rdfstore.mjs`, `dist/rdfstore_min.mjs`).
+
+## Module formats
+
+Which file you get depends on how the package is loaded:
+
+| Environment | Entry | API |
+|---|---|---|
+| Node.js, `require('rdfstore')` or `import('rdfstore')` | `src/store.js` | `create`, `connect`, `Store` (named exports with `import`) |
+| Bundlers targeting the browser (esbuild, Vite, webpack, Rollup), via the `browser` export condition | `dist/rdfstore.mjs` | named exports `create`, `connect`, `Store`, plus a default export |
+| `<script src="dist/rdfstore_min.js">` | `dist/rdfstore.js`, `dist/rdfstore_min.js` | global `rdfstore` |
+| `<script type="module">` | `dist/rdfstore_min.mjs` | as the ES module bundle |
+
+```javascript
+// ES modules, e.g. as a lazily loaded chunk in a browser app
+const { create } = await import('rdfstore');
+
+create(function(err, store) {
+  // the new store is ready
+});
+```
+
+The browser bundles replace Node's `http`, `https`, `url`, `fs` and `path` modules with empty stubs. Loading data from a remote URL or a local file therefore only works through the Node.js entry. In the browser, load data from strings.
 
 ## Tests
 

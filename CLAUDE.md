@@ -14,7 +14,7 @@ yarn unit                    # regenerate parser, then run all Jasmine specs
 yarn specs                   # run Jasmine specs only (skips parser regeneration)
 yarn e2e                     # all e2e scripts in e2e/ (basic, comprehensive, readme, esm)
 yarn test                    # parse-grammar + specs + e2e
-yarn build                   # parse-grammar + esbuild bundle -> dist/rdfstore.js + dist/rdfstore_min.js
+yarn build                   # parse-grammar + esbuild bundles -> dist/rdfstore{,_min}.js (IIFE) + dist/rdfstore{,_min}.mjs (ESM)
 yarn parse-grammar           # regenerate src/parser.js from grammar/sparql_query.grammar
 yarn lint                    # ESLint (no-undef only) over src/, without parser.js and perftest/
 ```
@@ -33,7 +33,8 @@ CI ([.github/workflows/main.yml](.github/workflows/main.yml)) runs `yarn lint`, 
 ## Generated / committed artifacts
 
 - [src/parser.js](src/parser.js) (~16k lines) is **generated** by [Peggy](https://peggyjs.org/) from [grammar/sparql_query.grammar](grammar/sparql_query.grammar) via [grammar/parse_grammar.js](grammar/parse_grammar.js). Never edit it by hand: change the grammar and run `yarn parse-grammar`. It is committed. `yarn unit`, `yarn test` and `yarn build` regenerate it on every run.
-- `dist/rdfstore.js` and `dist/rdfstore_min.js` are build outputs and are also committed, but **only rebuilt when cutting a release**. If you run `yarn build` to verify a change, discard the output with `git checkout -- dist`. The package `exports` map points `require` to `src/store.js` and `import` to `dist/rdfstore_min.js`, so ESM consumers (and `e2e:esm`) only see changes after a rebuild.
+- `dist/rdfstore.js`, `dist/rdfstore_min.js` (IIFE, global `rdfstore`) and `dist/rdfstore.mjs`, `dist/rdfstore_min.mjs` (ES module, from [src/index.mjs](src/index.mjs)) are build outputs and are also committed, but **only rebuilt when cutting a release**. If you run `yarn build` to verify a change, discard the output with `git checkout -- dist`, and delete any `dist/*.mjs` that `git status` lists as untracked (`git checkout` does not remove them). Leftovers can make e2e pass for the wrong reason.
+- The package `exports` map sends the `browser` condition (browser bundlers) to `dist/rdfstore.mjs` and everything else, so Node's `require` and `import`, to `src/store.js`. Node's ESM gets the named exports from the CommonJS source via its export detection. Browser consumers only see `src/` changes after a rebuild. `./dist/*` is exported for script-tag and CDN paths.
 - [esbuild.config.mjs](esbuild.config.mjs) bundles `src/store.js` as an IIFE with global `rdfstore`. It aliases Node built-ins (`http`, `https`, `url`, `fs`, `path`) to [stubs/empty.js](stubs/empty.js).
 
 ## Architecture
