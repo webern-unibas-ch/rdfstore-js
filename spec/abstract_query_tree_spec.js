@@ -308,3 +308,15 @@ describe("Parser", function() {
         }).not.toThrow();
     });
 });
+
+describe("SparqlParserError", function() {
+    var SparqlParserError = require("../src/abstract_query_tree").SparqlParserError;
+
+    it("Should be possible to create a SparqlParserError", function() {
+        var error = new SparqlParserError("Error parsing graph pattern");
+        expect(error instanceof Error).toBe(true);
+        expect(error.name).toBe("SparqlParserError");
+        expect(error.message).toBe("Error parsing graph pattern");
+        expect(new SparqlParserError().message).toBe("Error parsing SPARQL query");
+    });
+});

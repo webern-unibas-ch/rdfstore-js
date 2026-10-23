@@ -192,7 +192,7 @@ Lexicon.prototype.resolveBlank = function(label,callback) {
         } else {
             // ??
             var oid = that.oidCounter;
-            this.oidCounter++;
+            that.oidCounter++;
             callback(""+oid);
             //
         }

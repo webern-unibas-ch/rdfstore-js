@@ -188,7 +188,7 @@ Tree.prototype.__walk = function(tree,node,f,callback) {
  * tree in key order.
  */
 Tree.prototype.walkNodes = function(f) {
-    this.__walkNodes(this,root,f,function(){});
+    this.__walkNodes(this,this.root,f,function(){});
 };
 Tree.prototype.__walkNodes = function(tree,node,f,callback) {
     if(node.isLeaf) {

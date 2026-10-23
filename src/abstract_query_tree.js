@@ -12,7 +12,7 @@ NonSupportedSparqlFeatureError.prototype = new Error();
 NonSupportedSparqlFeatureError.constructor = NonSupportedSparqlFeatureError;
 
 function SparqlParserError(message) {
-    this.name = ParserError;
+    this.name = "SparqlParserError";
     this.message = message || "Error parsing SPARQL query";
 }
 SparqlParserError.prototype = new Error();

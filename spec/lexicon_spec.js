@@ -95,4 +95,15 @@ describe("Lexicon", function(){
         });
     })
 
+    it("Should assign distinct OIDs to unknown blank node labels", function(done){
+        new Lexicon(function(lexicon){
+            lexicon.resolveBlank("unknown1", function(oid1){
+                lexicon.resolveBlank("unknown2", function(oid2){
+                    expect(oid1).not.toBe(oid2);
+                    done();
+                });
+            });
+        });
+    });
+
 });

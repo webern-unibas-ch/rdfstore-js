@@ -179,7 +179,7 @@ PersistentLexicon.prototype.resolveUriCost = function(uri, callback) {
     if(uri === this.defaultGraphUri) {
         callback(0);
     } else {
-        var objectStore = that.db.transaction(["components"]).objectStore("components");
+        var objectStore = this.db.transaction(["components"]).objectStore("components");
         var request = objectStore.index("value").get("_u:"+uri);
         request.onsuccess = function(event) {
             if(event.target.result != null)
@@ -301,7 +301,7 @@ PersistentLexicon.prototype.registerLiteral = function(literal, callback) {
  * @param callback
  */
 PersistentLexicon.prototype.resolveLiteral = function (literal,callback) {
-    var objectStore = that.db.transaction(["components"]).objectStore("components");
+    var objectStore = this.db.transaction(["components"]).objectStore("components");
     var request = objectStore.index("value").get("_l:"+literal);
     request.onsuccess = function(event) {
         if(event.target.result != null) {
@@ -320,7 +320,7 @@ PersistentLexicon.prototype.resolveLiteral = function (literal,callback) {
  * @param callback
  */
 PersistentLexicon.prototype.resolveLiteralCost = function (literal,callback) {
-    var objectStore = that.db.transaction(["components"]).objectStore("components");
+    var objectStore = this.db.transaction(["components"]).objectStore("components");
     var request = objectStore.index("components").get(literal);
     request.onsuccess = function(event) {
         if(event.target.result != null)
