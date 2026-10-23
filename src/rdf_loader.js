@@ -1,3 +1,6 @@
+"use strict";
+
+/* global RDFXMLParser */ // optional, defined by a separately loaded RDF/XML parser
 var NetworkTransport = require("./network_transport").NetworkTransport;
 var RVN3Parser = require("./rvn3_parser").RVN3Parser;
 var JSONLDParser = require("./jsonld_parser").JSONLDParser;

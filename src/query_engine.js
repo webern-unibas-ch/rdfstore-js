@@ -1,3 +1,5 @@
+"use strict";
+
 //imports
 var AbstractQueryTree = require("./abstract_query_tree").AbstractQueryTree;
 var NonSupportedSparqlFeatureError = require("./abstract_query_tree").NonSupportedSparqlFeatureError;

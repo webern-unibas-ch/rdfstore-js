@@ -1,3 +1,4 @@
+"use strict";
 
 // imports
 var QuadIndex = require("./quad_index").QuadIndex;

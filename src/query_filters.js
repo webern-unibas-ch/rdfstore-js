@@ -1,3 +1,5 @@
+"use strict";
+
 var Utils = require('./utils');
 var     _ = Utils;
 var async = require('./utils');

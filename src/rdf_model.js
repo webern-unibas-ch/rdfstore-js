@@ -1,3 +1,5 @@
+"use strict";
+
 // imports
 var _ = require("./utils");
 var QueryFilters = require("./query_filters").QueryFilters;

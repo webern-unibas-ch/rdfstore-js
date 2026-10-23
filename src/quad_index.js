@@ -1,3 +1,5 @@
+"use strict";
+
 var BaseTree = require("./btree").Tree;
 var _ = require('./utils');
 var async = require('./utils');

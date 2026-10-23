@@ -52,6 +52,10 @@ jobs:
         run: |
           yarn install  --immutable
 
+      - name: Lint
+        run: |
+          yarn lint
+
       - name: Run unit tests
         run: |
           yarn unit

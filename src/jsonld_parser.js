@@ -1,3 +1,5 @@
+"use strict";
+
 var jsonld = require('jsonld');
 
 var toTriples = async function (input, graph, cb) {

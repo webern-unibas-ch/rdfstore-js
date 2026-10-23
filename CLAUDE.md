@@ -16,6 +16,7 @@ yarn e2e                     # all e2e scripts in e2e/ (basic, comprehensive, re
 yarn test                    # parse-grammar + specs + e2e
 yarn build                   # parse-grammar + esbuild bundle -> dist/rdfstore.js + dist/rdfstore_min.js
 yarn parse-grammar           # regenerate src/parser.js from grammar/sparql_query.grammar
+yarn lint                    # ESLint (no-undef only) over src/, without parser.js and perftest/
 ```
 
 Run a single spec file, or filter by spec name:
@@ -27,7 +28,7 @@ yarn jasmine spec/query_engine_spec.js --filter="some describe/it text"
 
 A single e2e script: `yarn e2e:basic`, `yarn e2e:comprehensive`, `yarn e2e:readme`, `yarn e2e:esm`. `e2e:esm` imports `dist/rdfstore_min.js`, so run `yarn build` first if `src/` changed.
 
-CI ([.github/workflows/main.yml](.github/workflows/main.yml)) runs `yarn unit`, `yarn e2e`, then `yarn build` on Node 22.22, 24.16 and 26.x. There is no linter configured.
+CI ([.github/workflows/main.yml](.github/workflows/main.yml)) runs `yarn lint`, `yarn unit`, `yarn e2e`, then `yarn build` on Node 22.22, 24.16 and 26.x.
 
 ## Generated / committed artifacts
 
@@ -38,6 +39,8 @@ CI ([.github/workflows/main.yml](.github/workflows/main.yml)) runs `yarn unit`, 
 ## Architecture
 
 Everything is callback-based (`callback(err, result)`) and asynchronous. There are no Promises in the core.
+
+**Every `src/` module is strict mode** (`"use strict";` at the top), so the CommonJS entry behaves like the ES module bundle. Declare every name with `var`: an implicit global throws in strict mode. [eslint.config.mjs](eslint.config.mjs) enables only `no-undef` to catch this statically, including on paths the specs never run. It cannot see `this` inside plain callbacks, which is `undefined` in strict mode: capture `var that = this;` in the method instead.
 
 **Layering** (from the public API down to storage):
 

@@ -43,6 +43,7 @@
     "specs": "jasmine ./spec/*.js",
     "\n---MAIN---": "",
     "build": "yarn parse-grammar && yarn build:browser",
+    "lint": "eslint src",
     "e2e": "yarn e2e:basic && yarn e2e:comprehensive && yarn e2e:readme && yarn e2e:esm",
     "unit": "yarn parse-grammar && yarn specs",
     "test": "yarn parse-grammar && yarn specs && yarn e2e"
@@ -62,6 +63,8 @@
   "devDependencies": {
     "async": "^3.2.6",
     "esbuild": "^0.28.0",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
     "jasmine": "^7.0.0",
     "jasmine-reporters": "^2.5.2",
     "lodash": "^4.18.1",

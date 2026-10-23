@@ -1,3 +1,5 @@
+"use strict";
+
 var N3Parser = require('n3').Parser;
 //var N3Parser = require('../node_modules/n3/lib/N3Parser');
 

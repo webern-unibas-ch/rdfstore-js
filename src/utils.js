@@ -1,3 +1,5 @@
+"use strict";
+
 var slowNextTick = (function () {
 
     if(typeof(process) !== 'undefined' && process.nextTick) {

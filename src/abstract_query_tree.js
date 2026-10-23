@@ -1,3 +1,5 @@
+"use strict";
+
 // imports
 var SparqlParser = require("./parser");
 var Utils = require("./utils");

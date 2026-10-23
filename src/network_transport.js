@@ -1,3 +1,5 @@
+"use strict";
+
 var utils = require("./utils");
 if(!utils.isWorker()) {
     var http = require("http");
