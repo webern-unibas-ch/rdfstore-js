@@ -232,7 +232,15 @@ QueryFilters.runDistinct = function(projectedBindings, projectionVariables) {
 // @todo add more aggregation functions here
 QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, dataset, env) {
     if(bindingsGroup == null || bindingsGroup.length === 0) {
-        return QueryFilters.ebvError();
+        // an aggregate without GROUP BY over no solutions: SPARQL 1.1 defines 0 for COUNT, SUM, AVG and "" for GROUP_CONCAT
+        var aggregateType = aggregator.expression != null ? aggregator.expression.aggregateType : null;
+        if(aggregateType === 'count' || aggregateType === 'sum' || aggregateType === 'avg') {
+            return {token: 'literal', type:xmlSchema+"integer", value:'0'};
+        } else if(aggregateType === 'group_concat') {
+            return {token: 'literal', type:null, value:''};
+        }
+        // MIN, MAX and anything else stay unbound, like an unmatched OPTIONAL variable
+        return null;
     } else if(aggregator.token === 'variable' && aggregator.kind == 'var') {
         return bindingsGroup[0][aggregator.value.value];
     } else if(aggregator.token === 'variable' && aggregator.kind === 'aliased') {
@@ -373,8 +381,7 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
             } else if(aggregator.expression.aggregateType === 'group_concat') {
                 var distinct = {};
                 var values = [];
-                // the grammar keeps the raw optional match: [';', WS, 'SEPARATOR', WS, '=', WS, String, WS]
-                var separator = aggregator.expression.separator != null ? aggregator.expression.separator[6].value : " ";
+                var separator = aggregator.expression.separator != null ? aggregator.expression.separator : " ";
                 for(var i=0; i< bindingsGroup.length; i++) {
                     var bindings = bindingsGroup[i];
                     var ebv = QueryFilters.runFilter(aggregator.expression.expression, bindings, queryEngine, dataset, env);

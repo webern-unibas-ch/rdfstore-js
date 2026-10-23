@@ -411,7 +411,7 @@ GroupCondition "[19] GroupCondition"
     return f;
 }
 / WS* '(' WS* e:Expression WS*  alias:( ('AS'/'as') WS* Var )?  WS* ')' WS* {
-    if(alias.length != 0) {
+    if(alias != null && alias.length != 0) {
     return {token: 'aliased_expression',
 	expression: e,
 	alias: alias[2] };
@@ -2545,7 +2545,7 @@ exp.expression = e;
 return exp;
 
 }
-/ ('GROUP_CONCAT'/'group_concat') WS* '(' WS* d:('DISTINCT'/'distinct')? WS* e:Expression s:(';' WS* 'SEPARATOR' WS* '=' WS* String WS*)? ')' WS*  {
+/ ('GROUP_CONCAT'/'group_concat') WS* '(' WS* d:('DISTINCT'/'distinct')? WS* e:Expression s:(';' WS* 'separator'i WS* '=' WS* sep:String WS* { return sep.value; })? ')' WS*  {
     var exp = {};
     exp.token = 'expression';
     exp.expressionType = 'aggregate';

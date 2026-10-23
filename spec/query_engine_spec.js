@@ -1573,6 +1573,224 @@ describe("QueryEngine", function(){
         });
     });
 
+    it("Test GroupByFunctionCallFirstSolutionError", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                // LANG() of an IRI is an error. With this data an IRI solution comes first,
+                // and it must not drop the clause from the group key
+                var query = 'PREFIX : <http://example/>\
+                            INSERT DATA {\
+                            :a :p <http://example/iri1> .\
+                            :e :p <http://example/iri2> .\
+                            :b :p "x"@en .\
+                            :c :p "y"@fr .\
+                            :d :p "z"@fr }';
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) {  ?s :p ?v . } GROUP BY LANG(?v)', function(err, results){
+                        expect(err).toBeNull();
+                        expect(results.length).toBe(2);
+                        var counts = [results[0].count.value, results[1].count.value].sort();
+                        expect(counts).toEqual(['1', '2']);
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test GroupByKeysDoNotCollide", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var query = 'PREFIX : <http://example/>\
+                            INSERT DATA {\
+                            :e :q "a" .\
+                            :e :r "bc" .\
+                            :f :q "ab" .\
+                            :f :r "c" }';
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) {  ?s :q ?a . ?s :r ?b . } GROUP BY STR(?a) STR(?b)', function(err, results){
+                        expect(err).toBeNull();
+                        expect(results.length).toBe(2);
+                        expect(results[0].count.value).toBe('1');
+                        expect(results[1].count.value).toBe('1');
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test GroupByAliasedExpression", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var query = "PREFIX : <http://example/>\
+                            INSERT DATA {\
+                            :s1 :p 1 .\
+                            :s2 :p 2 .\
+                            :s3 :p 2 }";
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT ?key (COUNT(?s) AS ?count) {  ?s :p ?v . } GROUP BY (STR(?v) AS ?key)', function(err, results){
+                        expect(err).toBeNull();
+                        expect(results.length).toBe(2);
+                        var counts = {};
+                        for(var i=0; i<results.length; i++) {
+                            counts[results[i].key.value] = results[i].count.value;
+                        }
+                        expect(counts).toEqual({'1': '1', '2': '2'});
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test AggregatesWithoutGroupBy", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var query = "PREFIX : <http://example/>\
+                            INSERT DATA {\
+                            :s1 :p 1 .\
+                            :s2 :p 2 .\
+                            :s3 :p 3 }";
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) (SUM(?v) AS ?sum) (GROUP_CONCAT(?v) AS ?all) {  ?s :p ?v . }', function(err, results){
+                        expect(err).toBeNull();
+                        expect(results.length).toBe(1);
+                        expect(results[0].count.value).toBe('3');
+                        expect(results[0].sum.value).toBe('6');
+                        expect(results[0].all.value.split(' ').sort()).toEqual(['1', '2', '3']);
+
+                        // over no solutions, as defined by SPARQL 1.1
+                        engine.execute('PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) (SUM(?v) AS ?sum) (AVG(?v) AS ?avg) (GROUP_CONCAT(?v) AS ?all) (MAX(?v) AS ?max) {  ?s :none ?v . }', function(err, results){
+                            expect(err).toBeNull();
+                            expect(results.length).toBe(1);
+                            expect(results[0].count.value).toBe('0');
+                            expect(results[0].sum.value).toBe('0');
+                            expect(results[0].avg.value).toBe('0');
+                            expect(results[0].all.value).toBe('');
+                            expect(results[0].max).toBeNull();
+                            done();
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test GroupByBracketedExpressionWithoutAlias", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var query = "PREFIX : <http://example/>\
+                            INSERT DATA {\
+                            :s1 :p 1 .\
+                            :s2 :p 2 .\
+                            :s3 :p 2 }";
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) {  ?s :p ?v . } GROUP BY (STR(?v))', function(err, results){
+                        expect(err).toBeNull();
+                        expect(results.length).toBe(2);
+                        var counts = [results[0].count.value, results[1].count.value].sort();
+                        expect(counts).toEqual(['1', '2']);
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test AggregateWithUngroupedVariable", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var query = "PREFIX : <http://example/>\
+                            INSERT DATA {\
+                            :s1 :p 1 .\
+                            :s2 :p 2 }";
+
+                engine.execute(query, function(err, result){
+                    // ?s is neither grouped nor aggregated, so the query is invalid
+                    engine.execute('PREFIX : <http://example/> SELECT ?s (COUNT(?v) AS ?count) {  ?s :p ?v . }', function(err, results){
+                        expect(err).not.toBeNull();
+                        expect(err.message).toBe('Incompatible Group and Projection variables');
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test GroupByWithSolutionModifiers", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var query = "PREFIX : <http://example/>\
+                            INSERT DATA {\
+                            :s1 :p 1 .\
+                            :s2 :p 2 .\
+                            :s3 :p 3 }";
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT ?s (COUNT(?v) AS ?count) {  ?s :p ?v . } GROUP BY ?s LIMIT 1', function(err, results){
+                        expect(err).toBeNull();
+                        expect(results.length).toBe(1);
+                        engine.execute('PREFIX : <http://example/> SELECT ?s (COUNT(?v) AS ?count) {  ?s :p ?v . } GROUP BY ?s OFFSET 1', function(err, results){
+                            expect(err).toBeNull();
+                            expect(results.length).toBe(2);
+                            engine.execute('PREFIX : <http://example/> SELECT DISTINCT (COUNT(?v) AS ?count) {  ?s :p ?v . } GROUP BY ?s', function(err, results){
+                                expect(err).toBeNull();
+                                expect(results.length).toBe(1);
+                                expect(results[0].count.value).toBe('1');
+                                engine.execute('PREFIX : <http://example/> SELECT (COUNT(?v) AS ?count) {  ?s :p ?v . } LIMIT 0', function(err, results){
+                                    expect(err).toBeNull();
+                                    expect(results.length).toBe(0);
+                                    done();
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test AggregateInsideExpression", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var query = "PREFIX : <http://example/>\
+                            INSERT DATA {\
+                            :s1 :p 1 .\
+                            :s2 :p 2 }";
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT (COUNT(?s)*2 AS ?double) {  ?s :p ?v . }', function(err, results){
+                        expect(err).not.toBeNull();
+                        expect(err.name).toBe('NonSupportedSparqlFeatureError');
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
     it("Test GroupConcat1", function(done) {
         new Lexicon(function(lexicon){
             new QuadBackend({treeOrder: 2}, function(backend){
@@ -1618,7 +1836,12 @@ describe("QueryEngine", function(){
                         expect(err).toBeNull();
                         expect(results.length).toBe(1);
                         expect(results[0].concat.value.split('|').sort()).toEqual(['1', '22', '333']);
-                        done();
+                        // keywords are case-insensitive
+                        engine.execute('PREFIX : <http://example/> SELECT (group_concat(?o ; Separator=",") AS ?concat) {  ?s :p ?o . } GROUP BY ?s', function(err, results){
+                            expect(err).toBeNull();
+                            expect(results[0].concat.value.split(',').sort()).toEqual(['1', '22', '333']);
+                            done();
+                        });
                     });
                 });
             });

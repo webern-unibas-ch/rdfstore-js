@@ -291,6 +291,22 @@ QueryEngine.prototype.removeDefaultGraphBindings = function(bindingsList, datase
 };
 
 
+// true if an aggregate (COUNT, SUM, ...) occurs anywhere in the expression tree
+QueryEngine.containsAggregate = function(expression) {
+    if(expression == null || typeof(expression) !== 'object') {
+        return false;
+    }
+    if(expression.expressionType === 'aggregate') {
+        return true;
+    }
+    for(var key in expression) {
+        if(QueryEngine.containsAggregate(expression[key])) {
+            return true;
+        }
+    }
+    return false;
+};
+
 QueryEngine.prototype.aggregateBindings = function(projection, bindingsGroup, dataset, env, callback) {
     var that = this;
     this.copyDenormalizedBindings(bindingsGroup, env.outCache, function(denormBindings){
@@ -741,6 +757,17 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
         var order      = unit.order;
         var that = this;
 
+        // an aggregate is only evaluated as a whole projection expression, e.g. (COUNT(?s) AS ?c), not inside one
+        if(projection != null && projection !== '*') {
+            for(var p = 0; p < projection.length; p++) {
+                var expression = projection[p].expression;
+                if(expression != null && expression.expressionType !== 'aggregate' && QueryEngine.containsAggregate(expression)) {
+                    return callback(new NonSupportedSparqlFeatureError("aggregate in expression",
+                        "Aggregates inside expressions are not supported" + (projection[p].alias ? ": ?" + projection[p].alias.value : "")));
+                }
+            }
+        }
+
         if(defaultDataset != null || namedDataset != null) {
             dataset.implicit = defaultDataset || [];
             dataset.named   = namedDataset || [];
@@ -756,8 +783,8 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
             try {
                 that.executeSelectUnit(projection, dataset, unit.pattern, env, function (result) {
                     if (result != null) {
-                        // detect single group
-                        if (unit.group != null && unit.group === "") {
+                        // detect single group: aggregates without GROUP BY (no group clause leaves `group` unset)
+                        if (unit.group == null || unit.group === "") {
                             var foundUniqueGroup = false;
                             for (var i = 0; i < unit.projection.length; i++) {
                                 if (unit.projection[i].expression != null && unit.projection[i].expression.expressionType === 'aggregate') {
@@ -779,7 +806,10 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
                                             k();
                                         });
                                     }, function(){
-                                        callback(null, {'bindings': aggregatedBindings, 'denorm': true});
+                                        // DISTINCT, OFFSET and LIMIT; ORDER BY on aggregated values is not supported yet
+                                        var modifiedBindings = that.applyModifier(modifier, aggregatedBindings);
+                                        var limitedBindings = that.applyLimitOffset(offset, limit, modifiedBindings);
+                                        callback(null, {'bindings': limitedBindings, 'denorm': true});
                                     });
                                 });
                             } else {
@@ -845,31 +875,32 @@ QueryEngine.prototype.groupSolution = function(bindings, group, dataset, queryEn
 
                     if(currentOrderClause.expression.primaryexpression === 'var') {
                         currentBindings[currentOrderClause.alias.value] = currentBindings[currentOrderClause.expression.value.value];
+                        kk();
                     } else {
-                        var denormBindings = that.copyDenormalizedBindings([currentBindings], queryEnv.outCache);
-                        var filterResultEbv = QueryFilters.runFilter(currentOrderClause.expression, denormBindings[0], that, dataset, queryEnv);
-                        if(!QueryFilters.isEbvError(filterResultEbv)) {
-                            if(filterResultEbv.value != null) {
-                                filterResultEbv.value = ""+filterResultEbv.value;
+                        that.copyDenormalizedBindings([currentBindings], queryEnv.outCache, function(denormBindings){
+                            var filterResultEbv = QueryFilters.runFilter(currentOrderClause.expression, denormBindings[0], that, dataset, queryEnv);
+                            if(!QueryFilters.isEbvError(filterResultEbv)) {
+                                if(filterResultEbv.value != null) {
+                                    filterResultEbv.value = ""+filterResultEbv.value;
+                                }
+                                currentBindings[currentOrderClause.alias.value]= filterResultEbv;
+                            } else {
+                                mustAddBindings = false;
                             }
-                            currentBindings[currentOrderClause.alias.value]= filterResultEbv;
-                        } else {
-                            mustAddBindings = false;
-                        }
+                            kk();
+                        });
                     }
-                    kk();
                 } else {
-                    // In this case, we create an additional variable in the binding to hold the group variable value
+                    // In this case, we create an additional variable in the binding to hold the group variable value:
+                    // one per group clause, registered even if the first solution fails to evaluate
+                    orderVariable = "groupCondition"+group.indexOf(currentOrderClause);
+                    if(initialized == false) {
+                        order.push(orderVariable);
+                    }
                     that.copyDenormalizedBindings([currentBindings], queryEnv.outCache, function(denormBindings){
                         var filterResultEbv = QueryFilters.runFilter(currentOrderClause, denormBindings[0], that, dataset, queryEnv);
                         if(!QueryFilters.isEbvError(filterResultEbv)) {
-                            // one variable per group clause, so equal values of the same clause end up in the same group
-                            orderVariable = "groupCondition"+group.indexOf(currentOrderClause);
                             currentBindings[orderVariable] = filterResultEbv;
-                            if(initialized == false) {
-                                order.push(orderVariable);
-                            }
-
                         } else {
                             mustAddBindings = false;
                         }
@@ -895,15 +926,20 @@ QueryEngine.prototype.groupSolution = function(bindings, group, dataset, queryEn
             var groupCounter = 0;
             for(var i=0; i<filteredBindings.length; i++) {
                 var currentTransformedBinding = filteredBindings[i];
-                var key = "";
+                // one entry per group clause, so ("a","bc") and ("ab","c") or 1 and "1" stay apart;
+                // a single OID keeps its plain key and with it the previous (numeric) group order
+                var keyParts = [];
                 for(var j=0; j<order.length; j++) {
                     var maybeObject = currentTransformedBinding[order[j]];
-                    if(typeof(maybeObject) === 'object') {
-                        key = key + maybeObject.value;
+                    if(maybeObject == null) {
+                        keyParts.push(null);
+                    } else if(typeof(maybeObject) === 'object') {
+                        keyParts.push([maybeObject.token, maybeObject.value, maybeObject.type || null, maybeObject.lang || null]);
                     } else {
-                        key = key + maybeObject;
+                        keyParts.push(maybeObject);
                     }
                 }
+                var key = (keyParts.length === 1 && typeof(keyParts[0]) !== 'object') ? String(keyParts[0]) : JSON.stringify(keyParts);
 
                 if(dups[key] == null) {
                     //currentTransformedBinding["__group__"] = groupCounter;
@@ -1846,7 +1882,8 @@ QueryEngine.prototype._executeClearGraph = function(destinyGraph, queryEnv, call
 
 QueryEngine.prototype.checkGroupSemantics = function(groupVars, projectionVars) {
     if(groupVars === 'singleGroup') {
-        return true;
+        // aggregates without GROUP BY: no variable may be projected without being aggregated
+        groupVars = [];
     }
 
     var projection = {};

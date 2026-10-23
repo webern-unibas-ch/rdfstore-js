@@ -4,6 +4,7 @@ import { dirname, resolve } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const emptyStub = resolve(__dirname, 'stubs/empty.js');
 
 // src/rvn3_parser.js only needs N3.Parser, but a CommonJS `require('n3')` keeps all of n3
 // (writer, store, streams) in the bundle. Routing it through a module that re-exports just
@@ -31,12 +32,13 @@ const common = {
   plugins: [n3ParserOnly],
   platform: 'browser',
   target: 'es2022',
+  // Node built-ins are not available in the browser
   alias: {
-    'http': resolve(__dirname, 'stubs/empty.js'),
-    'https': resolve(__dirname, 'stubs/empty.js'),
-    'url': resolve(__dirname, 'stubs/empty.js'),
-    'fs': resolve(__dirname, 'stubs/empty.js'),
-    'path': resolve(__dirname, 'stubs/empty.js')
+    'http': emptyStub,
+    'https': emptyStub,
+    'url': emptyStub,
+    'fs': emptyStub,
+    'path': emptyStub
   }
 };
 
