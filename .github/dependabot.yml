@@ -1,28 +1,47 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
-
 version: 2
 updates:
     # Maintain dependencies for GitHub Actions
     - package-ecosystem: 'github-actions'
       directory: '/'
       schedule:
-          interval: 'daily'
+          interval: 'weekly'
+      cooldown:
+          default-days: 3
       target-branch: 'develop'
       labels:
           - 'gh actions dependencies'
       groups:
+          # the codeql sub-actions only work in matching versions, so always update them together
           github/codeql-action:
               patterns:
                   - 'github/codeql-action/*'
-    
+          # minor and patch updates of all other actions in one PR, major updates separately
+          # (scorecards.yml does not run on pull requests, so its actions are only exercised after the merge)
+          github-actions:
+              patterns:
+                  - '*'
+              update-types:
+                  - 'minor'
+                  - 'patch'
+
     # Maintain dependencies for npm/yarn
     - package-ecosystem: 'npm'
       directory: '/'
       schedule:
-          interval: 'daily'
+          interval: 'weekly'
+      cooldown:
+          default-days: 3
+      target-branch: 'develop'
       open-pull-requests-limit: 15
       labels:
           - 'npm dependencies'
+      groups:
+          # production dependencies (jsonld, n3) and all major updates stay individual PRs;
+          # minor and patch updates of the development tooling come in one PR
+          development-dependencies:
+              dependency-type: 'development'
+              patterns:
+                  - '*'
+              update-types:
+                  - 'minor'
+                  - 'patch'
