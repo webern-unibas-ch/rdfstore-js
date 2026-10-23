@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Fork of Antonio Garrote's `rdfstore-js` (maintained by musicEnfanthen): an RDF graph store in plain CommonJS JavaScript that supports SPARQL 1.0 and most of SPARQL 1.1 Update. It runs in Node (`^22.22.3 || >= 24.15.0`) and in the browser (esbuild bundle). The package manager is Yarn 4 via corepack (`packageManager: yarn@4.16.0`).
+Fork of Antonio Garrote's `rdfstore-js` (maintained by musicEnfanthen): an RDF graph store in plain CommonJS JavaScript that supports SPARQL 1.0 and most of SPARQL 1.1 Update. It runs in Node (`^22.23.4 || >= 24.22.1`) and in the browser (esbuild bundle). The package manager is Yarn 4 via corepack (`packageManager: yarn@4.16.0`).
 
 ## Commands
 
@@ -28,7 +28,7 @@ yarn jasmine spec/query_engine_spec.js --filter="some describe/it text"
 
 A single e2e script: `yarn e2e:basic`, `yarn e2e:comprehensive`, `yarn e2e:readme`, `yarn e2e:esm`. `e2e:esm` imports the package as Node does (`src/store.js`), checks that the `browser` condition resolves to `dist/rdfstore.mjs`, and runs queries against that bundle. Run `yarn build` before `yarn e2e` or `yarn test`: otherwise the test fails (no bundle) or checks a stale one.
 
-CI ([.github/workflows/main.yml](.github/workflows/main.yml)) runs `yarn lint`, `yarn unit`, `yarn build`, then `yarn e2e` on Node 22.22, 24.16 and 26.x.
+CI ([.github/workflows/main.yml](.github/workflows/main.yml)) runs `yarn lint`, `yarn unit`, `yarn build`, then `yarn e2e` on Node 22.x, 24.x and 26.x, each with the newest patch release (`check-latest`).
 
 ## Generated / committed artifacts
 

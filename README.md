@@ -1,7 +1,7 @@
 # rdfstore-js 
 
 [![CI Workflow](https://github.com/musicEnfanthen/rdfstore-js/actions/workflows/main.yml/badge.svg)](https://github.com/musicEnfanthen/rdfstore-js/actions/workflows/main.yml)
-[![Node Version](https://img.shields.io/badge/node-%5E22.22.3%20%7C%7C%20%3E%3D24.15.0-brightgreen)](https://nodejs.org/)
+[![Node Version](https://img.shields.io/badge/node-%5E22.23.4%20%7C%7C%20%3E%3D24.22.1-brightgreen)](https://nodejs.org/)
 
 ## About this fork
 
