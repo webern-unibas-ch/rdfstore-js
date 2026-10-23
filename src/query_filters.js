@@ -368,9 +368,28 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
 
                 aggregated.value =''+aggregated.value;
                 return aggregated;
-            } else {
-                var ebv = QueryFilters.runFilter(aggregate.expression, bindingsGroup[0], dataset, {blanks:{}, outCache:{}});
-                return ebv;
+            } else if(aggregator.expression.aggregateType === 'group_concat') {
+                var distinct = {};
+                var values = [];
+                // the grammar keeps the raw optional match: [';', WS, 'SEPARATOR', WS, '=', WS, String, WS]
+                var separator = aggregator.expression.separator != null ? aggregator.expression.separator[6].value : " ";
+                for(var i=0; i< bindingsGroup.length; i++) {
+                    var bindings = bindingsGroup[i];
+                    var ebv = QueryFilters.runFilter(aggregator.expression.expression, bindings, queryEngine, dataset, env);
+                    if(!QueryFilters.isEbvError(ebv) && ebv.token === 'literal') {
+                        if(aggregator.expression.distinct != null && aggregator.expression.distinct != '') {
+                            var key = Utils.hashTerm(ebv);
+                            if(distinct[key] == null) {
+                                distinct[key] = true;
+                                values.push(ebv.value);
+                            }
+                        } else {
+                            values.push(ebv.value);
+                        }
+                    }
+                }
+
+                return {token: 'literal', type:null, value:values.join(separator)};
             }
         }
     }

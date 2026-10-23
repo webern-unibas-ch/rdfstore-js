@@ -1573,6 +1573,82 @@ describe("QueryEngine", function(){
         });
     });
 
+    it("Test GroupConcat1", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var query = 'PREFIX : <http://example/>\
+                            INSERT DATA {\
+                            :s1 :p "1" .\
+                            :s1 :p "22" .\
+                            :s2 :p "3" }';
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT ?s (GROUP_CONCAT(?o) AS ?concat) {  ?s :p ?o . } GROUP BY ?s', function(err, results){
+                        expect(err).toBeNull();
+                        expect(results.length).toBe(2);
+                        var concats = {};
+                        for(var i=0; i<results.length; i++) {
+                            concats[results[i].s.value] = results[i].concat;
+                        }
+                        expect(concats['http://example/s1'].value.split(' ').sort()).toEqual(['1', '22']);
+                        expect(concats['http://example/s1'].type).toBeNull();
+                        expect(concats['http://example/s2'].value).toBe('3');
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test GroupConcat2", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var query = 'PREFIX : <http://example/>\
+                            INSERT DATA {\
+                            :s1 :p "1" .\
+                            :s1 :p "22" .\
+                            :s1 :p "333" }';
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT (GROUP_CONCAT(?o ; SEPARATOR="|") AS ?concat) {  ?s :p ?o . } GROUP BY ?s', function(err, results){
+                        expect(err).toBeNull();
+                        expect(results.length).toBe(1);
+                        expect(results[0].concat.value.split('|').sort()).toEqual(['1', '22', '333']);
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test GroupConcatDistinct", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var query = 'PREFIX : <http://example/>\
+                            INSERT DATA {\
+                            :s1 :p "a" .\
+                            :s1 :q "a" .\
+                            :s1 :p "b" }';
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT (GROUP_CONCAT(?o) AS ?all) (GROUP_CONCAT(DISTINCT ?o) AS ?distinct) {  ?s ?p ?o . } GROUP BY ?s', function(err, results){
+                        expect(err).toBeNull();
+                        expect(results.length).toBe(1);
+                        expect(results[0].all.value.split(' ').sort()).toEqual(['a', 'a', 'b']);
+                        expect(results[0].distinct.value.split(' ').sort()).toEqual(['a', 'b']);
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
     it("Test DisjointUnion", function(done) {
         new Lexicon(function(lexicon){
             new QuadBackend({treeOrder: 15}, function(backend){
