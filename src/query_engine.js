@@ -13,15 +13,6 @@ var Callbacks = require("./graph_callbacks").CallbacksBackend;
 var async = require('./utils');
 var _ = require('./utils');
 
-function BindExpressionError(message, bind, error) {
-    this.name = "BindExpressionError";
-    this.bind = bind;
-    this.error = error;
-    this.message = message;
-}
-BindExpressionError.prototype = new Error();
-BindExpressionError.constructor = BindExpressionError;
-
 var QueryEngine = function(params) {
     if(arguments.length != 0) {
         this.backend = params.backend;
@@ -1161,7 +1152,7 @@ QueryEngine.prototype.executeUNION = function(projection, dataset, patterns, env
             var result = QueryPlan.unionBindings(set1, set2);
             that.runBinds(patterns.binds, result, dataset, env, function(err, bindings){
                 if(err != null) {
-                    throw(new BindExpressionError("Error processing bind expressions", patterns.binds, err));
+                    callback(err);
                 } else {
                     QueryFilters.checkFilters(patterns, bindings, false, dataset, env, that, callback);
                 }
@@ -1176,7 +1167,7 @@ QueryEngine.prototype.executeAndBGP = function(projection, dataset, pattern, env
         if(result!=null) {
             that.runBinds(pattern.binds, result, dataset, env, function(err, bindings){
                 if(err != null) {
-                    throw(new BindExpressionError("Error processing bind expressions", pattern.binds, err));
+                    callback(err);
                 } else {
                     QueryFilters.checkFilters(pattern, bindings, false, dataset, env, that, callback);
                 }
@@ -1220,7 +1211,7 @@ QueryEngine.prototype.executeLEFT_JOIN = function(projection, dataset, patterns,
                     var result = QueryPlan.leftOuterJoinBindings(set1, set2);
                     that.runBinds(patterns.binds, result, dataset, env, function(err, bindings){
                         if(err != null) {
-                            throw(new BindExpressionError("Error processing bind expressions", patterns.binds, err));
+                            callback(err);
                         } else {
                             QueryFilters.checkFilters(patterns, result, true, dataset, env, that, function(err, bindings){
                                 if(err != null) {
@@ -1335,7 +1326,7 @@ QueryEngine.prototype.executeJOIN = function(projection, dataset, patterns, env,
                 }
                 that.runBinds(patterns.binds, result, dataset, env, function(err, bindings){
                     if(err != null) {
-                        throw(new BindExpressionError("Error processing bind expressions", patterns.binds, err));
+                        callback(err);
                     } else {
                         QueryFilters.checkFilters(patterns, bindings, false, dataset, env, that, callback);
                     }
@@ -1889,11 +1880,15 @@ QueryEngine.prototype.runBinds = function(binds, bindings, dataset, env, callbac
                 for(var j=0; j<binds.length; j++) {
                     var bind = binds[j];
                     var thisDenormBindings = denormBindings[i];
-                    var ebv = QueryFilters.runFilter(bind.expression, thisDenormBindings, that, dataset, env);
-                    if(QueryFilters.isEbvError(ebv)) {
-                        callback(ebv);
-                    } else {
-                        // we set the value for the new binding
+                    var ebv;
+                    try {
+                        ebv = QueryFilters.runFilter(bind.expression, thisDenormBindings, that, dataset, env);
+                    } catch(e) {
+                        // some builtins throw on unbound arguments instead of returning an error value
+                        ebv = QueryFilters.ebvError();
+                    }
+                    // SPARQL 1.1 Extend: if the expression raises an error, the variable stays unbound
+                    if(!QueryFilters.isEbvError(ebv)) {
                         originalBindings[i][bind.as.value] = ebv;
                     }
                 }
