@@ -788,59 +788,57 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
 
 
         that.normalizeDatasets(dataset.implicit.concat(dataset.named), env, function(){
-            try {
-                that.executeSelectUnit(projection, dataset, unit.pattern, env, function (result) {
-                    if (result != null) {
-                        // detect single group: aggregates without GROUP BY (no group clause leaves `group` unset)
-                        if (unit.group == null || unit.group === "") {
-                            var foundUniqueGroup = false;
-                            for (var i = 0; i < unit.projection.length; i++) {
-                                if (unit.projection[i].expression != null && unit.projection[i].expression.expressionType === 'aggregate') {
-                                    foundUniqueGroup = true;
-                                    break;
-                                }
-                            }
-                            if (foundUniqueGroup === true) {
-                                unit.group = 'singleGroup';
+            that.executeSelectUnit(projection, dataset, unit.pattern, env, function (err, result) {
+                if (err != null) {
+                    callback(err);
+                } else if (result != null) {
+                    // detect single group: aggregates without GROUP BY (no group clause leaves `group` unset)
+                    if (unit.group == null || unit.group === "") {
+                        var foundUniqueGroup = false;
+                        for (var i = 0; i < unit.projection.length; i++) {
+                            if (unit.projection[i].expression != null && unit.projection[i].expression.expressionType === 'aggregate') {
+                                foundUniqueGroup = true;
+                                break;
                             }
                         }
-                        if (unit.group && unit.group != "") {
-                            if (that.checkGroupSemantics(unit.group, projection)) {
-                                that.groupSolution(result, unit.group, dataset, env, function(groupedBindings){
-                                    var aggregatedBindings = [];
-                                    async.eachSeries(groupedBindings, function(groupedBindingsGroup, k){
-                                        that.aggregateBindings(projection, groupedBindingsGroup, dataset, env, function(resultingBindings){
-                                            aggregatedBindings.push(resultingBindings);
-                                            k();
-                                        });
-                                    }, function(){
-                                        // DISTINCT, OFFSET and LIMIT; ORDER BY on aggregated values is not supported yet
-                                        var modifiedBindings = that.applyModifier(modifier, aggregatedBindings);
-                                        var limitedBindings = that.applyLimitOffset(offset, limit, modifiedBindings);
-                                        callback(null, {'bindings': limitedBindings, 'denorm': true});
-                                    });
-                                });
-                            } else {
-                                callback(new Error("Incompatible Group and Projection variables"));
-                            }
-                        } else {
-                            that.applyOrderBy(order, result, dataset, env, function(orderedBindings){
-                                var projectedBindings = that.projectBindings(projection, orderedBindings, dataset);
-                                var modifiedBindings = that.applyModifier(modifier, projectedBindings);
-                                var limitedBindings = that.applyLimitOffset(offset, limit, modifiedBindings);
-                                var filteredBindings = that.removeDefaultGraphBindings(limitedBindings, dataset);
-
-                                callback(null, filteredBindings);
-                            });
+                        if (foundUniqueGroup === true) {
+                            unit.group = 'singleGroup';
                         }
-
-                    } else { // fail selectUnit
-                        callback(new Error("Error executing SELECT query."));
                     }
-                });
-            } catch(e) {
-                callback(e);
-            }
+                    if (unit.group && unit.group != "") {
+                        if (that.checkGroupSemantics(unit.group, projection)) {
+                            that.groupSolution(result, unit.group, dataset, env, function(groupedBindings){
+                                var aggregatedBindings = [];
+                                async.eachSeries(groupedBindings, function(groupedBindingsGroup, k){
+                                    that.aggregateBindings(projection, groupedBindingsGroup, dataset, env, function(resultingBindings){
+                                        aggregatedBindings.push(resultingBindings);
+                                        k();
+                                    });
+                                }, function(){
+                                    // DISTINCT, OFFSET and LIMIT; ORDER BY on aggregated values is not supported yet
+                                    var modifiedBindings = that.applyModifier(modifier, aggregatedBindings);
+                                    var limitedBindings = that.applyLimitOffset(offset, limit, modifiedBindings);
+                                    callback(null, {'bindings': limitedBindings, 'denorm': true});
+                                });
+                            });
+                        } else {
+                            callback(new Error("Incompatible Group and Projection variables"));
+                        }
+                    } else {
+                        that.applyOrderBy(order, result, dataset, env, function(orderedBindings){
+                            var projectedBindings = that.projectBindings(projection, orderedBindings, dataset);
+                            var modifiedBindings = that.applyModifier(modifier, projectedBindings);
+                            var limitedBindings = that.applyLimitOffset(offset, limit, modifiedBindings);
+                            var filteredBindings = that.removeDefaultGraphBindings(limitedBindings, dataset);
+
+                            callback(null, filteredBindings);
+                        });
+                    }
+
+                } else { // fail selectUnit
+                    callback(new Error("Error executing SELECT query."));
+                }
+            });
         });
     } else {
         callback(new Error("Cannot execute " + unit.kind + " query as a select query"));
@@ -988,20 +986,22 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
     } else if(pattern.kind === "FILTER") {
         // Some components may have the filter inside the unit
         var that = this;
-        this.executeSelectUnit(projection, dataset, pattern.value, env, function (results) {
-            if (results != null) {
+        this.executeSelectUnit(projection, dataset, pattern.value, env, function (err, results) {
+            if (err != null) {
+                callback(err);
+            } else if (results != null) {
                 QueryFilters.checkFilters(pattern, results, false, dataset, env, that, callback);
             } else {
-                callback([]);
+                callback(null, []);
             }
         });
     } else if(pattern.kind === "EMPTY_PATTERN") {
         // as an example of this case  check DAWG test case: algebra/filter-nested-2
-        callback([]);
+        callback(null, []);
     //} else if(pattern.kind === "ZERO_OR_MORE_PATH" || pattern.kind === 'ONE_OR_MORE_PATH') {
     //    return this.executeZeroOrMorePath(pattern, dataset, env);
     } else {
-        throw(new NonSupportedSparqlFeatureError(pattern.kind));
+        callback(new NonSupportedSparqlFeatureError(pattern.kind));
     }
 };
 
@@ -1134,44 +1134,29 @@ QueryEngine.prototype.executeZeroOrMorePath = function(pattern, dataset, env) {
 QueryEngine.prototype.executeUNION = function(projection, dataset, patterns, env, callback) {
     var setQuery1 = patterns[0];
     var setQuery2 = patterns[1];
-    var error = null;
     var set1,set2;
 
 
     if(patterns.length != 2) {
-        throw("SPARQL algebra UNION with more than two components");
+        return callback(new Error("SPARQL algebra UNION with more than two components"));
     }
 
     var that = this;
     async.seq(
         function(k){
-            try {
-                that.executeSelectUnit(projection, dataset, setQuery1, env, function (result) {
-                    set1 = result;
-                    k();
-                });
-            } catch(e) {
-                error = e;
-                k();
-            }
+            that.executeSelectUnit(projection, dataset, setQuery1, env, function (err, result) {
+                set1 = result;
+                k(err);
+            });
         },
-    function(k){
-        if(error == null) {
-            try {
-                that.executeSelectUnit(projection, dataset, setQuery2, env, function (result) {
-                    set2 = result;
-                    k();
-                });
-            } catch(e) {
-                error = e;
-                k();
-            }
-        } else {
-            k();
-        }
-    })(function(){
-        if(error != null) {
-            callback(error);
+        function(k){
+            that.executeSelectUnit(projection, dataset, setQuery2, env, function (err, result) {
+                set2 = result;
+                k(err);
+            });
+        })(function(err){
+        if(err != null) {
+            callback(err);
         } else {
             var result = QueryPlan.unionBindings(set1, set2);
             that.runBinds(patterns.binds, result, dataset, env, function(err, bindings){
@@ -1197,7 +1182,7 @@ QueryEngine.prototype.executeAndBGP = function(projection, dataset, pattern, env
                 }
             });
         } else {
-            callback(null);
+            callback(null, null);
         }
     });
 };
@@ -1211,49 +1196,36 @@ QueryEngine.prototype.executeLEFT_JOIN = function(projection, dataset, patterns,
     } else {
         var set1 = null;
         var set2 = null;
-        var error = null;
 
         var that = this;
         var acum, duplicates;
 
         async.seq(
             function(k){
-                try {
-                    that.executeSelectUnit(projection, dataset, setQuery1, env, function (result) {
-                        set1 = result;
-                        k();
-                    });
-                } catch(e) {
-                    error = e;
-                    k();
-                }
+                that.executeSelectUnit(projection, dataset, setQuery1, env, function (err, result) {
+                    set1 = result;
+                    k(err);
+                });
             },
             function(k){
-                if(error != null) {
-                    k();
-                } else {
-                    try {
-                        that.executeSelectUnit(projection, dataset, setQuery2, env, function (result) {
-                            set2 = result;
-                            k();
-                        });
-                    } catch(e) {
-                        error = e;
-                        k();
-                    }
-                }
+                that.executeSelectUnit(projection, dataset, setQuery2, env, function (err, result) {
+                    set2 = result;
+                    k(err);
+                });
             })(
-            function(){
-                if(error != null) {
-                    callback(error);
+            function(err){
+                if(err != null) {
+                    callback(err);
                 } else {
                     var result = QueryPlan.leftOuterJoinBindings(set1, set2);
                     that.runBinds(patterns.binds, result, dataset, env, function(err, bindings){
                         if(err != null) {
                             throw(new BindExpressionError("Error processing bind expressions", patterns.binds, err));
                         } else {
-                            QueryFilters.checkFilters(patterns, result, true, dataset, env, that, function(bindings){
-                                if(set1.length>1 && set2.length>1) {
+                            QueryFilters.checkFilters(patterns, result, true, dataset, env, that, function(err, bindings){
+                                if(err != null) {
+                                    callback(err);
+                                } else if(set1.length>1 && set2.length>1) {
                                     var vars = [];
                                     var vars1 = {};
                                     for(var p in set1[0]) {
@@ -1303,9 +1275,9 @@ QueryEngine.prototype.executeLEFT_JOIN = function(projection, dataset, patterns,
                                         }
                                     }
 
-                                    callback(acum);
+                                    callback(null, acum);
                                 } else {
-                                    callback(bindings);
+                                    callback(null, bindings);
                                 }
                             });
                         }
@@ -1320,43 +1292,28 @@ QueryEngine.prototype.executeJOIN = function(projection, dataset, patterns, env,
     var setQuery2 = patterns.rvalue;
     var set1 = null;
     var set2 = null;
-    var error = null;
 
     var that = this;
 
     async.seq(
         function(k){
-            try {
-                that.executeSelectUnit(projection, dataset, setQuery1, env, function (result) {
-                    set1 = result;
-                    k();
-                });
-            } catch(e) {
-                error = e;
-                k();
-            }
+            that.executeSelectUnit(projection, dataset, setQuery1, env, function (err, result) {
+                set1 = result;
+                k(err);
+            });
         },
         function(k){
-            if(error != null) {
-                k();
-            } else {
-                try {
-                    that.executeSelectUnit(projection, dataset, setQuery2, env, function (result) {
-                        set2 = result;
-                        k();
-                    });
-                } catch(e) {
-                    error = e;
-                    k();
-                }
-            }
+            that.executeSelectUnit(projection, dataset, setQuery2, env, function (err, result) {
+                set2 = result;
+                k(err);
+            });
         })(
-        function(){
+        function(err){
             var result = null;
-            if(error != null) {
-                callback(error);
+            if(err != null) {
+                callback(err);
             } else if(set1.length ===0 || set2.length===0) {
-                callback([]);
+                callback(null, []);
             } else {
                 var commonVarsTmp = {};
                 var commonVars = [];
