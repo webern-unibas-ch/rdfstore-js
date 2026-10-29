@@ -41,6 +41,8 @@ CI ([.github/workflows/main.yml](.github/workflows/main.yml)) runs `yarn lint`, 
 
 Everything is callback-based (`callback(err, result)`) and asynchronous. There are no Promises in the core.
 
+Every error reaches the caller's callback exactly once, as `callback(err)` ([spec/error_contract_spec.js](spec/error_contract_spec.js)). Never `throw` inside async code: pass the error on. Internal select-unit callbacks (`executeSelectUnit`, `QueryFilters.checkFilters`) are node-style `(err, bindings)`. Public entry points guard the callback with `Utils.once`. In their catch they rethrow if the callback already ran, so an exception from the user's own callback isn't reported a second time.
+
 **Every `src/` module is strict mode** (`"use strict";` at the top), so the CommonJS entry behaves like the ES module bundle. Declare every name with `var`: an implicit global throws in strict mode. [eslint.config.mjs](eslint.config.mjs) enables only `no-undef` to catch this statically, including on paths the specs never run. It cannot see `this` inside plain callbacks, which is `undefined` in strict mode: capture `var that = this;` in the method instead.
 
 **Layering** (from the public API down to storage):

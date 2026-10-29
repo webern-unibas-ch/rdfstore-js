@@ -28,6 +28,7 @@ Please read this README file carefully to find the current set of features.
 - [API](#api)
 	- [Store creation](#store-creation)
 	- [Query execution](#query-execution)
+	- [Error handling](#error-handling)
 	- [Construct queries RDF Interfaces API](#construct-queries-rdf-interfaces-api)
 	- [Loading remote graphs](#loading-remote-graphs)
 	- [High level interface](#high-level-interface)
@@ -229,11 +230,27 @@ var namedGraphs  = [{'token':'uri', 'value': graph3}, {'token':'uri', 'value': g
 
 store.executeWithEnvironment("SELECT * { ?s ?p ?o }",defaultGraph,
   namedGraphs, function(err, results) {
-  if(err) {
+  if(!err) {
 	// process results
   }
 });
 ```
+
+### Error handling
+
+Every callback is called exactly once, as `callback(err, result)`. If the operation fails, `err` is an `Error` and `result` is not set. This covers SPARQL syntax errors, unsupported SPARQL features (`err.name === 'NonSupportedSparqlFeatureError'`), and data that cannot be loaded or parsed. None of these are thrown, so a failing query inside another callback cannot crash the process.
+
+```javascript
+store.execute("SELECT * WHERE { ?s ", function(err, results) {
+  if(err) {
+    console.error(err.message); // SPARQL syntax error
+    return;
+  }
+  // process results
+});
+```
+
+Two cases still throw synchronously: calling a method with the wrong arguments (a programming error), and an exception thrown by your own callback, which the store does not catch and never reports back to you as `err`.
 
 ### Construct queries RDF Interfaces API
 
