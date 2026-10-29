@@ -736,7 +736,7 @@ Store.prototype.load = function(){
 
 		var cb = function(err, quads) {
 			if(err) {
-			callback(err, quads);
+				callback(err);
 			} else {
 				that.engine.batchLoad(quads,function(success){
 					if(success != null){
@@ -748,12 +748,12 @@ Store.prototype.load = function(){
 	    	}
 		};
 
-		var args = [parser, {'token':'uri', 'value':graph.valueOf()}, data, options, cb];
+		var graphTerm = {'token':'uri', 'value':graph.valueOf()};
 
 		if(data && typeof(data)==='string' && data.indexOf('file://')=== 0) {
-		    this.engine.rdfLoader.loadFromFile.apply(null, args);
+		    this.engine.rdfLoader.loadFromFile(parser, graphTerm, data, cb);
 		} else {
-	    	this.engine.rdfLoader.tryToParse.apply(null, args);
+	    	this.engine.rdfLoader.tryToParse(parser, graphTerm, data, options, cb);
 		}
     }
 };

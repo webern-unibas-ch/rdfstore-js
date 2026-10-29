@@ -1,6 +1,7 @@
 "use strict";
 
 var N3Parser = require('n3').Parser;
+var Utils = require('./utils');
 //var N3Parser = require('../node_modules/n3/lib/N3Parser');
 
 // Add a wrapper around the N3.js parser
@@ -22,13 +23,14 @@ RVN3Parser.parser = {
             options.baseIRI = options.baseURI;
         }
 
-        // Parse triples into array
+        // Parse triples into array; after an error the parser must not report anything else
         var triples = [];
+        var done = Utils.once(callback);
         new N3Parser(options).parse(data, function (error, triple) {
             if (error)
-                callback(error);
+                done(error);
             else if (!triple)
-                callback(false, triples);
+                done(null, triples);
             else
                 triples.push({
                     subject:   convertEntity(triple.subject),

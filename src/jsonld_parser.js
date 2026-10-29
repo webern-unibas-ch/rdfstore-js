@@ -2,7 +2,7 @@
 
 var jsonld = require('jsonld');
 
-var toTriples = async function (input, graph, cb) {
+var toTriples = async function (input, graph) {
     var rval = null;
 
     // convert input to normalized RDF
@@ -46,7 +46,7 @@ var toTriples = async function (input, graph, cb) {
         callback(triple.subject, triple.predicate, triple.object);
     }
 
-    cb(null, rval);
+    return rval;
 
 }
 
@@ -64,11 +64,15 @@ JSONLDParser.parser = {
             if (typeof(data) === 'string') {
                 data = JSON.parse(data);
             }
-            toTriples(data, graph, callback);
         } catch (error) {
-            callback(error);
+            return callback(error);
         }
-
+        // call back outside the promise chain, so an exception in the callback is not turned into a rejection
+        toTriples(data, graph).then(function (triples) {
+            queueMicrotask(function () { callback(null, triples); });
+        }, function (error) {
+            queueMicrotask(function () { callback(error); });
+        });
     }
 
 };

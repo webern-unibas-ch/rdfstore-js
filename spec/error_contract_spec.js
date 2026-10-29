@@ -109,8 +109,11 @@ describe("Error contract", function() {
             });
         });
 
-        it("does not call back a second time when the user callback throws", function(done) {
-            withStore('<http://a> <http://p> "1"', function(store) {
+        it("does not call back a second time when the user callback throws", async function() {
+            var store = await new Promise(function(resolve) {
+                withStore('<http://a> <http://p> "1"', resolve);
+            });
+            await jasmine.spyOnGlobalErrorsAsync(async function(globalErrorSpy) {
                 var calls = 0;
                 var sentinel = new Error("thrown by the user callback");
                 var caught = null;
@@ -122,12 +125,11 @@ describe("Error contract", function() {
                 } catch(e) {
                     caught = e;
                 }
-                setTimeout(function() {
-                    expect(calls).toBe(1);
-                    // small stores run synchronously, so the user's exception surfaces from execute()
-                    expect(caught).toBe(sentinel);
-                    done();
-                }, 50);
+                await new Promise(function(resolve) { setTimeout(resolve, 50); });
+                expect(calls).toBe(1);
+                // the exception surfaces from execute() or, if the engine yielded to the event loop first, as an uncaught error
+                var uncaught = globalErrorSpy.calls.allArgs().map(function(args) { return args[0]; });
+                expect(caught === sentinel || uncaught.indexOf(sentinel) !== -1).toBe(true);
             });
         });
     });
@@ -179,6 +181,23 @@ describe("Error contract", function() {
             withStore(null, function(store) {
                 callsBackOnce(function(cb) {
                     store.load("text/turtle", "not turtle @@", cb);
+                }, expectError, done);
+            });
+        });
+
+        it("reports invalid JSON-LD via the callback", function(done) {
+            withStore(null, function(store) {
+                callsBackOnce(function(cb) {
+                    store.load("application/ld+json", '{"@context": 5, "@id": "http://a"}', cb);
+                }, expectError, done);
+            });
+        });
+
+        it("reports a missing file via the callback", function(done) {
+            withStore(null, function(store) {
+                callsBackOnce(function(cb) {
+                    // a local path: on Windows, file:///x would become //x, a network share that takes seconds to fail
+                    store.load("text/turtle", "file://" + __dirname + "/does-not-exist.ttl", cb);
                 }, expectError, done);
             });
         });

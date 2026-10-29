@@ -118,21 +118,17 @@ RDFLoader.prototype.loadFromFile = function(parser, graph, uri, callback) {
 };
 
 RDFLoader.prototype.tryToParse = function(parser, graph, input, options, callback) {
-    // console.log("TRYING TO PARSE");
-    // console.log(parser);
-    // console.log(graph);
-    // console.log(options);
-    // console.log(callback);
+    var done = Utils.once(callback);
     try {
         if(typeof(input) === 'string') {
             input = Utils.normalizeUnicodeLiterals(input);
         }
-        parser.parse(input, graph, options, callback);
-
+        parser.parse(input, graph, options, done);
     } catch(e) {
-        console.log(e.message);
-        console.log(e.stack);
-        callback(e);
+        // an exception from the caller's own callback is not a parse error: let it propagate
+        if(done.called)
+            throw e;
+        done(e);
     }
 };
 
