@@ -1107,7 +1107,8 @@ describe("QueryEngine", function(){
             new QuadBackend({treeOrder: 2}, function(backend){
                 var engine = new QueryEngine({backend: backend,
                     lexicon: lexicon});
-                engine.execute('CREATE GRAPH <a>', function(result){
+                engine.execute('CREATE GRAPH <a>', function(err, result){
+                    expect(err).toBe(null);
                     expect(result).toBe(true);
 
                     done();

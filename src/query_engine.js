@@ -1363,75 +1363,94 @@ QueryEngine.prototype.executeUpdate = function(syntaxTree, callback) {
     // environment for the operation -> base ns, declared ns, etc.
     var queryEnv = {blanks:{}, outCache:{}};
     this.registerNsInEnvironment(prologue, queryEnv);
-    for(var i=0; i<units.length; i++) {
 
-        var aqt = that.abstractQueryTree.parseExecutableUnit(units[i]);
-        if(aqt.kind === 'insertdata') {
-            var error = null;
-            async.eachSeries(aqt.quads, function(quad, k){
-                if(error === null) {
-                    that._executeQuadInsert(quad, queryEnv, function(err) {
-                        if(err != null)
-                            error = err;
-                        k();
-                    });
-                } else {
-                    k();
-                }
-            }, function(){
-                if(error === null)
-                    callback(null, true);
-                else
-                    callback(error);
-            });
-        } else if(aqt.kind === 'deletedata') {
-            var error = null;
-            async.eachSeries(aqt.quads, function(quad, k){
-                if(error === null) {
-                    that._executeQuadDelete(quad, queryEnv, function(err) {
-                        if(err != null)
-                            error = err;
-                        k();
-                    });
-                } else {
-                    k();
-                }
-            }, function(){
-                if(error === null)
-                    callback(null, true);
-                else
-                    callback(error);
-            });
-        } else if(aqt.kind === 'modify') {
-            this._executeModifyQuery(aqt, queryEnv, callback);
-        } else if(aqt.kind === 'create') {
-            callback(true);
-        } else if(aqt.kind === 'load') {
-            var graph = {'uri': Utils.lexicalFormBaseUri(aqt.sourceGraph, queryEnv)};
-            if(aqt.destinyGraph != null) {
-                graph = {'uri': Utils.lexicalFormBaseUri(aqt.destinyGraph, queryEnv)};
-            }
-            var that = this;
-            this.rdfLoader.load(aqt.sourceGraph.value, graph, function(err, result){
-                if(err) {
-                    callback(new Error("error batch loading quads"));
-                } else {
-                    that.batchLoad(result,function(result){
-                        if(result !== null) {
-                            callback(null, result);
-                        } else {
-                            callback(new Error("Error batch loading quads"));
-                        }
-                    });
-                }
-            });
-        } else if(aqt.kind === 'drop') {
-            this._executeClearGraph(aqt.destinyGraph, queryEnv, callback);
-        } else if(aqt.kind === 'clear') {
-            this._executeClearGraph(aqt.destinyGraph, queryEnv, callback);
-        } else {
-            throw new Error("not supported execution unit");
+    // operations separated by ';' run one after the other; the first error stops the request
+    var lastResult;
+    async.eachSeries(units, function(unit, k){
+        var aqt;
+        try {
+            aqt = that.abstractQueryTree.parseExecutableUnit(unit);
+        } catch(e) {
+            return k(e);
         }
+        that._executeUpdateUnit(aqt, queryEnv, function(err, result){
+            lastResult = result;
+            k(err);
+        });
+    }, function(err){
+        if(err != null)
+            callback(err);
+        else
+            callback(null, lastResult);
+    });
+};
+
+QueryEngine.prototype._executeUpdateUnit = function(aqt, queryEnv, callback) {
+    var that = this;
+    if(aqt.kind === 'insertdata') {
+        var error = null;
+        async.eachSeries(aqt.quads, function(quad, k){
+            if(error === null) {
+                that._executeQuadInsert(quad, queryEnv, function(err) {
+                    if(err != null)
+                        error = err;
+                    k();
+                });
+            } else {
+                k();
+            }
+        }, function(){
+            if(error === null)
+                callback(null, true);
+            else
+                callback(error);
+        });
+    } else if(aqt.kind === 'deletedata') {
+        var error = null;
+        async.eachSeries(aqt.quads, function(quad, k){
+            if(error === null) {
+                that._executeQuadDelete(quad, queryEnv, function(err) {
+                    if(err != null)
+                        error = err;
+                    k();
+                });
+            } else {
+                k();
+            }
+        }, function(){
+            if(error === null)
+                callback(null, true);
+            else
+                callback(error);
+        });
+    } else if(aqt.kind === 'modify') {
+        this._executeModifyQuery(aqt, queryEnv, callback);
+    } else if(aqt.kind === 'create') {
+        callback(null, true);
+    } else if(aqt.kind === 'load') {
+        var graph = {'uri': Utils.lexicalFormBaseUri(aqt.sourceGraph, queryEnv)};
+        if(aqt.destinyGraph != null) {
+            graph = {'uri': Utils.lexicalFormBaseUri(aqt.destinyGraph, queryEnv)};
+        }
+        this.rdfLoader.load(aqt.sourceGraph.value, graph, function(err, result){
+            if(err) {
+                callback(err);
+            } else {
+                that.batchLoad(result,function(result){
+                    if(result !== null) {
+                        callback(null, result);
+                    } else {
+                        callback(new Error("Error batch loading quads"));
+                    }
+                });
+            }
+        });
+    } else if(aqt.kind === 'drop') {
+        this._executeClearGraph(aqt.destinyGraph, queryEnv, callback);
+    } else if(aqt.kind === 'clear') {
+        this._executeClearGraph(aqt.destinyGraph, queryEnv, callback);
+    } else {
+        callback(new Error("not supported execution unit: " + aqt.kind));
     }
 };
 
@@ -1773,14 +1792,20 @@ QueryEngine.prototype._executeQuadDelete = function(quad, queryEnv, callback) {
 
 QueryEngine.prototype._executeClearGraph = function(destinyGraph, queryEnv, callback) {
     var that = this;
+    var finish = function(err) {
+        if(err)
+            callback(err);
+        else
+            callback(null, true);
+    };
     if(destinyGraph === 'default') {
-        this.execute("DELETE { ?s ?p ?o } WHERE { ?s ?p ?o }", callback);
+        this.execute("DELETE { ?s ?p ?o } WHERE { ?s ?p ?o }", finish);
     } else if(destinyGraph === 'named') {
         that.lexicon.registeredGraphs(true, function(graphs){
             if(graphs!=null) {
-                var foundErrorDeleting = false;
+                var foundErrorDeleting = null;
                 async.eachSeries(graphs, function(graph,k){
-                    if(!foundErrorDeleting) {
+                    if(foundErrorDeleting == null) {
                         that.execute("DELETE { GRAPH <"+graph+"> { ?s ?p ?o } } WHERE { GRAPH <"+graph+"> { ?s ?p ?o } }", function(err, results){
                             if(!err) {
                                 that.lexicon.resolveUri(graph, function(oid){
@@ -1789,7 +1814,7 @@ QueryEngine.prototype._executeClearGraph = function(destinyGraph, queryEnv, call
                                             k();
                                         });
                                     } else {
-                                        foundErrorDeleting = "Cannot find graph "+graph+" to clear it";
+                                        foundErrorDeleting = new Error("Cannot find graph "+graph+" to clear it");
                                         k();
                                     }
                                 });
@@ -1802,19 +1827,18 @@ QueryEngine.prototype._executeClearGraph = function(destinyGraph, queryEnv, call
                         k();
                     }
                 }, function(){
-                    callback(!foundErrorDeleting);
+                    finish(foundErrorDeleting);
                 });
             } else {
-                callback(false, "Error deleting named graphs");
+                callback(new Error("Error deleting named graphs"));
             }
         });
     } else if(destinyGraph === 'all') {
-        var that = this;
-        this.execute("CLEAR DEFAULT", function(err, result) {
+        this.execute("CLEAR DEFAULT", function(err) {
             if(!err) {
-                that.execute("CLEAR NAMED", callback);
+                that.execute("CLEAR NAMED", finish);
             } else {
-                callback(false,result);
+                callback(err);
             }
         });
     } else {
@@ -1823,15 +1847,15 @@ QueryEngine.prototype._executeClearGraph = function(destinyGraph, queryEnv, call
             var graphUri = Utils.lexicalFormBaseUri(destinyGraph,queryEnv);
             if(graphUri != null) {
                 this.callbacksBackend.ongoingModification = true;
-                this.execute("DELETE { GRAPH <"+graphUri+"> { ?s ?p ?o } } WHERE { GRAPH <"+graphUri+"> { ?s ?p ?o } }", function(res){
+                this.execute("DELETE { GRAPH <"+graphUri+"> { ?s ?p ?o } } WHERE { GRAPH <"+graphUri+"> { ?s ?p ?o } }", function(err){
                     that.callbacksBackend.ongoingModification = false;
-                    callback(res);
+                    finish(err);
                 });
             } else {
-                callback(false, "wrong graph URI");
+                callback(new Error("wrong graph URI"));
             }
         } else {
-            callback(false, "wrong graph URI");
+            callback(new Error("wrong graph URI"));
         }
     }
 };
