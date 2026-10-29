@@ -454,6 +454,20 @@ var seq = function (/* functions... */) {
 };
 
 
+// Wraps a callback so that only its first invocation runs; `called` tells whether it already ran.
+var once = function (callback) {
+    var wrapped = function () {
+        if (wrapped.called) {
+            return;
+        }
+        wrapped.called = true;
+        return callback.apply(this, arguments);
+    };
+    wrapped.called = false;
+    return wrapped;
+};
+
+
 var isWorker = function() {
     if(typeof(process) === "undefined" || process.browser === true) {
         if (typeof(window) === "undefined") {
@@ -495,6 +509,7 @@ module.exports = {
     eachSeries: eachSeries,
     eachParallel: eachParallel,
     seq: seq,
+    once: once,
     yieldFrequency: function(value){
         yieldFrequency = value;
     }

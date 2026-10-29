@@ -611,35 +611,43 @@ QueryEngine.prototype.denormalizeBindings = function(bindings, env, callback) {
 // Queries execution
 
 QueryEngine.prototype.execute = function(queryString, callback, defaultDataset, namedDataset){
-    //try{
+    var that = this;
+    var done = Utils.once(callback);
+    var modificationStarted = false;
+    try {
         queryString = Utils.normalizeUnicodeLiterals(queryString);
         var syntaxTree = this.abstractQueryTree.parseQueryString(queryString);
         if(syntaxTree == null) {
-            callback(false,"Error parsing query string");
-        } else {
-            if(syntaxTree.token === 'query' && syntaxTree.kind == 'update')  {
-                this.callbacksBackend.startGraphModification();
-                var that = this;
-                this.executeUpdate(syntaxTree, function(err, result){
-                    if(that.lexicon.updateAfterWrite)
-                        that.lexicon.updateAfterWrite();
+            done(new Error("Error parsing query string"));
+        } else if(syntaxTree.token === 'query' && syntaxTree.kind == 'update')  {
+            this.callbacksBackend.startGraphModification();
+            modificationStarted = true;
+            this.executeUpdate(syntaxTree, function(err, result){
+                if(that.lexicon.updateAfterWrite)
+                    that.lexicon.updateAfterWrite();
 
-                    if(err) {
-                        that.callbacksBackend.cancelGraphModification();
-                        callback(err, result);
-                    } else {
-                        that.callbacksBackend.endGraphModification(function(){
-                            callback(err, result);
-                        });
-                    }
-                });
-            } else if(syntaxTree.token === 'query' && syntaxTree.kind == 'query') {
-                this.executeQuery(syntaxTree, callback, defaultDataset, namedDataset);
-            }
+                if(err) {
+                    that.callbacksBackend.cancelGraphModification();
+                    done(err, result);
+                } else {
+                    that.callbacksBackend.endGraphModification(function(){
+                        done(err, result);
+                    });
+                }
+            });
+        } else if(syntaxTree.token === 'query' && syntaxTree.kind == 'query') {
+            this.executeQuery(syntaxTree, done, defaultDataset, namedDataset);
+        } else {
+            done(new Error("Cannot execute query of kind " + syntaxTree.kind));
         }
-    //} catch(e) {
-    //    callback(e);
-    //}
+    } catch(e) {
+        // an exception from the caller's own callback is not a query error: let it propagate
+        if(done.called)
+            throw e;
+        if(modificationStarted)
+            this.callbacksBackend.cancelGraphModification();
+        done(e);
+    }
 };
 
 // Retrieval queries
