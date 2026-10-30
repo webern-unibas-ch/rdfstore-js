@@ -307,6 +307,20 @@ describe("Parser", function() {
             }
         }).not.toThrow();
     });
+
+    it("Should be possible to parse HAVING clauses", function(){
+        var query = "SELECT ?s (COUNT(?o) AS ?count) { ?s ?p ?o } GROUP BY ?s HAVING (COUNT(?o) > 1) (?count < 10) ORDER BY ?count LIMIT 5";
+
+        var result = aqt.parseSelect(aqt.parseQueryString(query).units[0]);
+        expect(result.having.length).toBe(2);
+        expect(result.having[0].operator).toBe('>');
+        expect(result.having[0].op1.expressionType).toBe('aggregate');
+        expect(result.order.length).toBe(1);
+        expect(result.limit).toBe(5);
+
+        result = aqt.parseSelect(aqt.parseQueryString("SELECT (COUNT(*) AS ?c) { ?s ?p ?o } having (COUNT(*) > 1)").units[0]);
+        expect(result.having.length).toBe(1);
+    });
 });
 
 describe("SparqlParserError", function() {

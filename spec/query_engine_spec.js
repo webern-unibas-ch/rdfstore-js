@@ -1941,6 +1941,170 @@ describe("QueryEngine", function(){
         });
     });
 
+    // Classes with 3, 1, 2, 10 and 9 instances: the groups don't come out in count order, and 10 vs. 9
+    // checks that counts compare as numbers.
+    var groupCountData = function() {
+        var counts = {C2: 3, C1: 1, C3: 2, C4: 10, C5: 9};
+        var triples = [];
+        for(var c in counts) {
+            for(var i=0; i<counts[c]; i++) {
+                triples.push(':' + c + '_' + i + ' a :' + c + ' .');
+            }
+        }
+        return 'PREFIX : <http://example/> INSERT DATA { ' + triples.join(' ') + ' }';
+    };
+
+    // "class=count" strings in result order
+    var classCounts = function(results) {
+        return results.map(function(result) {
+            return result['class'].value.replace("http://example/", "") + "=" + result.count.value;
+        });
+    };
+
+    it("Test GroupByOrderBy", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var select = 'PREFIX : <http://example/> SELECT ?class (COUNT(?s) AS ?count) { ?s a ?class } GROUP BY ?class ';
+
+                engine.execute(groupCountData(), function(err, result){
+                    engine.execute(select + 'ORDER BY ?count', function(err, results){
+                        expect(err).toBeNull();
+                        expect(classCounts(results)).toEqual(["C1=1", "C3=2", "C2=3", "C5=9", "C4=10"]);
+                        engine.execute(select + 'ORDER BY DESC(?count)', function(err, results){
+                            expect(err).toBeNull();
+                            expect(classCounts(results)).toEqual(["C4=10", "C5=9", "C2=3", "C3=2", "C1=1"]);
+                            engine.execute(select + 'ORDER BY DESC(?class)', function(err, results){
+                                expect(err).toBeNull();
+                                expect(classCounts(results)).toEqual(["C5=9", "C4=10", "C3=2", "C2=3", "C1=1"]);
+                                // an aggregate that is not projected
+                                engine.execute('PREFIX : <http://example/> SELECT ?class { ?s a ?class } GROUP BY ?class ORDER BY DESC(COUNT(?s))', function(err, results){
+                                    expect(err).toBeNull();
+                                    expect(results.map(function(r) { return r['class'].value.replace("http://example/", ""); }))
+                                        .toEqual(["C4", "C5", "C2", "C3", "C1"]);
+                                    engine.execute(select + 'ORDER BY ?count LIMIT 2', function(err, results){
+                                        expect(err).toBeNull();
+                                        expect(classCounts(results)).toEqual(["C1=1", "C3=2"]);
+                                        done();
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test GroupByHaving", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var select = 'PREFIX : <http://example/> SELECT ?class (COUNT(?s) AS ?count) { ?s a ?class } GROUP BY ?class ';
+
+                engine.execute(groupCountData(), function(err, result){
+                    engine.execute(select + 'HAVING (COUNT(?s) > 2) ORDER BY ?count', function(err, results){
+                        expect(err).toBeNull();
+                        expect(classCounts(results)).toEqual(["C2=3", "C5=9", "C4=10"]);
+                        // the SELECT alias, several conditions, lower case
+                        engine.execute(select + 'having (?count > 1) (?count < 10) ORDER BY DESC(?count)', function(err, results){
+                            expect(err).toBeNull();
+                            expect(classCounts(results)).toEqual(["C5=9", "C2=3", "C3=2"]);
+                            // a group variable
+                            engine.execute(select + 'HAVING (?class = :C3 || ?class = :C1) ORDER BY ?count LIMIT 1', function(err, results){
+                                expect(err).toBeNull();
+                                expect(classCounts(results)).toEqual(["C1=1"]);
+                                // without GROUP BY: one group over all solutions
+                                engine.execute('PREFIX : <http://example/> SELECT (COUNT(*) AS ?c) { ?s a ?class } HAVING (COUNT(*) > 100)', function(err, results){
+                                    expect(err).toBeNull();
+                                    expect(results.length).toBe(0);
+                                    engine.execute('PREFIX : <http://example/> SELECT (COUNT(*) AS ?c) { ?s a ?class } HAVING (COUNT(*) > 20)', function(err, results){
+                                        expect(err).toBeNull();
+                                        expect(results.length).toBe(1);
+                                        expect(results[0].c.value).toBe('25');
+                                        done();
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test GroupByInvalidQueries", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+
+                engine.execute(groupCountData(), function(err, result){
+                    // SELECT * can't be grouped
+                    engine.execute('PREFIX : <http://example/> SELECT * { ?s a ?class } GROUP BY ?class', function(err, results){
+                        expect(err.message).toBe("Incompatible Group and Projection variables");
+                        // an aggregate in ORDER BY groups the solutions, so ?class must be grouped
+                        engine.execute('PREFIX : <http://example/> SELECT ?class { ?s a ?class } ORDER BY DESC(COUNT(?s))', function(err, results){
+                            expect(err.message).toBe("Incompatible Group and Projection variables");
+                            // ?s is neither grouped nor aggregated
+                            engine.execute('PREFIX : <http://example/> SELECT ?class { ?s a ?class } GROUP BY ?class HAVING (BOUND(?s))', function(err, results){
+                                expect(err.message).toBe("Variable ?s is neither grouped nor aggregated");
+                                engine.execute('PREFIX : <http://example/> SELECT ?class { ?s a ?class } GROUP BY ?class ORDER BY ?s', function(err, results){
+                                    expect(err.message).toBe("Variable ?s is neither grouped nor aggregated");
+                                    engine.execute('PREFIX : <http://example/> CONSTRUCT { ?class a ?class } WHERE { ?s a ?class } GROUP BY ?class HAVING (COUNT(?s) > 100)', function(err, results){
+                                        expect(err.name).toBe('NonSupportedSparqlFeatureError');
+                                        engine.execute('PREFIX : <http://example/> CONSTRUCT { ?class a ?class } WHERE { ?s a ?class } GROUP BY ?class', function(err, results){
+                                            expect(err.name).toBe('NonSupportedSparqlFeatureError');
+                                            done();
+                                        });
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test GroupByAggregatesInsideExpressions", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+
+                engine.execute(groupCountData(), function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT ?class ((COUNT(?s) * 2) AS ?double) { ?s a ?class } GROUP BY ?class HAVING (COUNT(?s) * 2 > 5) ORDER BY ?double', function(err, results){
+                        expect(err).toBeNull();
+                        expect(results.map(function(r) { return r['class'].value.replace("http://example/", "") + "=" + r['double'].value; }))
+                            .toEqual(["C2=6", "C5=18", "C4=20"]);
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test GroupByAggregateNamesDoNotCollide", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+
+                engine.execute(groupCountData(), function(err, result){
+                    // a user variable named like an internal one keeps its own value
+                    engine.execute('PREFIX : <http://example/> SELECT ?class (COUNT(?s) AS ?__aggregate0) { ?s a ?class } GROUP BY ?class HAVING (MAX(STR(?s)) != "") ORDER BY ?__aggregate0 LIMIT 2', function(err, results){
+                        expect(err).toBeNull();
+                        expect(results.map(function(r) { return r.__aggregate0.value; })).toEqual(['1', '2']);
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
     it("Test AggregateInsideExpression", function(done) {
         new Lexicon(function(lexicon){
             new QuadBackend({treeOrder: 2}, function(backend){
@@ -1953,8 +2117,9 @@ describe("QueryEngine", function(){
 
                 engine.execute(query, function(err, result){
                     engine.execute('PREFIX : <http://example/> SELECT (COUNT(?s)*2 AS ?double) {  ?s :p ?v . }', function(err, results){
-                        expect(err).not.toBeNull();
-                        expect(err.name).toBe('NonSupportedSparqlFeatureError');
+                        expect(err).toBeNull();
+                        expect(results.length).toBe(1);
+                        expect(results[0]['double'].value).toBe('4');
                         done();
                     });
                 });

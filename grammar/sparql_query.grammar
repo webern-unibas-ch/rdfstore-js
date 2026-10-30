@@ -153,6 +153,9 @@ SelectQuery "[6] SelectQuery"
     if(sm!=null && sm.group!=null) {
 	query.group = sm.group;
     }
+    if(sm!=null && sm.having!=null) {
+	query.having = sm.having;
+    }
 
     return query;
 }
@@ -181,6 +184,9 @@ SubSelect "[7] SubSelect"
     }
     if(sm!=null && sm.group!=null) {
 	query.group = sm.group;
+    }
+    if(sm!=null && sm.having!=null) {
+	query.having = sm.having;
     }
 
     return query;
@@ -250,6 +256,12 @@ ConstructQuery "[9] ConstructQuery"
     if(sm!=null && (sm.order!=null && sm.order!="")) {
 	query.order = sm.order;
     }
+    if(sm!=null && sm.group!=null) {
+	query.group = sm.group;
+    }
+    if(sm!=null && sm.having!=null) {
+	query.having = sm.having;
+    }
     return query
 
 } / WS* ('CONSTRUCT'/'construct') WS* gs:DatasetClause* WS* ('WHERE'/'where') WS* '{' WS* t:TriplesTemplate? WS* '}' WS* sm:SolutionModifier {
@@ -289,6 +301,12 @@ ConstructQuery "[9] ConstructQuery"
     }
     if(sm!=null && (sm.order!=null && sm.order!="")) {
 	query.order = sm.order;
+    }
+    if(sm!=null && sm.group!=null) {
+	query.group = sm.group;
+    }
+    if(sm!=null && sm.having!=null) {
+	query.having = sm.having;
     }
     return query
 }
@@ -372,7 +390,7 @@ WhereClause "[16] WhereClause"
  [17]	SolutionModifier	  ::=	GroupClause? HavingClause? OrderClause? LimitOffsetClauses?
  */
 SolutionModifier "[17] SolutionModifier"
-    = gc:GroupClause? HavingClause? oc:OrderClause? lo:LimitOffsetClauses? {
+    = gc:GroupClause? hc:HavingClause? oc:OrderClause? lo:LimitOffsetClauses? {
     var acum = {};
 if(lo != null) {
     if(lo.limit != null) {
@@ -385,6 +403,10 @@ if(lo != null) {
 
 if(gc != null) {
     acum.group = gc;
+}
+
+if(hc != null) {
+    acum.having = hc;
 }
 
 acum.order = oc;
@@ -427,13 +449,17 @@ GroupCondition "[19] GroupCondition"
  [20]	HavingClause	  ::=	'HAVING' HavingCondition+
  */
 HavingClause "[20] HavingClause"
-    = 'HAVING' HavingCondition+
+    = ('HAVING'/'having') WS* hc:HavingCondition+ {
+    return hc;
+}
 
     /*
      [21]	HavingCondition	  ::=	Constraint
      */
 HavingCondition "[21] HavingCondition"
-    = Constraint
+    = c:Constraint WS* {
+    return c;
+}
 
 /*
  [22]	OrderClause	  ::=	'ORDER' 'BY' OrderCondition+

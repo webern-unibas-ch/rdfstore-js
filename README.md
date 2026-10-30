@@ -112,6 +112,7 @@ This is a list of the different kind of queries currently implemented:
 - variable aliases
 - variable aggregation: MAX, MIN, COUNT, AVG, SUM functions
 - GROUP BY clauses
+- HAVING clauses (SELECT queries)
 - DISTINCT query modifier
 - CONSTRUCT queries
 - ASK queries

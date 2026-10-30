@@ -298,20 +298,134 @@ QueryEngine.containsAggregate = function(expression) {
     return false;
 };
 
-QueryEngine.prototype.aggregateBindings = function(projection, bindingsGroup, dataset, env, callback) {
-    var that = this;
-    this.copyDenormalizedBindings(bindingsGroup, env.outCache, function(denormBindings){
-        var aggregatedBindings = {};
-        for(var i=0; i<projection.length; i++) {
-            var aggregatedValue = QueryFilters.runAggregator(projection[i], denormBindings, that, dataset, env);
-            if(projection[i].alias) {
-                aggregatedBindings[projection[i].alias.value] = aggregatedValue;
-            } else {
-                aggregatedBindings[projection[i].value.value] = aggregatedValue;
+// Copy of the expression with each aggregate replaced by a variable '#aggregate<n>' ('#' can't occur in a
+// SPARQL variable), so that aggregates can be used inside expressions. The distinct aggregates are added
+// to `aggregates` as {name, key, expression}.
+QueryEngine.extractAggregates = function(expression, aggregates) {
+    if(expression == null || typeof(expression) !== 'object') {
+        return expression;
+    }
+    if(expression.expressionType === 'aggregate') {
+        var key = JSON.stringify(expression);
+        var name = null;
+        for(var i=0; i<aggregates.length && name == null; i++) {
+            if(aggregates[i].key === key) {
+                name = aggregates[i].name;
             }
         }
-        callback(aggregatedBindings);
-    });
+        if(name == null) {
+            name = '#aggregate' + aggregates.length;
+            aggregates.push({name: name, key: key, expression: expression});
+        }
+        return {token: 'expression', expressionType: 'atomic', primaryexpression: 'var', value: {token: 'var', value: name}};
+    }
+    var copy = Array.isArray(expression) ? [] : {};
+    for(var key in expression) {
+        copy[key] = QueryEngine.extractAggregates(expression[key], aggregates);
+    }
+    return copy;
+};
+
+// The variables used in an expression, without the patterns of EXISTS / NOT EXISTS.
+QueryEngine.expressionVariables = function(expression, vars) {
+    if(expression == null || typeof(expression) !== 'object') {
+        return vars;
+    }
+    if(expression.token === 'var') {
+        vars.push(expression.value);
+    } else if(expression.builtincall !== 'exists' && expression.builtincall !== 'notexists') {
+        for(var key in expression) {
+            QueryEngine.expressionVariables(expression[key], vars);
+        }
+    }
+    return vars;
+};
+
+// The variables a GROUP BY binds: grouped variables and the aliases of grouped expressions.
+QueryEngine.groupVariables = function(group) {
+    var vars = [];
+    for(var i=0; group !== 'singleGroup' && i<group.length; i++) {
+        if(group[i].token === 'var') {
+            vars.push(group[i].value);
+        } else if(group[i].token === 'aliased_expression') {
+            vars.push(group[i].alias.value);
+        }
+    }
+    return vars;
+};
+
+// How a grouped query evaluates its expressions. Aggregates inside SELECT expressions, HAVING and ORDER BY
+// become variables of each group's scope (see groupScope). Outside aggregates, these expressions may use
+// the group variables and, more leniently than SPARQL, the SELECT aliases; `ungroupedVariable` names the
+// first other variable.
+QueryEngine.planGroups = function(group, projection, having, order) {
+    var plan = {groupVars: QueryEngine.groupVariables(group), aggregates: [], projection: [], having: [], order: []};
+    var expressions = [];
+    for(var i=0; i<projection.length; i++) {
+        var expression = projection[i].expression;
+        var nested = expression != null && expression.expressionType !== 'aggregate' && QueryEngine.containsAggregate(expression);
+        plan.projection.push({
+            name: projection[i].alias ? projection[i].alias.value : projection[i].value.value,
+            item: projection[i],
+            expression: nested ? QueryEngine.extractAggregates(expression, plan.aggregates) : null
+        });
+        if(nested) {
+            expressions.push(plan.projection[i].expression);
+        }
+    }
+    for(i=0; having != null && i<having.length; i++) {
+        plan.having.push(QueryEngine.extractAggregates(having[i], plan.aggregates));
+        expressions.push(plan.having[i]);
+    }
+    for(i=0; order != null && i<order.length; i++) {
+        plan.order.push({direction: order[i].direction, expression: QueryEngine.extractAggregates(order[i].expression, plan.aggregates)});
+        expressions.push(plan.order[i].expression);
+    }
+
+    var inScope = {};
+    var names = plan.groupVars.concat(plan.projection.map(function(projected) { return projected.name; }),
+        plan.aggregates.map(function(aggregate) { return aggregate.name; }));
+    for(i=0; i<names.length; i++) {
+        inScope[names[i]] = true;
+    }
+    var used = QueryEngine.expressionVariables(expressions, []);
+    for(i=0; i<used.length && plan.ungroupedVariable == null; i++) {
+        if(inScope[used[i]] !== true) {
+            plan.ungroupedVariable = used[i];
+        }
+    }
+    return plan;
+};
+
+// One group's solution as SELECT expressions, HAVING and ORDER BY see it: the group variables, the
+// aggregates of the plan and the projected values.
+QueryEngine.prototype.groupScope = function(plan, denormGroup, dataset, env) {
+    var scope = {};
+    for(var i=0; i<plan.groupVars.length; i++) {
+        scope[plan.groupVars[i]] = denormGroup.length > 0 ? denormGroup[0][plan.groupVars[i]] : null;
+    }
+    for(i=0; i<plan.aggregates.length; i++) {
+        var value = QueryFilters.runAggregator({token: 'variable', kind: 'aliased', expression: plan.aggregates[i].expression}, denormGroup, this, dataset, env);
+        if(!QueryFilters.isEbvError(value)) {
+            scope[plan.aggregates[i].name] = value;
+        }
+    }
+    for(i=0; i<plan.projection.length; i++) {
+        var projected = plan.projection[i];
+        if(projected.expression == null) {
+            scope[projected.name] = QueryFilters.runAggregator(projected.item, denormGroup, this, dataset, env);
+        } else {
+            // an error leaves the variable unbound; computed literals carry their value as a number
+            value = QueryFilters.runFilter(projected.expression, scope, this, dataset, env);
+            if(!QueryFilters.isEbvError(value)) {
+                scope[projected.name] = value.value == null ? value : Utils.clone(value);
+                if(value.value != null) {
+                    scope[projected.name].value = "" + value.value;
+                }
+            }
+        }
+    }
+    return scope;
 };
 
 
@@ -687,6 +801,9 @@ QueryEngine.prototype.executeQuery = function(syntaxTree, callback, defaultDatas
             }
         });
     } else if(aqt.kind === 'construct') {
+        if(aqt.group != null || aqt.having != null) {
+            return callback(new NonSupportedSparqlFeatureError("GROUP BY in CONSTRUCT", "GROUP BY and HAVING are not supported in CONSTRUCT queries"));
+        }
         aqt.projection = [{"token": "variable", "kind": "*"}];
         that = this;
         this.executeSelect(aqt, queryEnv, defaultDataset, namedDataset, function(err, result){
@@ -768,17 +885,6 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
                 reply(err, result);
         };
 
-        // an aggregate is only evaluated as a whole projection expression, e.g. (COUNT(?s) AS ?c), not inside one
-        if(projection != null && projection !== '*') {
-            for(var p = 0; p < projection.length; p++) {
-                var expression = projection[p].expression;
-                if(expression != null && expression.expressionType !== 'aggregate' && QueryEngine.containsAggregate(expression)) {
-                    return callback(new NonSupportedSparqlFeatureError("aggregate in expression",
-                        "Aggregates inside expressions are not supported" + (projection[p].alias ? ": ?" + projection[p].alias.value : "")));
-                }
-            }
-        }
-
         if(defaultDataset != null || namedDataset != null) {
             dataset.implicit = defaultDataset || [];
             dataset.named   = namedDataset || [];
@@ -795,13 +901,18 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
                 if (err != null) {
                     callback(err);
                 } else if (result != null) {
-                    // detect single group: aggregates without GROUP BY (no group clause leaves `group` unset)
+                    // detect single group: aggregates (in SELECT or ORDER BY) or HAVING without GROUP BY
+                    // (no group clause leaves `group` unset)
                     if (unit.group == null || unit.group === "") {
-                        var foundUniqueGroup = false;
+                        var foundUniqueGroup = unit.having != null;
                         for (var i = 0; i < unit.projection.length; i++) {
-                            if (unit.projection[i].expression != null && unit.projection[i].expression.expressionType === 'aggregate') {
+                            if (QueryEngine.containsAggregate(unit.projection[i].expression)) {
                                 foundUniqueGroup = true;
-                                break;
+                            }
+                        }
+                        for (i = 0; order != null && i < order.length; i++) {
+                            if (QueryEngine.containsAggregate(order[i].expression)) {
+                                foundUniqueGroup = true;
                             }
                         }
                         if (foundUniqueGroup === true) {
@@ -810,18 +921,37 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
                     }
                     if (unit.group && unit.group != "") {
                         if (that.checkGroupSemantics(unit.group, projection)) {
+                            var plan = QueryEngine.planGroups(unit.group, projection, unit.having, order);
+                            if (plan.ungroupedVariable != null) {
+                                return callback(new Error("Variable ?" + plan.ungroupedVariable + " is neither grouped nor aggregated"));
+                            }
                             that.groupSolution(result, unit.group, dataset, env, function(groupedBindings){
-                                var aggregatedBindings = [];
+                                var scopes = [];
                                 async.eachSeries(groupedBindings, function(groupedBindingsGroup, k){
-                                    that.aggregateBindings(projection, groupedBindingsGroup, dataset, env, function(resultingBindings){
-                                        aggregatedBindings.push(resultingBindings);
+                                    that.copyDenormalizedBindings(groupedBindingsGroup, env.outCache, function(denormGroup){
+                                        var scope = that.groupScope(plan, denormGroup, dataset, env);
+                                        for (var h = 0; h < plan.having.length; h++) {
+                                            if (QueryFilters.ebv(QueryFilters.runFilter(plan.having[h], scope, that, dataset, env)) !== true) {
+                                                return k();
+                                            }
+                                        }
+                                        scopes.push(scope);
                                         k();
                                     });
                                 }, function(){
-                                    // DISTINCT, OFFSET and LIMIT; ORDER BY on aggregated values is not supported yet
-                                    var modifiedBindings = that.applyModifier(modifier, aggregatedBindings);
-                                    var limitedBindings = that.applyLimitOffset(offset, limit, modifiedBindings);
-                                    callback(null, {'bindings': limitedBindings, 'denorm': true});
+                                    that.applyOrderBy(plan.order, scopes, dataset, env, function(orderedScopes){
+                                        var aggregatedBindings = [];
+                                        for (var s = 0; s < orderedScopes.length; s++) {
+                                            var projected = {};
+                                            for (var p = 0; p < plan.projection.length; p++) {
+                                                projected[plan.projection[p].name] = orderedScopes[s][plan.projection[p].name];
+                                            }
+                                            aggregatedBindings.push(projected);
+                                        }
+                                        var modifiedBindings = that.applyModifier(modifier, aggregatedBindings);
+                                        var limitedBindings = that.applyLimitOffset(offset, limit, modifiedBindings);
+                                        callback(null, {'bindings': limitedBindings, 'denorm': true});
+                                    });
                                 });
                             });
                         } else {
@@ -1852,20 +1982,14 @@ QueryEngine.prototype._executeClearGraph = function(destinyGraph, queryEnv, call
 };
 
 QueryEngine.prototype.checkGroupSemantics = function(groupVars, projectionVars) {
-    if(groupVars === 'singleGroup') {
-        // aggregates without GROUP BY: no variable may be projected without being aggregated
-        groupVars = [];
+    if(projectionVars[0].kind === '*') {
+        return false;
     }
-
+    // aggregates without GROUP BY ('singleGroup') have no group variables: nothing may be projected without being aggregated
     var projection = {};
-
-    for(var i=0; i<groupVars.length; i++) {
-        var groupVar = groupVars[i];
-        if(groupVar.token === 'var') {
-            projection[groupVar.value] = true;
-        } else if(groupVar.token === 'aliased_expression') {
-            projection[groupVar.alias.value] = true;
-        }
+    var names = QueryEngine.groupVariables(groupVars);
+    for(var i=0; i<names.length; i++) {
+        projection[names[i]] = true;
     }
 
     for(i=0; i<projectionVars.length; i++) {
