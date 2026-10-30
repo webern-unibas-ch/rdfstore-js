@@ -37,4 +37,39 @@ describe("Store with a large dataset", function () {
         });
     }, 60000);
 
+    // OPTIONAL used to compare every left with every right solution (about 11 s at 32000 rows).
+    it("Should evaluate OPTIONAL over 32000 solutions", function (done) {
+        var numSubjects = 32000;
+
+        var turtle = '@prefix ex: <http://example.org/> .\n';
+        for (var i = 0; i < numSubjects; i++) {
+            turtle += 'ex:s' + i + ' ex:p "v' + i + '" .\n';
+            if (i % 2 === 0) {
+                turtle += 'ex:s' + i + ' ex:q "w' + i + '" .\n';
+            }
+        }
+
+        new Store.Store(function (err, store) {
+            expect(err).toBe(null);
+            store.load('text/turtle', turtle, function (err) {
+                expect(err).toBe(null);
+                store.execute('SELECT ?s ?o ?x WHERE { ?s <http://example.org/p> ?o OPTIONAL { ?s <http://example.org/q> ?x } }', function (err, results) {
+                    expect(err).toBe(null);
+                    expect(results.length).toBe(numSubjects);
+                    var bound = 0;
+                    for (var i = 0; i < results.length; i++) {
+                        if (results[i].x != null) {
+                            expect(results[i].x.value).toBe('w' + results[i].o.value.substring(1));
+                            bound++;
+                        }
+                    }
+                    expect(bound).toBe(numSubjects / 2);
+                    store.close(function () {
+                        done();
+                    });
+                });
+            });
+        });
+    }, 60000);
+
 });
