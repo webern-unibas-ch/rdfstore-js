@@ -483,6 +483,58 @@ describe("QueryEngine", function(){
         });
     });
 
+    it("Test OptionalFilterVariableBoundOnlyInSomeLeftSolutions", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                // the left UNION binds ?x for :a only: :b's ?x comes from the OPTIONAL alone
+                // and must be unbound again when it fails the OPTIONAL's filter
+                var query = 'PREFIX : <http://example/>\
+                            INSERT DATA {\
+                            :a :q 1 .\
+                            :b :p 2 .\
+                            :b :r 5 .\
+                            :c :p 3 .\
+                            :c :r 20 }';
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT ?s ?x { { { ?s :q ?x } UNION { ?s :p ?o } } OPTIONAL { ?s :r ?x FILTER(?x > 10) } }', function(err, results){
+                        expect(err).toBeNull();
+                        expect(optionalRows(results, ["s", "x"])).toEqual(["a|1", "b|", "c|20"]);
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test OptionalFilterKeepsOuterBind", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                // the BIND after the OPTIONAL is evaluated on the joined solutions: a solution
+                // whose OPTIONAL part fails the filter keeps the BIND's value
+                var query = 'PREFIX : <http://example/>\
+                            INSERT DATA {\
+                            :a :p 1 .\
+                            :b :p 2 .\
+                            :b :q 5 .\
+                            :c :p 3 .\
+                            :c :q 20 }';
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT ?s ?x ?z { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 10) } BIND(STR(?o) AS ?z) }', function(err, results){
+                        expect(err).toBeNull();
+                        expect(optionalRows(results, ["s", "x", "z"])).toEqual(["a||1", "b||2", "c|20|3"]);
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
     it("Test OptionalDistinct1", function(done) {
         new Lexicon(function(lexicon){
             new QuadBackend({treeOrder: 2}, function(backend){

@@ -1218,25 +1218,20 @@ QueryEngine.prototype.executeLEFT_JOIN = function(projection, dataset, patterns,
             if(err != null) {
                 callback(err);
             } else {
-                // the variables only the right side binds, from all solutions; taken before the
-                // join, which adds them to the unmatched left solutions
-                var vars = [];
-                var vars1 = {};
-                var i, p;
-                for(i=0; i<set1.length; i++) {
-                    for(p in set1[i]) {
-                        vars1[p] = true;
+                // the variables of the right side, from all solutions
+                var rightVars = {};
+                for(var i=0; i<set2.length; i++) {
+                    for(var p in set2[i]) {
+                        rightVars[p] = true;
                     }
                 }
-                for(i=0; i<set2.length; i++) {
-                    for(p in set2[i]) {
-                        if(vars1[p] !== true) {
-                            vars1[p] = true;
-                            vars.push(p);
-                        }
-                    }
+                var bindVars = [];
+                for(i=0; patterns.binds != null && i<patterns.binds.length; i++) {
+                    bindVars.push(patterns.binds[i].as.value);
                 }
-                var result = QueryPlan.leftOuterJoinBindings(set1, set2);
+                // merged solution -> the left solution it came from
+                var leftSolutions = new Map();
+                var result = QueryPlan.leftOuterJoinBindings(set1, set2, leftSolutions);
                 that.runBinds(patterns.binds, result, dataset, env, function(err, bindings){
                     if(err != null) {
                         callback(err);
@@ -1250,14 +1245,25 @@ QueryEngine.prototype.executeLEFT_JOIN = function(projection, dataset, patterns,
                                 duplicates = {};
                                 for(var i=0; i<bindings.length; i++) {
                                     if(bindings[i]["__nullify__"] === true) {
-                                        for(var j=0; j<vars.length; j++) {
-                                            bindings[i]["bindings"][vars[j]] = null;
+                                        // back to the left solution (an unmatched one was not merged), with the
+                                        // right side's variables unbound; outer BINDs ran on the merged solution
+                                        var merged = bindings[i]["bindings"];
+                                        var left = leftSolutions.get(merged) || merged;
+                                        var solution = {};
+                                        for(var p in left) {
+                                            solution[p] = left[p];
+                                        }
+                                        QueryPlan.augmentMissingBindings(solution, rightVars);
+                                        for(var j=0; j<bindVars.length; j++) {
+                                            if(bindVars[j] in merged) {
+                                                solution[bindVars[j]] = merged[bindVars[j]];
+                                            }
                                         }
                                         var idx = [];
                                         var idxColl = [];
-                                        for(var p in bindings[i]["bindings"]) {
-                                            if(bindings[i]["bindings"][p] != null) {
-                                                idx.push(p+bindings[i]["bindings"][p]);
+                                        for(p in solution) {
+                                            if(solution[p] != null) {
+                                                idx.push(p+solution[p]);
                                                 idx.sort();
                                                 idxColl.push(idx.join(""));
                                             }
@@ -1269,7 +1275,7 @@ QueryEngine.prototype.executeLEFT_JOIN = function(projection, dataset, patterns,
                                                 duplicates[idxColl[j]] = true;
                                             }
                                             ////duplicates[idx.join("")]= true
-                                            acum.push(bindings[i]["bindings"]);
+                                            acum.push(solution);
                                         }
                                     } else {
                                         acum.push(bindings[i]);

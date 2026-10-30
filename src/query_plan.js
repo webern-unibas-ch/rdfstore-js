@@ -641,7 +641,8 @@ var oidKey = function(vars, bindings) {
 // solution is only compared with the right solutions that can match it: those with the same
 // OIDs on the shared variables, plus those with a shared variable unbound or bound to a
 // non-OID value (e.g. a BIND result). A left solution without an OID key is compared with all.
-QueryPlanDPSize.hashJoinBindings = function(bindingsA, bindingsB, leftOuter) {
+// An optional leftSolutions Map receives each merged solution -> the left solution it came from.
+QueryPlanDPSize.hashJoinBindings = function(bindingsA, bindingsB, leftOuter, leftSolutions) {
     var varsA = {};
     var varsB = {};
     var shared = {};
@@ -678,7 +679,11 @@ QueryPlanDPSize.hashJoinBindings = function(bindingsA, bindingsB, leftOuter) {
     var tryJoin = function(j) {
         if(QueryPlanDPSize.areCompatibleBindings(bindingA, bindingsB[j])) {
             matched = true;
-            result.push(QueryPlanDPSize.mergeBindings(bindingA, bindingsB[j]));
+            var merged = QueryPlanDPSize.mergeBindings(bindingA, bindingsB[j]);
+            if(leftSolutions != null) {
+                leftSolutions.set(merged, bindingA);
+            }
+            result.push(merged);
         }
     };
     for(i=0; i<bindingsA.length; i++) {
@@ -754,8 +759,8 @@ QueryPlanDPSize.augmentMissingBindings = function(bindingA, bindingB) {
  };
  */
 
-QueryPlanDPSize.leftOuterJoinBindings = function(bindingsA, bindingsB) {
-    return QueryPlanDPSize.hashJoinBindings(bindingsA, bindingsB, true);
+QueryPlanDPSize.leftOuterJoinBindings = function(bindingsA, bindingsB, leftSolutions) {
+    return QueryPlanDPSize.hashJoinBindings(bindingsA, bindingsB, true, leftSolutions);
 };
 
 QueryPlanDPSize.crossProductBindings = function(bindingsA, bindingsB) {
