@@ -1,7 +1,8 @@
 var QueryPlan = require("../src/query_plan").QueryPlan;
 
 // Reference implementations: the nested loops that joinBindings and leftOuterJoinBindings used
-// before the hash lookup. The hash join must return the same rows in the same order.
+// before the hash lookup. The hash join must return the same rows in the same order. An unmatched
+// left solution gets every variable of the right side as null.
 var nestedLoopJoin = function(bindingsA, bindingsB) {
     var result = [];
     for(var i=0; i<bindingsA.length; i++) {
@@ -27,7 +28,9 @@ var nestedLoopLeftOuterJoin = function(bindingsA, bindingsB) {
             }
         }
         if(matched === false) {
-            QueryPlan.augmentMissingBindings(bindingA, bindingB);
+            for(j=0; j<bindingsB.length; j++) {
+                QueryPlan.augmentMissingBindings(bindingA, bindingsB[j]);
+            }
             result.push(bindingA);
         }
     }
@@ -97,6 +100,11 @@ describe("QueryPlan joins", function() {
             expect(QueryPlan.leftOuterJoinBindings(copyRows(rowsA), copyRows(rowsB)))
                 .toEqual(nestedLoopLeftOuterJoin(copyRows(rowsA), copyRows(rowsB)));
         }
+    });
+
+    it("Should add every variable of the right side to an unmatched left solution", function() {
+        var result = QueryPlan.leftOuterJoinBindings([{s: 1}], [{s: 2, x: 5}, {s: 2, y: 6}]);
+        expect(result).toEqual([{s: 1, x: null, y: null}]);
     });
 
     it("Should left-join 32000 x 16000 bound rows without comparing every pair", function() {

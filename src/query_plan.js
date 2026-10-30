@@ -643,6 +643,7 @@ var oidKey = function(vars, bindings) {
 // non-OID value (e.g. a BIND result). A left solution without an OID key is compared with all.
 QueryPlanDPSize.hashJoinBindings = function(bindingsA, bindingsB, leftOuter) {
     var varsA = {};
+    var varsB = {};
     var shared = {};
     var sharedVars = [];
     var i, p, key;
@@ -653,6 +654,7 @@ QueryPlanDPSize.hashJoinBindings = function(bindingsA, bindingsB, leftOuter) {
     }
     for(i=0; i<bindingsB.length; i++) {
         for(p in bindingsB[i]) {
+            varsB[p] = true;
             if(varsA[p] === true && shared[p] !== true) {
                 shared[p] = true;
                 sharedVars.push(p);
@@ -703,8 +705,9 @@ QueryPlanDPSize.hashJoinBindings = function(bindingsA, bindingsB, leftOuter) {
             // missing bindings must be present for further processing
             // e.g. filtering by not present value (see DAWG tests
             // bev-6)
-            // augmentMissingBindings set their value to null.
-            QueryPlanDPSize.augmentMissingBindings(bindingA, bindingsB[bindingsB.length-1]);
+            // augmentMissingBindings set their value to null, for
+            // every variable of the right side.
+            QueryPlanDPSize.augmentMissingBindings(bindingA, varsB);
             result.push(bindingA);
         }
     }

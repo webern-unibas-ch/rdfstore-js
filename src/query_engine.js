@@ -1218,6 +1218,24 @@ QueryEngine.prototype.executeLEFT_JOIN = function(projection, dataset, patterns,
             if(err != null) {
                 callback(err);
             } else {
+                // the variables only the right side binds, from all solutions; taken before the
+                // join, which adds them to the unmatched left solutions
+                var vars = [];
+                var vars1 = {};
+                var i, p;
+                for(i=0; i<set1.length; i++) {
+                    for(p in set1[i]) {
+                        vars1[p] = true;
+                    }
+                }
+                for(i=0; i<set2.length; i++) {
+                    for(p in set2[i]) {
+                        if(vars1[p] !== true) {
+                            vars1[p] = true;
+                            vars.push(p);
+                        }
+                    }
+                }
                 var result = QueryPlan.leftOuterJoinBindings(set1, set2);
                 that.runBinds(patterns.binds, result, dataset, env, function(err, bindings){
                     if(err != null) {
@@ -1228,16 +1246,6 @@ QueryEngine.prototype.executeLEFT_JOIN = function(projection, dataset, patterns,
                                 callback(err);
                             } else {
                                 // rows that failed the OPTIONAL's filter come back wrapped: keep their left part only
-                                var vars = [];
-                                var vars1 = {};
-                                for(var p in set1[0]) {
-                                    vars1[p] = true;
-                                }
-                                for(p in set2[0]) {
-                                    if(vars1[p] != true) {
-                                        vars.push(p);
-                                    }
-                                }
                                 acum = [];
                                 duplicates = {};
                                 for(var i=0; i<bindings.length; i++) {
