@@ -100,16 +100,20 @@ RDFLoader.prototype.load = function(uri, graph, callback) {
         }});
 };
 
-RDFLoader.prototype.loadFromFile = function(parser, graph, uri, callback) {
+RDFLoader.prototype.loadFromFile = function(parser, graph, uri, options, callback) {
     try {
         var that = this;
         var fs = require('fs');
+        var parseOptions = {documentURI: uri};
+        for(var option in options) {
+            parseOptions[option] = options[option];
+        }
         fs.readFile(uri.split("file:/")[1], function(err, data) {
             if(err) {
                 callback(err);
             } else {
                 var data = data.toString('utf8');
-                that.tryToParse(parser, graph, data, {documentURI: uri}, callback);
+                that.tryToParse(parser, graph, data, parseOptions, callback);
             }
         });
     } catch(e) {
@@ -128,7 +132,7 @@ RDFLoader.prototype.tryToParse = function(parser, graph, input, options, callbac
         // an exception from the caller's own callback is not a parse error: let it propagate
         if(done.called)
             throw e;
-        done(e);
+        done(Utils.toError(e));
     }
 };
 

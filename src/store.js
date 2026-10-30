@@ -738,20 +738,14 @@ Store.prototype.load = function(){
 			if(err) {
 				callback(err);
 			} else {
-				that.engine.batchLoad(quads,function(success){
-					if(success != null){
-						callback(null,success);
-					} else {
-						callback(new Error("Error batch-loading triples."));
-					}
-				});
-	    	}
+				that.engine.batchLoad(quads, callback);
+			}
 		};
 
 		var graphTerm = {'token':'uri', 'value':graph.valueOf()};
 
 		if(data && typeof(data)==='string' && data.indexOf('file://')=== 0) {
-		    this.engine.rdfLoader.loadFromFile(parser, graphTerm, data, cb);
+		    this.engine.rdfLoader.loadFromFile(parser, graphTerm, data, options, cb);
 		} else {
 	    	this.engine.rdfLoader.tryToParse(parser, graphTerm, data, options, cb);
 		}

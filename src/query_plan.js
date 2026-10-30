@@ -406,15 +406,15 @@ QueryPlanDPSize.executeAndBGPsDPSize = function(allBgps, dataset, queryEngine, e
                         k();
                     }
                 } else {
-                    k("Error executing bushy tree");
+                    k(new Error("Error executing bushy tree"));
                 }
 
             });
         },function(err){
             if(err) {
-                callback(null, err);
+                callback(err);
             } else {
-                callback(acum);
+                callback(null, acum);
             }
         });
     });

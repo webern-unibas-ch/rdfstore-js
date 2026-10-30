@@ -315,11 +315,12 @@ QueryEngine.prototype.aggregateBindings = function(projection, bindingsGroup, da
 };
 
 
-QueryEngine.prototype.projectBindings = function(projection, results, dataset) {
+QueryEngine.prototype.projectBindings = function(projection, results, dataset, env) {
     if(projection[0].kind === '*') {
         return results;
     } else {
         var projectedResults = [];
+        var expressionEnv = {blanks:{}, outCache:{}};
 
         for(var i=0; i<results.length; i++) {
             var currentResult = results[i];
@@ -330,7 +331,7 @@ QueryEngine.prototype.projectBindings = function(projection, results, dataset) {
                 if(projection[j].token == 'variable' && projection[j].kind != 'aliased') {
                     currentProjected[projection[j].value.value] = currentResult[projection[j].value.value];
                 } else if(projection[j].token == 'variable' && projection[j].kind == 'aliased') {
-                    var ebv = QueryFilters.runFilter(projection[j].expression, currentResult, this, dataset, {blanks:{}, outCache:{}});
+                    var ebv = QueryFilters.runFilter(projection[j].expression, currentResult, this, dataset, expressionEnv);
                     if(QueryFilters.isEbvError(ebv)) {
                         shouldAdd = false;
                         break;
@@ -346,6 +347,8 @@ QueryEngine.prototype.projectBindings = function(projection, results, dataset) {
 
         }
 
+        if(env.unsupportedFeature == null)
+            env.unsupportedFeature = expressionEnv.unsupportedFeature;
         return projectedResults;
     }
 };
@@ -622,7 +625,7 @@ QueryEngine.prototype.execute = function(queryString, callback, defaultDataset, 
                     done(err, result);
                 } else {
                     that.callbacksBackend.endGraphModification(function(){
-                        done(err, result);
+                        done(null, result);
                     });
                 }
             });
@@ -637,7 +640,7 @@ QueryEngine.prototype.execute = function(queryString, callback, defaultDataset, 
             throw e;
         if(modificationStarted)
             this.callbacksBackend.cancelGraphModification();
-        done(e);
+        done(Utils.toError(e));
     }
 };
 
@@ -756,6 +759,15 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
         var order      = unit.order;
         var that = this;
 
+        // an unsupported feature met while evaluating an expression (see QueryFilters.runFilter) fails the query
+        var reply = callback;
+        callback = function(err, result) {
+            if(err == null && env.unsupportedFeature != null)
+                reply(env.unsupportedFeature);
+            else
+                reply(err, result);
+        };
+
         // an aggregate is only evaluated as a whole projection expression, e.g. (COUNT(?s) AS ?c), not inside one
         if(projection != null && projection !== '*') {
             for(var p = 0; p < projection.length; p++) {
@@ -817,7 +829,7 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
                         }
                     } else {
                         that.applyOrderBy(order, result, dataset, env, function(orderedBindings){
-                            var projectedBindings = that.projectBindings(projection, orderedBindings, dataset);
+                            var projectedBindings = that.projectBindings(projection, orderedBindings, dataset, env);
                             var modifiedBindings = that.applyModifier(modifier, projectedBindings);
                             var limitedBindings = that.applyLimitOffset(offset, limit, modifiedBindings);
                             var filteredBindings = that.removeDefaultGraphBindings(limitedBindings, dataset);
@@ -1122,17 +1134,11 @@ QueryEngine.prototype.executeZeroOrMorePath = function(pattern, dataset, env) {
 };
 */
 
-QueryEngine.prototype.executeUNION = function(projection, dataset, patterns, env, callback) {
-    var setQuery1 = patterns[0];
-    var setQuery2 = patterns[1];
-    var set1,set2;
-
-
-    if(patterns.length != 2) {
-        return callback(new Error("SPARQL algebra UNION with more than two components"));
-    }
-
+// Evaluates two sub-patterns one after the other; stops at the first error. With skipIfFirstEmpty
+// (joins), the second one is not evaluated when the first has no solutions.
+QueryEngine.prototype.executeSelectUnits = function(projection, dataset, setQuery1, setQuery2, env, skipIfFirstEmpty, callback) {
     var that = this;
+    var set1, set2;
     async.seq(
         function(k){
             that.executeSelectUnit(projection, dataset, setQuery1, env, function (err, result) {
@@ -1141,11 +1147,29 @@ QueryEngine.prototype.executeUNION = function(projection, dataset, patterns, env
             });
         },
         function(k){
+            if(skipIfFirstEmpty && set1 != null && set1.length === 0) {
+                set2 = [];
+                return k();
+            }
             that.executeSelectUnit(projection, dataset, setQuery2, env, function (err, result) {
                 set2 = result;
                 k(err);
             });
         })(function(err){
+        if(err != null)
+            callback(err);
+        else
+            callback(null, set1, set2);
+    });
+};
+
+QueryEngine.prototype.executeUNION = function(projection, dataset, patterns, env, callback) {
+    if(patterns.length != 2) {
+        return callback(new Error("SPARQL algebra UNION with more than two components"));
+    }
+
+    var that = this;
+    this.executeSelectUnits(projection, dataset, patterns[0], patterns[1], env, false, function(err, set1, set2){
         if(err != null) {
             callback(err);
         } else {
@@ -1163,8 +1187,10 @@ QueryEngine.prototype.executeUNION = function(projection, dataset, patterns, env
 
 QueryEngine.prototype.executeAndBGP = function(projection, dataset, pattern, env, callback) {
     var that = this;
-    QueryPlan.executeAndBGPsDPSize(pattern.value, dataset, this, env, function(result){
-        if(result!=null) {
+    QueryPlan.executeAndBGPsDPSize(pattern.value, dataset, this, env, function(err, result){
+        if(err != null) {
+            callback(err);
+        } else if(result!=null) {
             that.runBinds(pattern.binds, result, dataset, env, function(err, bindings){
                 if(err != null) {
                     callback(err);
@@ -1185,154 +1211,121 @@ QueryEngine.prototype.executeLEFT_JOIN = function(projection, dataset, patterns,
         // LEFT JOIN ( Z | X) => X
         this.executeSelectUnit(projection, dataset, setQuery2, env, callback);
     } else {
-        var set1 = null;
-        var set2 = null;
-
         var that = this;
         var acum, duplicates;
 
-        async.seq(
-            function(k){
-                that.executeSelectUnit(projection, dataset, setQuery1, env, function (err, result) {
-                    set1 = result;
-                    k(err);
-                });
-            },
-            function(k){
-                that.executeSelectUnit(projection, dataset, setQuery2, env, function (err, result) {
-                    set2 = result;
-                    k(err);
-                });
-            })(
-            function(err){
-                if(err != null) {
-                    callback(err);
-                } else {
-                    var result = QueryPlan.leftOuterJoinBindings(set1, set2);
-                    that.runBinds(patterns.binds, result, dataset, env, function(err, bindings){
-                        if(err != null) {
-                            callback(err);
-                        } else {
-                            QueryFilters.checkFilters(patterns, result, true, dataset, env, that, function(err, bindings){
-                                if(err != null) {
-                                    callback(err);
-                                } else if(set1.length>1 && set2.length>1) {
-                                    var vars = [];
-                                    var vars1 = {};
-                                    for(var p in set1[0]) {
-                                        vars1[p] = true;
-                                    }
-                                    for(p in set2[0]) {
-                                        if(vars1[p] != true) {
-                                            vars.push(p);
-                                        }
-                                    }
-                                    acum = [];
-                                    duplicates = {};
-                                    for(var i=0; i<bindings.length; i++) {
-                                        if(bindings[i]["__nullify__"] === true) {
-                                            for(var j=0; j<vars.length; j++) {
-                                                bindings[i]["bindings"][vars[j]] = null;
-                                            }
-                                            var idx = [];
-                                            var idxColl = [];
-                                            for(var p in bindings[i]["bindings"]) {
-                                                if(bindings[i]["bindings"][p] != null) {
-                                                    idx.push(p+bindings[i]["bindings"][p]);
-                                                    idx.sort();
-                                                    idxColl.push(idx.join(""));
-                                                }
-                                            }
-                                            // reject duplicates -> (set union)
-                                            if(duplicates[idx.join("")]==null) {
-                                                for(j=0; j<idxColl.length; j++) {
-                                                    //console.log(" - "+idxColl[j])
-                                                    duplicates[idxColl[j]] = true;
-                                                }
-                                                ////duplicates[idx.join("")]= true
-                                                acum.push(bindings[i]["bindings"]);
-                                            }
-                                        } else {
-                                            acum.push(bindings[i]);
-                                            var idx = [];
-                                            var idxColl = [];
-                                            for(var p in bindings[i]) {
-                                                idx.push(p+bindings[i][p]);
-                                                idx.sort();
-                                                //console.log(idx.join("") + " -> ok");
-                                                duplicates[idx.join("")] = true;
-                                            }
-
-                                        }
-                                    }
-
-                                    callback(null, acum);
-                                } else {
-                                    callback(null, bindings);
+        this.executeSelectUnits(projection, dataset, setQuery1, setQuery2, env, true, function(err, set1, set2){
+            if(err != null) {
+                callback(err);
+            } else {
+                var result = QueryPlan.leftOuterJoinBindings(set1, set2);
+                that.runBinds(patterns.binds, result, dataset, env, function(err, bindings){
+                    if(err != null) {
+                        callback(err);
+                    } else {
+                        QueryFilters.checkFilters(patterns, result, true, dataset, env, that, function(err, bindings){
+                            if(err != null) {
+                                callback(err);
+                            } else {
+                                // rows that failed the OPTIONAL's filter come back wrapped: keep their left part only
+                                var vars = [];
+                                var vars1 = {};
+                                for(var p in set1[0]) {
+                                    vars1[p] = true;
                                 }
-                            });
-                        }
-                    });
-                }
-            });
+                                for(p in set2[0]) {
+                                    if(vars1[p] != true) {
+                                        vars.push(p);
+                                    }
+                                }
+                                acum = [];
+                                duplicates = {};
+                                for(var i=0; i<bindings.length; i++) {
+                                    if(bindings[i]["__nullify__"] === true) {
+                                        for(var j=0; j<vars.length; j++) {
+                                            bindings[i]["bindings"][vars[j]] = null;
+                                        }
+                                        var idx = [];
+                                        var idxColl = [];
+                                        for(var p in bindings[i]["bindings"]) {
+                                            if(bindings[i]["bindings"][p] != null) {
+                                                idx.push(p+bindings[i]["bindings"][p]);
+                                                idx.sort();
+                                                idxColl.push(idx.join(""));
+                                            }
+                                        }
+                                        // reject duplicates -> (set union)
+                                        if(duplicates[idx.join("")]==null) {
+                                            for(j=0; j<idxColl.length; j++) {
+                                                //console.log(" - "+idxColl[j])
+                                                duplicates[idxColl[j]] = true;
+                                            }
+                                            ////duplicates[idx.join("")]= true
+                                            acum.push(bindings[i]["bindings"]);
+                                        }
+                                    } else {
+                                        acum.push(bindings[i]);
+                                        var idx = [];
+                                        var idxColl = [];
+                                        for(var p in bindings[i]) {
+                                            idx.push(p+bindings[i][p]);
+                                            idx.sort();
+                                            //console.log(idx.join("") + " -> ok");
+                                            duplicates[idx.join("")] = true;
+                                        }
+
+                                    }
+                                }
+
+                                callback(null, acum);
+                            }
+                        });
+                    }
+                });
+            }
+        });
     }
 };
 
 QueryEngine.prototype.executeJOIN = function(projection, dataset, patterns, env, callback) {
     var setQuery1 = patterns.lvalue;
     var setQuery2 = patterns.rvalue;
-    var set1 = null;
-    var set2 = null;
-
     var that = this;
 
-    async.seq(
-        function(k){
-            that.executeSelectUnit(projection, dataset, setQuery1, env, function (err, result) {
-                set1 = result;
-                k(err);
-            });
-        },
-        function(k){
-            that.executeSelectUnit(projection, dataset, setQuery2, env, function (err, result) {
-                set2 = result;
-                k(err);
-            });
-        })(
-        function(err){
-            var result = null;
-            if(err != null) {
-                callback(err);
-            } else if(set1.length ===0 || set2.length===0) {
-                callback(null, []);
-            } else {
-                var commonVarsTmp = {};
-                var commonVars = [];
+    this.executeSelectUnits(projection, dataset, setQuery1, setQuery2, env, true, function(err, set1, set2){
+        var result = null;
+        if(err != null) {
+            callback(err);
+        } else if(set1.length ===0 || set2.length===0) {
+            callback(null, []);
+        } else {
+            var commonVarsTmp = {};
+            var commonVars = [];
 
-                for(var p in set1[0])
-                    commonVarsTmp[p] = false;
-                for(var p  in set2[0]) {
-                    if(commonVarsTmp[p] === false)
-                        commonVars.push(p);
-                }
-
-                if(commonVars.length == 0) {
-                    result = QueryPlan.joinBindings(set1,set2);
-                } else if(that.abstractQueryTree.treeWithUnion(setQuery1) ||
-                    that.abstractQueryTree.treeWithUnion(setQuery2)) {
-                    result = QueryPlan.joinBindings(set1,set2);
-                } else {
-                    result = QueryPlan.joinBindings2(commonVars, set1, set2);
-                }
-                that.runBinds(patterns.binds, result, dataset, env, function(err, bindings){
-                    if(err != null) {
-                        callback(err);
-                    } else {
-                        QueryFilters.checkFilters(patterns, bindings, false, dataset, env, that, callback);
-                    }
-                });
+            for(var p in set1[0])
+                commonVarsTmp[p] = false;
+            for(var p  in set2[0]) {
+                if(commonVarsTmp[p] === false)
+                    commonVars.push(p);
             }
-        });
+
+            if(commonVars.length == 0) {
+                result = QueryPlan.joinBindings(set1,set2);
+            } else if(that.abstractQueryTree.treeWithUnion(setQuery1) ||
+                that.abstractQueryTree.treeWithUnion(setQuery2)) {
+                result = QueryPlan.joinBindings(set1,set2);
+            } else {
+                result = QueryPlan.joinBindings2(commonVars, set1, set2);
+            }
+            that.runBinds(patterns.binds, result, dataset, env, function(err, bindings){
+                if(err != null) {
+                    callback(err);
+                } else {
+                    QueryFilters.checkFilters(patterns, bindings, false, dataset, env, that, callback);
+                }
+            });
+        }
+    });
 };
 
 
@@ -1388,40 +1381,22 @@ QueryEngine.prototype.executeUpdate = function(syntaxTree, callback) {
 QueryEngine.prototype._executeUpdateUnit = function(aqt, queryEnv, callback) {
     var that = this;
     if(aqt.kind === 'insertdata') {
-        var error = null;
         async.eachSeries(aqt.quads, function(quad, k){
-            if(error === null) {
-                that._executeQuadInsert(quad, queryEnv, function(err) {
-                    if(err != null)
-                        error = err;
-                    k();
-                });
-            } else {
-                k();
-            }
-        }, function(){
-            if(error === null)
-                callback(null, true);
+            that._executeQuadInsert(quad, queryEnv, k);
+        }, function(err){
+            if(err != null)
+                callback(err);
             else
-                callback(error);
+                callback(null, true);
         });
     } else if(aqt.kind === 'deletedata') {
-        var error = null;
         async.eachSeries(aqt.quads, function(quad, k){
-            if(error === null) {
-                that._executeQuadDelete(quad, queryEnv, function(err) {
-                    if(err != null)
-                        error = err;
-                    k();
-                });
-            } else {
-                k();
-            }
-        }, function(){
-            if(error === null)
-                callback(null, true);
+            that._executeQuadDelete(quad, queryEnv, k);
+        }, function(err){
+            if(err != null)
+                callback(err);
             else
-                callback(error);
+                callback(null, true);
         });
     } else if(aqt.kind === 'modify') {
         this._executeModifyQuery(aqt, queryEnv, callback);
@@ -1436,13 +1411,7 @@ QueryEngine.prototype._executeUpdateUnit = function(aqt, queryEnv, callback) {
             if(err) {
                 callback(err);
             } else {
-                that.batchLoad(result,function(result){
-                    if(result !== null) {
-                        callback(null, result);
-                    } else {
-                        callback(new Error("Error batch loading quads"));
-                    }
-                });
+                that.batchLoad(result, callback);
             }
         });
     } else if(aqt.kind === 'drop') {
@@ -1454,10 +1423,21 @@ QueryEngine.prototype._executeUpdateUnit = function(aqt, queryEnv, callback) {
     }
 };
 
+// Stores parsed quads; calls back (err) or (null, number of new quads).
 QueryEngine.prototype.batchLoad = function(quads, callback) {
     var counter = 0;
     var blanks = {};
     var that = this;
+
+    // check every quad first, so that a broken one does not leave the batch half stored
+    var components = ['subject','predicate','object','graph'];
+    for(var q=0; q<quads.length; q++) {
+        for(var c=0; c<components.length; c++) {
+            if(quads[q][components[c]] == null || typeof(quads[q][components[c]]) !== 'object') {
+                return callback(new Error("Cannot load a quad without a " + components[c]));
+            }
+        }
+    }
 
     if(this.eventsOnBatchLoad)
         this.callbacksBackend.startGraphModification();
@@ -1526,7 +1506,7 @@ QueryEngine.prototype.batchLoad = function(quads, callback) {
 
     async.eachSeries(quads, function(quad,k){
         var newQuad = {};
-        async.eachSeries(['subject','predicate','object','graph'], function(component,kk){
+        async.eachSeries(components, function(component,kk){
             registerComponent(quad, component, newQuad, kk)
         }, function(){
             var originalQuad = quad;
@@ -1554,11 +1534,11 @@ QueryEngine.prototype.batchLoad = function(quads, callback) {
             that.lexicon.updateAfterWrite();
 
         var exitFn = function(){
-            callback(counter);
+            callback(null, counter);
         };
 
         if(that.eventsOnBatchLoad) {
-            that.callbacksBackend.endGraphModification(exitFn());
+            that.callbacksBackend.endGraphModification(exitFn);
         } else {
             exitFn();
         }
@@ -1648,6 +1628,7 @@ QueryEngine.prototype._executeModifyQuery = function(aqt, queryEnv, callback) {
                     }
                 }
 
+                // a template quad that cannot be built (e.g. an unbound variable) is skipped, as SPARQL 1.1 Update specifies
                 async.eachSeries(quads, function(quad,kk) {
                     that._executeQuadDelete(quad, queryEnv, function(){
                         kk();
@@ -1684,6 +1665,7 @@ QueryEngine.prototype._executeModifyQuery = function(aqt, queryEnv, callback) {
                     }
                 }
 
+                // as for DELETE: template quads that cannot be built are skipped
                 async.eachSeries(quads, function(quad,kk) {
                     that._executeQuadInsert(quad, queryEnv, function(){
                         kk();
@@ -1695,7 +1677,7 @@ QueryEngine.prototype._executeModifyQuery = function(aqt, queryEnv, callback) {
         }
     )(function(){
         if(querySuccess)
-            callback(null);
+            callback(null, true);
         else
             callback(error);
     });
@@ -1790,6 +1772,18 @@ QueryEngine.prototype._executeQuadDelete = function(quad, queryEnv, callback) {
         });
 };
 
+// Runs an update inside the update that is already in progress: unlike execute(), it neither starts
+// nor ends a graph modification, so its changes are announced together with the surrounding update.
+QueryEngine.prototype._executeNestedUpdate = function(queryString, callback) {
+    var syntaxTree;
+    try {
+        syntaxTree = this.abstractQueryTree.parseQueryString(queryString);
+    } catch(e) {
+        return callback(Utils.toError(e));
+    }
+    this.executeUpdate(syntaxTree, callback);
+};
+
 QueryEngine.prototype._executeClearGraph = function(destinyGraph, queryEnv, callback) {
     var that = this;
     var finish = function(err) {
@@ -1799,14 +1793,14 @@ QueryEngine.prototype._executeClearGraph = function(destinyGraph, queryEnv, call
             callback(null, true);
     };
     if(destinyGraph === 'default') {
-        this.execute("DELETE { ?s ?p ?o } WHERE { ?s ?p ?o }", finish);
+        this._executeNestedUpdate("DELETE { ?s ?p ?o } WHERE { ?s ?p ?o }", finish);
     } else if(destinyGraph === 'named') {
         that.lexicon.registeredGraphs(true, function(graphs){
             if(graphs!=null) {
                 var foundErrorDeleting = null;
                 async.eachSeries(graphs, function(graph,k){
                     if(foundErrorDeleting == null) {
-                        that.execute("DELETE { GRAPH <"+graph+"> { ?s ?p ?o } } WHERE { GRAPH <"+graph+"> { ?s ?p ?o } }", function(err, results){
+                        that._executeNestedUpdate("DELETE { GRAPH <"+graph+"> { ?s ?p ?o } } WHERE { GRAPH <"+graph+"> { ?s ?p ?o } }", function(err){
                             if(!err) {
                                 that.lexicon.resolveUri(graph, function(oid){
                                     if(oid != -1) {
@@ -1830,15 +1824,15 @@ QueryEngine.prototype._executeClearGraph = function(destinyGraph, queryEnv, call
                     finish(foundErrorDeleting);
                 });
             } else {
-                callback(new Error("Error deleting named graphs"));
+                finish(new Error("Error deleting named graphs"));
             }
         });
     } else if(destinyGraph === 'all') {
-        this.execute("CLEAR DEFAULT", function(err) {
+        this._executeClearGraph('default', queryEnv, function(err) {
             if(!err) {
-                that.execute("CLEAR NAMED", finish);
+                that._executeClearGraph('named', queryEnv, finish);
             } else {
-                callback(err);
+                finish(err);
             }
         });
     } else {
@@ -1846,16 +1840,12 @@ QueryEngine.prototype._executeClearGraph = function(destinyGraph, queryEnv, call
         if(destinyGraph.token == 'uri') {
             var graphUri = Utils.lexicalFormBaseUri(destinyGraph,queryEnv);
             if(graphUri != null) {
-                this.callbacksBackend.ongoingModification = true;
-                this.execute("DELETE { GRAPH <"+graphUri+"> { ?s ?p ?o } } WHERE { GRAPH <"+graphUri+"> { ?s ?p ?o } }", function(err){
-                    that.callbacksBackend.ongoingModification = false;
-                    finish(err);
-                });
+                this._executeNestedUpdate("DELETE { GRAPH <"+graphUri+"> { ?s ?p ?o } } WHERE { GRAPH <"+graphUri+"> { ?s ?p ?o } }", finish);
             } else {
-                callback(new Error("wrong graph URI"));
+                finish(new Error("wrong graph URI"));
             }
         } else {
-            callback(new Error("wrong graph URI"));
+            finish(new Error("wrong graph URI"));
         }
     }
 };
@@ -1904,13 +1894,7 @@ QueryEngine.prototype.runBinds = function(binds, bindings, dataset, env, callbac
                 for(var j=0; j<binds.length; j++) {
                     var bind = binds[j];
                     var thisDenormBindings = denormBindings[i];
-                    var ebv;
-                    try {
-                        ebv = QueryFilters.runFilter(bind.expression, thisDenormBindings, that, dataset, env);
-                    } catch(e) {
-                        // some builtins throw on unbound arguments instead of returning an error value
-                        ebv = QueryFilters.ebvError();
-                    }
+                    var ebv = QueryFilters.runFilter(bind.expression, thisDenormBindings, that, dataset, env);
                     // SPARQL 1.1 Extend: if the expression raises an error, the variable stays unbound
                     if(!QueryFilters.isEbvError(ebv)) {
                         originalBindings[i][bind.as.value] = ebv;

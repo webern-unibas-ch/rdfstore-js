@@ -3,6 +3,7 @@
 var Utils = require('./utils');
 var     _ = Utils;
 var async = require('./utils');
+var NonSupportedSparqlFeatureError = require('./abstract_query_tree').NonSupportedSparqlFeatureError;
 
 var QueryFilters = {};
 
@@ -21,7 +22,10 @@ QueryFilters.checkFilters = function(pattern, bindings, nullifyErrors, dataset, 
             return callback(err);
         }
         async.eachSeries(preProcessedFilters, function(filter,k){
-            QueryFilters.run(filter.value, bindings, nullifyErrors, dataset, queryEnv, queryEngine, function(filteredBindings){
+            QueryFilters.run(filter.value, bindings, nullifyErrors, dataset, queryEnv, queryEngine, function(err, filteredBindings){
+                if(err != null) {
+                    return k(err);
+                }
                 var acum = [];
                 for(var i=0; i<filteredBindings.length; i++) {
                     var filteredBinding = filteredBindings[i];
@@ -34,8 +38,12 @@ QueryFilters.checkFilters = function(pattern, bindings, nullifyErrors, dataset, 
                 bindings = acum;
                 k();
             });
-        },function(){
-            callback(null, bindings.concat(nullified));
+        },function(err){
+            if(err != null) {
+                callback(err);
+            } else {
+                callback(null, bindings.concat(nullified));
+            }
         });
     });
 };
@@ -209,10 +217,9 @@ QueryFilters.run = function(filterExpr, bindings, nullifyFilters, dataset, env, 
         var filteredBindings = [];
         for(var i=0; i<bindings.length; i++) {
             var thisDenormBindings = denormBindings[i];
-            var ebv = QueryFilters.runFilter(filterExpr, thisDenormBindings, queryEngine, dataset, env);
             // ebv can be directly a RDFTerm (e.g. atomic expression in filter)
             // this additional call to ebv will return -> true/false/error
-            var ebv = QueryFilters.ebv(ebv);
+            var ebv = QueryFilters.ebv(QueryFilters.runFilter(filterExpr, thisDenormBindings, queryEngine, dataset, env));
             //console.log("EBV:")
             //console.log(ebv)
             //console.log("FOR:")
@@ -234,7 +241,7 @@ QueryFilters.run = function(filterExpr, bindings, nullifyFilters, dataset, env, 
                 }
             }
         }
-        callback(filteredBindings);
+        callback(null, filteredBindings);
     });
 };
 
@@ -428,7 +435,21 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
     }
 };
 
+// Evaluates an expression; every sub-expression goes through here as well. An exception while evaluating
+// (e.g. a builtin applied to an unbound variable, or a failing custom function) is an expression error, as
+// in SPARQL, so || and && can still decide. An unsupported feature is noted on the query environment, and
+// the query reports it once it has finished (see QueryEngine.executeSelect).
 QueryFilters.runFilter = function(filterExpr, bindings, queryEngine, dataset, env) {
+    try {
+        return QueryFilters.runExpression(filterExpr, bindings, queryEngine, dataset, env);
+    } catch(e) {
+        if(e instanceof NonSupportedSparqlFeatureError && env != null && env.unsupportedFeature == null)
+            env.unsupportedFeature = e;
+        return QueryFilters.ebvError();
+    }
+};
+
+QueryFilters.runExpression = function(filterExpr, bindings, queryEngine, dataset, env) {
     //console.log("RUNNING FILTER");
     //console.log(filterExpr);
     if(filterExpr.expressionType != null) {
@@ -929,8 +950,6 @@ QueryFilters.effectiveTypeValue = function(val){
         }
     } else {
         // @todo
-        console.log("not implemented yet");
-        console.log(val);
         throw("value not supported in operations yet");
     }
 };
@@ -1469,7 +1488,7 @@ QueryFilters.runBuiltInCall = function(builtincall, args, bindings, queryEngine,
         } else if(queryEngine.customFns[builtincall] != null) {
             return queryEngine.customFns[builtincall](QueryFilters, ops);
         } else {
-            throw ("Builtin call "+builtincall+" not implemented yet");
+            throw new NonSupportedSparqlFeatureError(builtincall, "Builtin call "+builtincall+" not implemented yet");
         }
     }
 };

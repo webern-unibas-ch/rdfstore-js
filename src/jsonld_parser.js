@@ -39,7 +39,6 @@ var toTriples = async function (input, graph) {
 
 
     // generate triples
-    var quit = false;
     var triples = normalized;
     for (var i = 0; i < triples.length; i++) {
         var triple = triples[i];
