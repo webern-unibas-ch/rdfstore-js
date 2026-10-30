@@ -29,6 +29,7 @@ Please read this README file carefully to find the current set of features.
 	- [Store creation](#store-creation)
 	- [Query execution](#query-execution)
 	- [Error handling](#error-handling)
+	- [Promise API](#promise-api)
 	- [Construct queries RDF Interfaces API](#construct-queries-rdf-interfaces-api)
 	- [Loading remote graphs](#loading-remote-graphs)
 	- [High level interface](#high-level-interface)
@@ -156,12 +157,14 @@ It writes a script-tag bundle (`dist/rdfstore.js`, `dist/rdfstore_min.js`) and a
 
 ## Module formats
 
+*ES module support (`import` in Node.js, the `browser` export condition and the `.mjs` bundles): since v0.9.18-alpha.24.*
+
 Which file you get depends on how the package is loaded:
 
 | Environment | Entry | API |
 |---|---|---|
-| Node.js, `require('rdfstore')` or `import('rdfstore')` | `src/store.js` | `create`, `connect`, `Store` (named exports with `import`) |
-| Bundlers targeting the browser (esbuild, Vite, webpack, Rollup), via the `browser` export condition | `dist/rdfstore.mjs` | named exports `create`, `connect`, `Store`, plus a default export |
+| Node.js, `require('rdfstore')` or `import('rdfstore')` | `src/store.js` | `create`, `connect`, `Store`, `promises` (named exports with `import`) |
+| Bundlers targeting the browser (esbuild, Vite, webpack, Rollup), via the `browser` export condition | `dist/rdfstore.mjs` | named exports `create`, `connect`, `Store`, `promises`, plus a default export |
 | `<script src="dist/rdfstore_min.js">` | `dist/rdfstore.js`, `dist/rdfstore_min.js` | global `rdfstore` |
 | `<script type="module">` | `dist/rdfstore_min.mjs` | as the ES module bundle |
 
@@ -175,6 +178,10 @@ create(function(err, store) {
 ```
 
 The browser bundles replace Node's `http`, `https`, `url`, `fs` and `path` modules with empty stubs. Loading data from a remote URL or a local file therefore only works through the Node.js entry. In the browser, load data from strings.
+
+*Since v0.9.18-alpha.25.*
+
+TypeScript declarations ship with the package (`types/rdfstore.d.ts`) and are picked up automatically for every entry above. They cover the store, its promise API, the query results (`SelectResult`, `Graph`, ...) and the RDF Interfaces model.
 
 ## Tests
 
@@ -225,8 +232,8 @@ store.execute("SELECT * { ?s ?p ?o }", function(err, results){
 
 // execution with an explicit default and named graph
 
-var defaultGraph = [{'token':'uri', 'value': graph1}, {'token':'uri', 'value': graph2}, ...];
-var namedGraphs  = [{'token':'uri', 'value': graph3}, {'token':'uri', 'value': graph4}, ...];
+var defaultGraph = [graph1, graph2, ...]; // graph URIs as strings
+var namedGraphs  = [graph3, graph4, ...];
 
 store.executeWithEnvironment("SELECT * { ?s ?p ?o }",defaultGraph,
   namedGraphs, function(err, results) {
@@ -237,6 +244,8 @@ store.executeWithEnvironment("SELECT * { ?s ?p ?o }",defaultGraph,
 ```
 
 ### Error handling
+
+*Since v0.9.18-alpha.25.*
 
 Every callback is called exactly once, as `callback(err, result)`. If the operation fails, `err` is an `Error` and `result` is not set. This covers SPARQL syntax errors, unsupported SPARQL features (`err.name === 'NonSupportedSparqlFeatureError'`), and data that cannot be loaded or parsed. None of these are thrown, so a failing query inside another callback cannot crash the process.
 
@@ -251,6 +260,31 @@ store.execute("SELECT * WHERE { ?s ", function(err, results) {
 ```
 
 Two cases still throw synchronously: calling a method with the wrong arguments (a programming error), and an exception thrown by your own callback, which the store does not catch and never reports back to you as `err`.
+
+### Promise API
+
+*Since v0.9.18-alpha.25.*
+
+`rdfstore.promises.create()` and `store.promises` offer the asynchronous methods with promises instead of callbacks. Each method takes the same arguments as its callback version, minus the callback. It resolves with the callback's result and rejects with its error.
+
+```javascript
+const store = await rdfstore.promises.create();
+
+const count = await store.promises.load('text/turtle', turtleString);
+const results = await store.promises.execute('SELECT * { ?s ?p ?o }');
+
+try {
+  await store.promises.execute('SELECT * WHERE { ?s ');
+} catch(err) {
+  console.error(err.message); // SPARQL syntax error
+}
+
+await store.promises.close();
+```
+
+The promise methods are `execute`, `executeWithEnvironment`, `load`, `insert`, `delete`, `clear`, `graph`, `node`, `registeredGraphs` and `close`. A promise method never throws: calling it with the wrong arguments rejects too.
+
+The promise API lives in its own namespace, so the callback API keeps working unchanged. The callback methods also keep their optional callbacks: `store.execute(query)` without a callback still ignores the result instead of returning a promise. The events API has no promise version, because its listeners fire more than once.
 
 ### Construct queries RDF Interfaces API
 

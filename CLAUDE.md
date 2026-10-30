@@ -17,6 +17,7 @@ yarn test                    # parse-grammar + specs + e2e
 yarn build                   # parse-grammar + esbuild bundles -> dist/rdfstore{,_min}.js (IIFE) + dist/rdfstore{,_min}.mjs (ESM)
 yarn parse-grammar           # regenerate src/parser.js from grammar/sparql_query.grammar
 yarn lint                    # ESLint (no-undef only) over src/, without parser.js and perftest/
+yarn types                   # tsc check of types/rdfstore.d.ts against types/test.{mts,cts}
 ```
 
 Run a single spec file, or filter by spec name:
@@ -28,13 +29,14 @@ yarn jasmine spec/query_engine_spec.js --filter="some describe/it text"
 
 A single e2e script: `yarn e2e:basic`, `yarn e2e:comprehensive`, `yarn e2e:readme`, `yarn e2e:esm`. `e2e:esm` imports the package as Node does (`src/store.js`), checks that the `browser` condition resolves to `dist/rdfstore.mjs`, and runs queries against that bundle. Run `yarn build` before `yarn e2e` or `yarn test`: otherwise the test fails (no bundle) or checks a stale one.
 
-CI ([.github/workflows/main.yml](.github/workflows/main.yml)) runs `yarn lint`, `yarn unit`, `yarn build`, then `yarn e2e` on Node 22.x, 24.x and 26.x, each with the newest patch release (`check-latest`).
+CI ([.github/workflows/main.yml](.github/workflows/main.yml)) runs `yarn lint`, `yarn types`, `yarn unit`, `yarn build`, then `yarn e2e` on Node 22.x, 24.x and 26.x, each with the newest patch release (`check-latest`).
 
 ## Generated / committed artifacts
 
 - [src/parser.js](src/parser.js) (~16k lines) is **generated** by [Peggy](https://peggyjs.org/) from [grammar/sparql_query.grammar](grammar/sparql_query.grammar) via [grammar/parse_grammar.js](grammar/parse_grammar.js). Never edit it by hand: change the grammar and run `yarn parse-grammar`. It is committed. `yarn unit`, `yarn test` and `yarn build` regenerate it on every run.
 - `dist/rdfstore.js`, `dist/rdfstore_min.js` (IIFE, global `rdfstore`) and `dist/rdfstore.mjs`, `dist/rdfstore_min.mjs` (ES module, from [src/index.mjs](src/index.mjs)) are build outputs and are also committed, but **only rebuilt when cutting a release**. If you run `yarn build` to verify a change, discard the output with `git checkout -- dist`, and delete any `dist/*.mjs` that `git status` lists as untracked (`git checkout` does not remove them). Leftovers can make e2e pass for the wrong reason.
 - The package `exports` map sends the `browser` condition (browser bundlers) to `dist/rdfstore.mjs` and everything else, so Node's `require` and `import`, to `src/store.js`. Node's ESM gets the named exports from the CommonJS source via its export detection. Browser consumers only see `src/` changes after a rebuild. `./dist/*` is exported for script-tag and CDN paths.
+- The `types` condition (first) and the `types` field point to [types/rdfstore.d.ts](types/rdfstore.d.ts). It is hand-written: when a public `Store` method or its result changes, update it and the usage files in `types/`. `typescript` is held at `^6`, because Yarn 4.16 cannot install TypeScript 7.
 - [esbuild.config.mjs](esbuild.config.mjs) bundles `src/store.js` as an IIFE with global `rdfstore` and [src/index.mjs](src/index.mjs) as an ES module. Both builds alias Node built-ins (`http`, `https`, `url`, `fs`, `path`) to [stubs/empty.js](stubs/empty.js), and the `n3ParserOnly` plugin narrows `require('n3')` in [src/rvn3_parser.js](src/rvn3_parser.js) to `export { Parser } from "n3"`, so the bundles carry only the N3.js parser (about 170 kB smaller). If `src/` needs more of n3 (Writer, Store, …), extend that re-export, otherwise it is `undefined` in the browser bundles only. Node uses the full `n3` package.
 
 ## Architecture
@@ -42,6 +44,8 @@ CI ([.github/workflows/main.yml](.github/workflows/main.yml)) runs `yarn lint`, 
 Everything is callback-based (`callback(err, result)`) and asynchronous. There are no Promises in the core.
 
 Every error reaches the caller's callback exactly once, as `callback(err)` ([spec/error_contract_spec.js](spec/error_contract_spec.js)). Never `throw` inside async code: pass the error on. Internal select-unit callbacks (`executeSelectUnit`, `QueryFilters.checkFilters`) are node-style `(err, bindings)`. Public entry points guard the callback with `Utils.once`. In their catch they rethrow if the callback already ran, so an exception from the user's own callback isn't reported a second time.
+
+`store.promises` and `rdfstore.promises.create` ([src/store_promises.js](src/store_promises.js)) wrap the callback API with `Utils.toPromise`. Each wrapper calls the store method with the exact argument count of the intended form, because the methods dispatch on `arguments.length`. The core stays callback-based.
 
 **Every `src/` module is strict mode** (`"use strict";` at the top), so the CommonJS entry behaves like the ES module bundle. Declare every name with `var`: an implicit global throws in strict mode. [eslint.config.mjs](eslint.config.mjs) enables only `no-undef` to catch this statically, including on paths the specs never run. It cannot see `this` inside plain callbacks, which is `undefined` in strict mode: capture `var that = this;` in the method instead.
 
