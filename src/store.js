@@ -9,6 +9,7 @@ var PersistentLexicon = require("./persistent_lexicon").PersistentLexicon;
 var RDFModel = require("./rdf_model");
 var _ = require("./utils");
 var NetworkTransport = require("./network_transport").NetworkTransport;
+var StorePromises = require("./store_promises").StorePromises;
 
 
 /**
@@ -55,6 +56,7 @@ var Store = function(arg1, arg2) {
 		QuadBackend = PersistentBackend;
     }
     this.functionMap = {};
+    this.promises = new StorePromises(this);
 
     var that = this;
     this.customFns = {};
@@ -918,6 +920,19 @@ Store.yieldFrequency = function(val) {
     _.yieldFrequency(val);
 };
 
+/**
+ * Promise version of <code>create</code>: resolves with the new store.
+ * The store's own promise methods are in <code>store.promises</code>.
+ *
+ * @param {Object} [params] configuration parameters, see the Store constructor
+ */
+var promises = {
+    create: function(params) {
+        return _.toPromise(function(cb) { new Store(params || {}, cb); });
+    }
+};
+
 module.exports.Store = Store;
 module.exports.create = create;
 module.exports.connect = connect;
+module.exports.promises = promises;

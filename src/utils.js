@@ -472,6 +472,23 @@ var once = function (callback) {
     return wrapped;
 };
 
+// Runs fn(callback) and settles a promise with its node-style result; a synchronous throw rejects too.
+var toPromise = function (fn) {
+    return new Promise(function (resolve, reject) {
+        try {
+            fn(function (err, result) {
+                if (err) {
+                    reject(toError(err));
+                } else {
+                    resolve(result);
+                }
+            });
+        } catch (e) {
+            reject(toError(e));
+        }
+    });
+};
+
 
 var isWorker = function() {
     if(typeof(process) === "undefined" || process.browser === true) {
@@ -516,6 +533,7 @@ module.exports = {
     seq: seq,
     once: once,
     toError: toError,
+    toPromise: toPromise,
     yieldFrequency: function(value){
         yieldFrequency = value;
     }

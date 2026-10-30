@@ -28,4 +28,27 @@ describe("Utils", function () {
             done();
         })
     })
+
+    describe("toPromise", function() {
+
+        it("resolves with the callback's result", async function() {
+            var result = await Utils.toPromise(function(cb) { setTimeout(function() { cb(null, 42); }, 0); });
+            expect(result).toBe(42);
+        });
+
+        it("rejects with the callback's error", async function() {
+            var error = new Error("boom");
+            await expectAsync(Utils.toPromise(function(cb) { cb(error); })).toBeRejectedWith(error);
+        });
+
+        it("rejects a synchronous throw as an Error", async function() {
+            var promise = Utils.toPromise(function() { throw "not an Error"; });
+            await expectAsync(promise).toBeRejectedWithError(Error, "not an Error");
+        });
+
+        it("ignores later calls of the callback", async function() {
+            var result = await Utils.toPromise(function(cb) { cb(null, 1); cb(new Error("late")); });
+            expect(result).toBe(1);
+        });
+    });
 });
