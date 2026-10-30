@@ -2245,6 +2245,154 @@ describe("QueryEngine", function(){
     });
 
 
+    // "local name=value^^type" (type only for typed literals, "-" for unbound) for the given variables, in result order
+    var termRows = function(results, vars) {
+        return results.map(function(result) {
+            return vars.map(function(v) {
+                var term = result[v];
+                if(term == null) {
+                    return v + "=-";
+                }
+                return v + "=" + String(term.value).replace("http://example/", "") + (term.type ? "^^" + term.type.replace(/.*#/, "") : "");
+            }).join(" ");
+        });
+    };
+
+    it("Test ProjectedExpressions", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var query = 'PREFIX : <http://example/> INSERT DATA { :a :p "x"@en . :b :p 2 . :c :p :u }';
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT ?s (STR(?v) AS ?x) (?v AS ?y) { ?s :p ?v } ORDER BY ?s', function(err, results){
+                        expect(err).toBeNull();
+                        expect(termRows(results, ["s", "x", "y"])).toEqual(["s=a x=x y=x", "s=b x=2 y=2^^integer", "s=c x=u y=u"]);
+                        // an error leaves the variable unbound and keeps the solution
+                        engine.execute('PREFIX : <http://example/> SELECT ?s (LANG(?v) AS ?x) (-?v AS ?z) { ?s :p ?v } ORDER BY ?s', function(err, results){
+                            expect(err).toBeNull();
+                            expect(termRows(results, ["s", "x", "z"])).toEqual([
+                                "s=a x=en z=-",
+                                "s=b x= z=-2^^integer",
+                                "s=c x=- z=-"]);
+                            done();
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test ArithmeticResults", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var query = 'PREFIX : <http://example/> INSERT DATA { :b :p 2 . :c :p :u }';
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT ?s ?x ?y ?z { ?s :p ?v BIND(?v + 1 AS ?x) BIND(1/"a" AS ?y) BIND(!(1/"a") AS ?z) } ORDER BY ?s', function(err, results){
+                        expect(err).toBeNull();
+                        expect(termRows(results, ["s", "x", "y", "z"])).toEqual(["s=b x=3^^integer y=- z=-", "s=c x=- y=- z=-"]);
+                        expect(typeof results[0].x.value).toBe("string");
+                        engine.execute('PREFIX : <http://example/> SELECT ?s (?v / 4 AS ?x) (?v / 0 AS ?y) { ?s :p ?v } ORDER BY ?s', function(err, results){
+                            expect(err).toBeNull();
+                            expect(termRows(results, ["s", "x", "y"])).toEqual(["s=b x=0.5^^decimal y=-", "s=c x=- y=-"]);
+                            // error || true is true
+                            engine.execute('PREFIX : <http://example/> SELECT ?s { ?s :p ?v FILTER(?v + 1 > 2 || true) } ORDER BY ?s', function(err, results){
+                                expect(err).toBeNull();
+                                expect(termRows(results, ["s"])).toEqual(["s=b", "s=c"]);
+                                done();
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test ComputedLiteralForms", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var query = 'PREFIX : <http://example/> INSERT DATA { :b :p 2 . :c :p 3 }';
+                var xsd = 'PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> ';
+
+                engine.execute(query, function(err, result){
+                    // a computed INF is read back as infinity
+                    engine.execute(xsd + 'PREFIX : <http://example/> SELECT ?s ?x ?y { ?s :p ?v BIND(?v / "0"^^xsd:double AS ?x) BIND(?x + 1 AS ?y) FILTER(?x > 1) } ORDER BY ?s', function(err, results){
+                        expect(err).toBeNull();
+                        expect(termRows(results, ["s", "x", "y"])).toEqual(["s=b x=INF^^double y=INF^^double", "s=c x=INF^^double y=INF^^double"]);
+                        // a large integer keeps its digits
+                        engine.execute('PREFIX : <http://example/> SELECT ?x ?y { :b :p ?v BIND(10000000000 * 10000000000 * 10 AS ?x) BIND(?x + ?v AS ?y) }', function(err, results){
+                            expect(err).toBeNull();
+                            expect(termRows(results, ["x", "y"])).toEqual(["x=1000000000000000000000^^integer y=1000000000000000000000^^integer"]);
+                            // the same form from an aggregate
+                            engine.execute(xsd + 'PREFIX : <http://example/> SELECT (SUM(?v) / "0"^^xsd:double AS ?a) { ?s :p ?v } HAVING (?a > 1)', function(err, results){
+                                expect(err).toBeNull();
+                                expect(termRows(results, ["a"])).toEqual(["a=INF^^double"]);
+                                done();
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test OrderByProjectedExpression", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var query = 'PREFIX : <http://example/> INSERT DATA { :b :p 2 . :c :p 3 . :d :p :u }';
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT ?s (?v * 2 AS ?d) { ?s :p ?v } ORDER BY DESC(?d) LIMIT 2', function(err, results){
+                        expect(err).toBeNull();
+                        expect(termRows(results, ["s", "d"])).toEqual(["s=c d=6^^integer", "s=b d=4^^integer"]);
+                        // the effective boolean value of an IRI is an error, and so is its negation
+                        engine.execute('PREFIX : <http://example/> SELECT ?s { ?s :p ?v FILTER(!?v) }', function(err, results){
+                            expect(err).toBeNull();
+                            expect(termRows(results, ["s"])).toEqual([]);
+                            // AVG of values that are no numbers is unbound, AVG of no values is 0
+                            engine.execute('PREFIX : <http://example/> SELECT ?s (AVG(?v) AS ?a) { ?s :p ?v } GROUP BY ?s ORDER BY ?s', function(err, results){
+                                expect(err).toBeNull();
+                                expect(termRows(results, ["s", "a"])).toEqual(["s=b a=2^^decimal", "s=c a=3^^decimal", "s=d a=-"]);
+                                engine.execute('PREFIX : <http://example/> SELECT (AVG(?v) AS ?a) { ?s :nothing ?v }', function(err, results){
+                                    expect(err).toBeNull();
+                                    expect(termRows(results, ["a"])).toEqual(["a=0^^integer"]);
+                                    done();
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test ChainedBinds", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var query = 'PREFIX : <http://example/> INSERT DATA { :b :p 2 }';
+
+                engine.execute(query, function(err, result){
+                    // a BIND sees the variables of the BINDs before it
+                    engine.execute('PREFIX : <http://example/> SELECT ?x ?y ?z { ?s :p ?v BIND(?v + 1 AS ?x) BIND(?x * 10 AS ?y) BIND(STR(?y) AS ?z) }', function(err, results){
+                        expect(err).toBeNull();
+                        expect(termRows(results, ["x", "y", "z"])).toEqual(["x=3^^integer y=30^^integer z=30"]);
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
     it("Test BIND", function(done){
         new Lexicon(function(lexicon){
             new QuadBackend({treeOrder: 15}, function(backend){
@@ -2275,7 +2423,7 @@ describe("QueryEngine", function(){
 
                     engine.execute(query, function(err, results){
                         expect(results.length == 1);
-                        expect(results[0].price.value).toBe(17.25);
+                        expect(results[0].price.value).toBe('17.25');
                         expect(results[0].title.value).toBe("The Semantic Web");
                         done();
                     });

@@ -83,6 +83,63 @@ describe('QueryFilters', function() {
 
     });
 
+    it('should report a type error in arithmetic as an error', function() {
+        var string = createLiteralExpression('a', null);
+        var arithmetic = function(type, first, operator, second) {
+            var expr = {expressionType: type};
+            if(type === 'additiveexpression') {
+                expr.summand = first;
+                expr.summands = [ { operator: operator, expression: second } ];
+            } else {
+                expr.factor = first;
+                expr.factors = [ { operator: operator, expression: second } ];
+            }
+            return QueryFilters.runFilter(expr, {}, null, null, null);
+        };
+
+        expect(QueryFilters.isEbvError(arithmetic('additiveexpression', string, '+', createIntegerExpression(1)))).toBe(true);
+        expect(QueryFilters.isEbvError(arithmetic('additiveexpression', createIntegerExpression(1), '-', string))).toBe(true);
+        expect(QueryFilters.isEbvError(arithmetic('multiplicativeexpression', string, '*', createIntegerExpression(2)))).toBe(true);
+        expect(QueryFilters.isEbvError(arithmetic('multiplicativeexpression', createIntegerExpression(2), '/', string))).toBe(true);
+        // an error in a later operand
+        expect(QueryFilters.isEbvError(arithmetic('multiplicativeexpression', createIntegerExpression(3), '*',
+            {expressionType: 'multiplicativeexpression', factor: createIntegerExpression(2), factors: [ { operator: '/', expression: string } ]}))).toBe(true);
+    });
+
+    it('should report the negation of an error as an error', function() {
+        var expr = {
+            expressionType: 'unaryexpression',
+            unaryexpression: '!',
+            expression: {
+                expressionType: 'additiveexpression',
+                summand: createLiteralExpression('a', null),
+                summands: [ { operator: '+', expression: createIntegerExpression(1) } ]
+            }
+        };
+        expect(QueryFilters.isEbvError(QueryFilters.runFilter(expr, {}, null, null, null))).toBe(true);
+    });
+
+    it('should divide as op:numeric-divide', function() {
+        var divide = function(a, b) {
+            return QueryFilters.runFilter({
+                expressionType: 'multiplicativeexpression',
+                factor: a,
+                factors: [ { operator: '/', expression: b } ]
+            }, {}, null, null, null);
+        };
+        var xsd = 'http://www.w3.org/2001/XMLSchema#';
+
+        // integer / integer is a decimal
+        var half = divide(createIntegerExpression('1'), createIntegerExpression('2'));
+        expect(half.type).toBe(xsd + 'decimal');
+        expect(half.value).toBe(0.5);
+        expect(divide(createIntegerExpression('4'), createIntegerExpression('2')).type).toBe(xsd + 'decimal');
+        // division by zero: an error for integers and decimals, infinity for doubles
+        expect(QueryFilters.isEbvError(divide(createIntegerExpression('1'), createIntegerExpression('0')))).toBe(true);
+        expect(QueryFilters.isEbvError(divide(createLiteralExpression('1.0', xsd + 'decimal'), createIntegerExpression('0')))).toBe(true);
+        expect(divide(createLiteralExpression('1', xsd + 'double'), createIntegerExpression('0')).value).toBe(Infinity);
+    });
+
     it('should run regex filters', function(done) {
         var text = {
             expressionType: 'atomic',

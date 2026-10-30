@@ -412,59 +412,73 @@ QueryEngine.prototype.groupScope = function(plan, denormGroup, dataset, env) {
     }
     for(i=0; i<plan.projection.length; i++) {
         var projected = plan.projection[i];
-        if(projected.expression == null) {
-            scope[projected.name] = QueryFilters.runAggregator(projected.item, denormGroup, this, dataset, env);
-        } else {
-            // an error leaves the variable unbound; computed literals carry their value as a number
-            value = QueryFilters.runFilter(projected.expression, scope, this, dataset, env);
-            if(!QueryFilters.isEbvError(value)) {
-                scope[projected.name] = value.value == null ? value : Utils.clone(value);
-                if(value.value != null) {
-                    scope[projected.name].value = "" + value.value;
-                }
-            }
+        value = projected.expression == null ?
+            QueryFilters.runAggregator(projected.item, denormGroup, this, dataset, env) :
+            QueryFilters.runFilter(projected.expression, scope, this, dataset, env);
+        // an error leaves the variable unbound
+        if(!QueryFilters.isEbvError(value)) {
+            scope[projected.name] = QueryFilters.resultTerm(value);
         }
     }
     return scope;
 };
 
 
-QueryEngine.prototype.projectBindings = function(projection, results, dataset, env) {
-    if(projection[0].kind === '*') {
-        return results;
-    } else {
-        var projectedResults = [];
+// Adds the SELECT aliases to copies of the solutions (SPARQL 1.1 Extend, before ORDER BY). Expressions are
+// evaluated on the terms of the variables they use, not on OIDs; an error leaves the alias unbound.
+QueryEngine.prototype.extendBindings = function(projection, results, dataset, env, callback) {
+    var aliased = [];
+    var used = [];
+    for(var j=0; projection[0].kind !== '*' && j<projection.length; j++) {
+        if(projection[j].kind === 'aliased') {
+            aliased.push(projection[j]);
+            QueryEngine.expressionVariables(projection[j].expression, used);
+        }
+    }
+    if(aliased.length === 0) {
+        return callback(results);
+    }
+    var usedBindings = results.map(function(result) {
+        var usedResult = {};
+        for(var u=0; u<used.length; u++) {
+            usedResult[used[u]] = result[used[u]];
+        }
+        return usedResult;
+    });
+    var that = this;
+    this.copyDenormalizedBindings(usedBindings, env.outCache, function(denormResults) {
         var expressionEnv = {blanks:{}, outCache:{}};
-
+        var extended = [];
         for(var i=0; i<results.length; i++) {
-            var currentResult = results[i];
-            var currentProjected = {};
-            var shouldAdd = true;
-
-            for(var j=0; j< projection.length; j++) {
-                if(projection[j].token == 'variable' && projection[j].kind != 'aliased') {
-                    currentProjected[projection[j].value.value] = currentResult[projection[j].value.value];
-                } else if(projection[j].token == 'variable' && projection[j].kind == 'aliased') {
-                    var ebv = QueryFilters.runFilter(projection[j].expression, currentResult, this, dataset, expressionEnv);
-                    if(QueryFilters.isEbvError(ebv)) {
-                        shouldAdd = false;
-                        break;
-                    } else {
-                        currentProjected[projection[j].alias.value] = ebv;
-                    }
-                }
+            var extendedResult = {};
+            for(var p in results[i]) {
+                extendedResult[p] = results[i][p];
             }
-
-            if(shouldAdd === true) {
-                projectedResults.push(currentProjected);
+            for(var j=0; j<aliased.length; j++) {
+                var ebv = QueryFilters.runFilter(aliased[j].expression, denormResults[i], that, dataset, expressionEnv);
+                extendedResult[aliased[j].alias.value] = QueryFilters.isEbvError(ebv) ? null : QueryFilters.resultTerm(ebv);
             }
-
+            extended.push(extendedResult);
         }
 
         if(env.unsupportedFeature == null)
             env.unsupportedFeature = expressionEnv.unsupportedFeature;
-        return projectedResults;
+        callback(extended);
+    });
+};
+
+QueryEngine.prototype.projectBindings = function(projection, results) {
+    if(projection[0].kind === '*') {
+        return results;
     }
+    return results.map(function(result) {
+        var projected = {};
+        for(var j=0; j<projection.length; j++) {
+            var name = projection[j].kind === 'aliased' ? projection[j].alias.value : projection[j].value.value;
+            projected[name] = result[name];
+        }
+        return projected;
+    });
 };
 
 QueryEngine.prototype.resolveNsInEnvironment = function(prefix, env) {
@@ -958,13 +972,15 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
                             callback(new Error("Incompatible Group and Projection variables"));
                         }
                     } else {
-                        that.applyOrderBy(order, result, dataset, env, function(orderedBindings){
-                            var projectedBindings = that.projectBindings(projection, orderedBindings, dataset, env);
-                            var modifiedBindings = that.applyModifier(modifier, projectedBindings);
-                            var limitedBindings = that.applyLimitOffset(offset, limit, modifiedBindings);
-                            var filteredBindings = that.removeDefaultGraphBindings(limitedBindings, dataset);
+                        that.extendBindings(projection, result, dataset, env, function(extendedBindings){
+                            that.applyOrderBy(order, extendedBindings, dataset, env, function(orderedBindings){
+                                var projectedBindings = that.projectBindings(projection, orderedBindings);
+                                var modifiedBindings = that.applyModifier(modifier, projectedBindings);
+                                var limitedBindings = that.applyLimitOffset(offset, limit, modifiedBindings);
+                                var filteredBindings = that.removeDefaultGraphBindings(limitedBindings, dataset);
 
-                            callback(null, filteredBindings);
+                                callback(null, filteredBindings);
+                            });
                         });
                     }
 
@@ -1019,10 +1035,7 @@ QueryEngine.prototype.groupSolution = function(bindings, group, dataset, queryEn
                         that.copyDenormalizedBindings([currentBindings], queryEnv.outCache, function(denormBindings){
                             var filterResultEbv = QueryFilters.runFilter(currentOrderClause.expression, denormBindings[0], that, dataset, queryEnv);
                             if(!QueryFilters.isEbvError(filterResultEbv)) {
-                                if(filterResultEbv.value != null) {
-                                    filterResultEbv.value = ""+filterResultEbv.value;
-                                }
-                                currentBindings[currentOrderClause.alias.value]= filterResultEbv;
+                                currentBindings[currentOrderClause.alias.value] = QueryFilters.resultTerm(filterResultEbv);
                             } else {
                                 mustAddBindings = false;
                             }
@@ -2020,9 +2033,11 @@ QueryEngine.prototype.runBinds = function(binds, bindings, dataset, env, callbac
                     var bind = binds[j];
                     var thisDenormBindings = denormBindings[i];
                     var ebv = QueryFilters.runFilter(bind.expression, thisDenormBindings, that, dataset, env);
-                    // SPARQL 1.1 Extend: if the expression raises an error, the variable stays unbound
+                    // SPARQL 1.1 Extend: if the expression raises an error, the variable stays unbound;
+                    // otherwise the following BINDs see it
                     if(!QueryFilters.isEbvError(ebv)) {
-                        originalBindings[i][bind.as.value] = ebv;
+                        originalBindings[i][bind.as.value] = QueryFilters.resultTerm(ebv);
+                        thisDenormBindings[bind.as.value] = originalBindings[i][bind.as.value];
                     }
                 }
             }

@@ -381,9 +381,11 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
                     }
                 }
 
-                var result = QueryFilters.runDivFunction(aggregated, {token: 'literal', type:xmlSchema+"integer", value:''+count});
-                result.value = ''+result.value;
-                return result;
+                // values but no numbers: AVG = SUM/COUNT is a type error (an empty group gives 0, see above)
+                if(count === 0) {
+                    return QueryFilters.ebvError();
+                }
+                return QueryFilters.resultTerm(QueryFilters.runDivFunction(aggregated, {token: 'literal', type:xmlSchema+"integer", value:''+count}));
             } else if(aggregator.expression.aggregateType === 'sum') {
                 var distinct = {};
                 var aggregated = {token: 'literal', type:xmlSchema+"integer", value:'0'};
@@ -407,8 +409,7 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
                     }
                 }
 
-                aggregated.value =''+aggregated.value;
-                return aggregated;
+                return QueryFilters.resultTerm(aggregated);
             } else if(aggregator.expression.aggregateType === 'group_concat') {
                 var distinct = {};
                 var values = [];
@@ -739,6 +740,9 @@ QueryFilters.ebv = function (term) {
             } else {
                 return QueryFilters.ebvError();
             }
+        } else if (term.token === 'uri' || term.token === 'blank') {
+            // an IRI or blank node has no effective boolean value
+            return QueryFilters.ebvError();
         } else {
             return term.value === true;
         }
@@ -814,120 +818,46 @@ QueryFilters.runRelationalFilter = function(filterExpr, op1, op2, bindings, quer
  * Transforms a JS object representing a [typed] literal in a javascript
  * value that can be used in javascript operations and functions
  */
+// The number of a numeric literal: its lexical form, or the number of a computed literal.
+QueryFilters.numericValue = function(value) {
+    if(value === 'INF' || value === '+INF') {
+        return Infinity;
+    } else if(value === '-INF') {
+        return -Infinity;
+    }
+    return typeof(value) === 'number' ? value : parseFloat(value);
+};
+
+// The lexical form of a computed number: INF, -INF and NaN for infinite and undefined results, and no
+// exponent notation (which JavaScript uses from 1e21 and below 1e-6) except for xsd:double and xsd:float.
+QueryFilters.lexicalForm = function(value, type) {
+    if(value === Infinity) {
+        return 'INF';
+    } else if(value === -Infinity) {
+        return '-INF';
+    }
+    var lexical = '' + value;
+    if(typeof(value) === 'number' && lexical.indexOf('e') !== -1 && type !== xmlSchema+"double" && type !== xmlSchema+"float") {
+        lexical = Number.isInteger(value) ? BigInt(value).toString() : value.toFixed(20).replace(/.?0+$/, '');
+    }
+    return lexical;
+};
+
+// A computed literal as a value of a solution: expressions compute literals with a number or boolean
+// value, while stored literals carry their lexical form as a string.
+QueryFilters.resultTerm = function(term) {
+    if(term == null || term.value == null || typeof(term.value) === 'string') {
+        return term;
+    }
+    var copy = Utils.clone(term);
+    copy.value = QueryFilters.lexicalForm(term.value, term.type);
+    return copy;
+};
+
 QueryFilters.effectiveTypeValue = function(val){
     if(val.token == 'literal') {
-        if(val.type == xmlSchema+"integer") {
-            var tmp = parseInt(val.value);
-            //if(isNaN(tmp)) {
-            //    return false;
-            //} else {
-            return tmp;
-            //}
-        } else if(val.type == xmlSchema+"decimal") {
-            var tmp = parseFloat(val.value);
-            //if(isNaN(tmp)) {
-            //    return false;
-            //} else {
-            return tmp;
-            //}
-        } else if (val.type == xmlSchema+"float") {
-            var tmp = parseFloat(val.value);
-            //if(isNaN(tmp)) {
-            //    return false;
-            //} else {
-            return tmp;
-            //}
-        } else if (val.type == xmlSchema+"double") {
-            var tmp = parseFloat(val.value);
-            //if(isNaN(tmp)) {
-            //    return false;
-            //} else {
-            return tmp;
-            //}
-        } else if (val.type == xmlSchema+"nonPositiveInteger") {
-            var tmp = parseFloat(val.value);
-            //if(isNaN(tmp)) {
-            //    return false;
-            //} else {
-            return tmp;
-            //}
-        } else if (val.type == xmlSchema+"negativeInteger") {
-            var tmp = parseInt(val.value);
-            //if(isNaN(tmp)) {
-            //    return false;
-            //} else {
-            return tmp;
-            //}
-        } else if (val.type == xmlSchema+"long") {
-            var tmp = parseInt(val.value);
-            //if(isNaN(tmp)) {
-            //    return false;
-            //} else {
-            return tmp;
-            //}
-        } else if (val.type == xmlSchema+"int") {
-            var tmp = parseInt(val.value);
-            //if(isNaN(tmp)) {
-            //    return false;
-            //} else {
-            return tmp;
-            //}
-        } else if (val.type == xmlSchema+"short") {
-            var tmp = parseInt(val.value);
-            //if(isNaN(tmp)) {
-            //    return false;
-            //} else {
-            return tmp;
-            //}
-        } else if (val.type == xmlSchema+"byte") {
-            var tmp = parseInt(val.value);
-            //if(isNaN(tmp)) {
-            //    return false;
-            //} else {
-            return tmp;
-            //}
-        } else if (val.type == xmlSchema+"nonNegativeInteger") {
-            var tmp = parseInt(val.value);
-            //if(isNaN(tmp)) {
-            //    return false;
-            //} else {
-            return tmp;
-            //}
-        } else if (val.type == xmlSchema+"unsignedLong") {
-            var tmp = parseInt(val.value);
-            //if(isNaN(tmp)) {
-            //    return false;
-            //} else {
-            return tmp;
-            //}
-        } else if (val.type == xmlSchema+"unsignedInt") {
-            var tmp = parseInt(val.value);
-            //if(isNaN(tmp)) {
-            //    return false;
-            //} else {
-            return tmp;
-            //}
-        } else if (val.type == xmlSchema+"unsignedShort") {
-            var tmp = parseInt(val.value);
-            //if(isNaN(tmp)) {
-            //    return false;
-            //} else {
-            return tmp;
-            //}
-        } else if (val.type == xmlSchema+"unsignedByte") {
-            var tmp = parseInt(val.value);
-            //if(isNaN(tmp)) {
-            //    return false;
-            //} else {
-            return tmp;
-            //}
-        } else if (val.type == xmlSchema+"positiveInteger" ) {
-            var tmp = parseInt(val.value);
-            //if(isNaN(tmp)) {
-            //    return false;
-            //} else {
-            return tmp;
-            //}
+        if(QueryFilters.isNumeric(val)) {
+            return QueryFilters.numericValue(val.value);
         } else if (val.type == xmlSchema+"date" ||
             val.type == xmlSchema+"dateTime" ) {
             try {
@@ -1259,6 +1189,7 @@ QueryFilters.runAddition = function(summand, summands, bindings, queryEngine, da
         return QueryFilters.ebvError();
     }
 
+    // a non-numeric operand is a type error
     var acum = summandOp;
     if(QueryFilters.isNumeric(summandOp)) {
         for(var i=0; i<summands.length; i++) {
@@ -1270,12 +1201,12 @@ QueryFilters.runAddition = function(summand, summands, bindings, queryEngine, da
                     acum = QueryFilters.runSubFunction(acum, nextSummandOp);
                 }
             } else {
-                return QueryFilters.ebvFalse();
+                return QueryFilters.ebvError();
             }
         }
         return acum;
     } else {
-        return QueryFilters.ebvFalse();
+        return QueryFilters.ebvError();
     }
 };
 
@@ -1319,13 +1250,11 @@ QueryFilters.runMultiplication = function(factor, factors, bindings, queryEngine
         return factorOp;
     }
 
+    // a non-numeric operand (or an error) is a type error
     var acum = factorOp;
     if(QueryFilters.isNumeric(factorOp)) {
         for(var i=0; i<factors.length; i++) {
             var nextFactorOp = QueryFilters.runFilter(factors[i].expression, bindings,queryEngine, dataset, env);
-            if(QueryFilters.isEbvError(nextFactorOp)) {
-                return factorOp;
-            }
             if(QueryFilters.isNumeric(nextFactorOp)) {
                 if(factors[i].operator === '*') {
                     acum = QueryFilters.runMulFunction(acum, nextFactorOp);
@@ -1333,12 +1262,12 @@ QueryFilters.runMultiplication = function(factor, factors, bindings, queryEngine
                     acum = QueryFilters.runDivFunction(acum, nextFactorOp);
                 }
             } else {
-                return QueryFilters.ebvFalse();
+                return QueryFilters.ebvError();
             }
         }
         return acum;
     } else {
-        return QueryFilters.ebvFalse();
+        return QueryFilters.ebvError();
     }
 };
 
@@ -1359,20 +1288,23 @@ QueryFilters.runMulFunction = function(faca, facb) {
     }
 };
 
+// op:numeric-divide: integer / integer is a decimal, and dividing a decimal or integer by zero is an error
+// (a float or double gives INF or NaN)
 QueryFilters.runDivFunction = function(faca, facb) {
     if(QueryFilters.isEbvError(faca) || QueryFilters.isEbvError(facb)) {
         return QueryFilters.ebvError();
     }
-    var val = QueryFilters.effectiveTypeValue(faca) / QueryFilters.effectiveTypeValue(facb);
+    var divisor = QueryFilters.effectiveTypeValue(facb);
+    var val = QueryFilters.effectiveTypeValue(faca) / divisor;
 
     if(QueryFilters.isDouble(faca) || QueryFilters.isDouble(facb)) {
         return {token: 'literal', type:xmlSchema+"double", value:val};
     } else if(QueryFilters.isFloat(faca) || QueryFilters.isFloat(facb)) {
         return {token: 'literal', type:xmlSchema+"float", value:val};
-    } else if(QueryFilters.isDecimal(faca) || QueryFilters.isDecimal(facb)) {
-        return {token: 'literal', type:xmlSchema+"decimal", value:val};
+    } else if(divisor == 0) {
+        return QueryFilters.ebvError();
     } else {
-        return {token: 'literal', type:xmlSchema+"integer", value:val};
+        return {token: 'literal', type:xmlSchema+"decimal", value:val};
     }
 };
 
@@ -1501,22 +1433,10 @@ QueryFilters.runUnaryExpression = function(unaryexpression, expression, bindings
 
     if(unaryexpression === '!') {
         var res = QueryFilters.ebv(op);
-        //console.log("** Unary ! ");
-        //console.log(op)
         if(QueryFilters.isEbvError(res)) {
-            //console.log("--- ERROR")
-            //console.log(QueryFilters.ebvFalse())
-            //console.log("\r\n")
-
-            // ??
-            return QueryFilters.ebvFalse();
+            return res;
         } else {
-            res = !res;
-            //console.log("--- BOOL")
-            //console.log(QueryFilters.ebvBoolean(res))
-            //console.log("\r\n")
-
-            return QueryFilters.ebvBoolean(res);
+            return QueryFilters.ebvBoolean(!res);
         }
     } else if(unaryexpression === '+') {
         if(QueryFilters.isNumeric(op)) {
