@@ -38,10 +38,11 @@ export type SelectResult = Bindings[];
 
 /**
  * Result of `execute`: SELECT gives `SelectResult`, CONSTRUCT a `Graph`,
- * ASK a `boolean`, an update `true`. Pass the expected type as type argument,
- * e.g. `execute<SelectResult>(query)`, to skip narrowing.
+ * ASK a `boolean`, `LOAD` the number of loaded triples, any other update `true`.
+ * Pass the expected type as type argument, e.g. `execute<SelectResult>(query)`,
+ * to skip narrowing.
  */
-export type QueryResult = SelectResult | Graph | boolean;
+export type QueryResult = SelectResult | Graph | boolean | number;
 
 // ---------------------------------------------------------------------------
 // RDF Interfaces model (store.rdf)

@@ -473,20 +473,29 @@ var once = function (callback) {
 };
 
 // Runs fn(callback) and settles a promise with its node-style result; a synchronous throw rejects too.
+// A throw after the callback already ran is rethrown, as at the callback entry points: the promise
+// is settled by then and would swallow it.
 var toPromise = function (fn) {
-    return new Promise(function (resolve, reject) {
-        try {
-            fn(function (err, result) {
-                if (err) {
-                    reject(toError(err));
-                } else {
-                    resolve(result);
-                }
-            });
-        } catch (e) {
-            reject(toError(e));
-        }
+    var settle;
+    var promise = new Promise(function (resolve, reject) {
+        settle = function (err, result) {
+            if (err) {
+                reject(toError(err));
+            } else {
+                resolve(result);
+            }
+        };
     });
+    var done = once(settle);
+    try {
+        fn(done);
+    } catch (e) {
+        if (done.called) {
+            throw e;
+        }
+        done(e);
+    }
+    return promise;
 };
 
 

@@ -46,6 +46,14 @@ describe("Utils", function () {
             await expectAsync(promise).toBeRejectedWithError(Error, "not an Error");
         });
 
+        it("rethrows a throw after the callback ran instead of swallowing it", async function() {
+            var promise;
+            expect(function() {
+                promise = Utils.toPromise(function(cb) { cb(null, 1); throw new Error("after callback"); });
+            }).toThrowError("after callback");
+            expect(promise).toBeUndefined();
+        });
+
         it("ignores later calls of the callback", async function() {
             var result = await Utils.toPromise(function(cb) { cb(null, 1); cb(new Error("late")); });
             expect(result).toBe(1);

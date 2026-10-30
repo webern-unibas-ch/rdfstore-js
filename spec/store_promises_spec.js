@@ -41,6 +41,12 @@ describe("Promise API", function() {
             expect(store instanceof rdfstore.Store).toBe(true);
             expect(await store.promises.load("text/turtle", TURTLE)).toBe(2);
         });
+
+        it("leaves the caller's options unchanged", async function() {
+            var options = {treeOrder: 4};
+            await rdfstore.promises.create(options);
+            expect(options).toEqual({treeOrder: 4});
+        });
     });
 
     describe("load", function() {
@@ -62,6 +68,16 @@ describe("Promise API", function() {
             expect(await store.promises.load("text/turtle", '<d> <http://p> "3" .', {graph: "http://g", baseURI: "http://base/"})).toBe(1);
             var rows = await store.promises.execute("SELECT ?s { GRAPH <http://g> { ?s ?p ?o } }");
             expect(rows[0].s.value).toBe("http://base/d");
+        });
+
+        it("leaves the caller's options unchanged, so they can be reused", async function() {
+            var store = await newStore();
+            var options = {graph: "http://g"};
+            await store.promises.load("text/turtle", '<http://a> <http://p> "1" .', options);
+            await store.promises.load("text/turtle", '<http://b> <http://p> "2" .', options);
+            expect(options).toEqual({graph: "http://g"});
+            expect((await store.promises.graph("http://g")).length).toBe(2);
+            expect((await store.promises.graph()).length).toBe(0);
         });
 
         it("rejects bad Turtle with an Error", async function() {
@@ -206,6 +222,26 @@ describe("Promise API", function() {
 
         it("resolves close", async function() {
             expect(await store.promises.close()).toBeUndefined();
+        });
+    });
+
+    describe("detached methods", function() {
+
+        it("work when taken off store.promises", async function() {
+            var store = await newStore();
+            var { load, execute } = store.promises;
+            expect(await load("text/turtle", TURTLE)).toBe(2);
+            var results = await Promise.all(["ASK { <http://a> ?p ?o }", "ASK { <http://z> ?p ?o }"].map(function(query) {
+                return execute(query);
+            }));
+            expect(results).toEqual([true, false]);
+        });
+
+        it("are built once per store", async function() {
+            var store = await newStore();
+            var other = await newStore();
+            expect(store.promises).toBe(store.promises);
+            expect(store.promises).not.toBe(other.promises);
         });
     });
 
