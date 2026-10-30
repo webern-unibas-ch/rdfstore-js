@@ -24,8 +24,31 @@ rdfstore.create(function(err, store) {
                 console.log(`   ${i+1}. ${result.s.value} → ${result.p.value} → ${result.o.value}`);
             });
             
-            console.log('\n✅ Basic E2E test passed!\n');
             store.close();
+            promiseScenario();
         });
     });
 });
+
+// The same steps through the promise API
+async function promiseScenario() {
+    try {
+        const store = await rdfstore.promises.create();
+        console.log('✅ Store created (promises)');
+
+        const count = await store.promises.load('text/turtle', '<person:jane> <foaf:name> "Jane Doe" .');
+        console.log(`✅ Loaded ${count} triple(s) (promises)`);
+
+        const results = await store.promises.execute('SELECT * WHERE { ?s ?p ?o }');
+        if (results.length !== 1 || results[0].o.value !== 'Jane Doe') {
+            throw new Error(`unexpected results: ${JSON.stringify(results)}`);
+        }
+        console.log(`✅ Query returned ${results.length} result(s) (promises)`);
+
+        await store.promises.close();
+        console.log('\n✅ Basic E2E test passed!\n');
+    } catch (err) {
+        console.error('❌ Promise API failed:', err);
+        process.exitCode = 1;
+    }
+}

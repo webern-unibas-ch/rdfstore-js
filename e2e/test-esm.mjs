@@ -37,23 +37,18 @@ ex:alice ex:knows ex:bob .
 ex:bob ex:knows ex:carol .
 ex:alice ex:name "Alice" .`;
 
-// Turns the store's callback API into a promise, for this test only
-function call(target, method, ...args) {
-  return new Promise((resolve, reject) => {
-    target[method](...args, (err, result) => (err ? reject(err) : resolve(result)));
-  });
-}
-
 async function runScenario(mod) {
   check(['create', 'Store', 'connect'].every((name) => typeof mod[name] === 'function'),
     'Named exports create, Store, connect');
-  check(mod.default != null && typeof mod.default.create === 'function', 'Default export with create');
+  check(mod.promises != null && typeof mod.promises.create === 'function', 'Named export promises with create');
+  check(mod.default != null && typeof mod.default.create === 'function' && mod.default.promises === mod.promises,
+    'Default export with create and promises');
 
-  const store = await call(mod, 'create');
-  const count = await call(store, 'load', 'text/turtle', turtle);
+  const store = await mod.promises.create();
+  const count = await store.promises.load('text/turtle', turtle);
   check(count === 3, `Loaded ${count} triples`);
 
-  const rows = await call(store, 'execute',
+  const rows = await store.promises.execute(
     'SELECT ?s ?o WHERE { ?s <http://example.org/knows> ?o } ORDER BY ?s');
   const pairs = rows.map((row) => `${row.s.value} ${row.o.value}`);
   check(JSON.stringify(pairs) === JSON.stringify([
@@ -61,14 +56,17 @@ async function runScenario(mod) {
     'http://example.org/bob http://example.org/carol'
   ]), `SELECT returned ${rows.length} expected bindings`);
 
-  const graph = await call(store, 'execute',
+  const graph = await store.promises.execute(
     'CONSTRUCT { ?o <http://example.org/knownBy> ?s } WHERE { ?s <http://example.org/knows> ?o }');
   const subjects = graph.toArray().map((triple) => triple.subject.nominalValue).sort();
   check(graph.length === 2 &&
     JSON.stringify(subjects) === JSON.stringify(['http://example.org/bob', 'http://example.org/carol']),
     `CONSTRUCT returned ${graph.length} expected triples`);
 
-  store.close();
+  const error = await store.promises.execute('SELECT * WHERE { ?s ').then(() => null, (err) => err);
+  check(error instanceof Error, 'Syntax error rejects with an Error');
+
+  await store.promises.close();
 }
 
 try {
