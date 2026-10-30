@@ -58,6 +58,10 @@ jobs:
         run: |
           yarn lint
 
+      - name: Type check declarations
+        run: |
+          yarn types
+
       - name: Run unit tests
         run: |
           yarn unit
