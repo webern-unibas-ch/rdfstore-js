@@ -535,6 +535,59 @@ describe("QueryEngine", function(){
         });
     });
 
+    it("Test OptionalFilterKeepsLeftSolutionOnceIfNoneMatches", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                // :b has a passing and a failing ?x: only the passing one is kept, also with a BIND after the OPTIONAL
+                var query = 'PREFIX : <http://example/>\
+                            INSERT DATA {\
+                            :b :p 2 .\
+                            :b :q 5 .\
+                            :b :q 30 .\
+                            :b :t :u }';
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT ?s ?x ?z { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 10) } BIND(1 AS ?z) }', function(err, results){
+                        expect(err).toBeNull();
+                        expect(optionalRows(results, ["s", "x", "z"])).toEqual(["b|30|1"]);
+                        // {?s=:b} from the second branch fails the filter (?o unbound): it is kept,
+                        // although its bindings are a subset of the passing solution's
+                        engine.execute('PREFIX : <http://example/> SELECT ?s ?o ?x { { { ?s :p ?o } UNION { ?s :t :u } } OPTIONAL { ?s :q ?x FILTER(?x > ?o) } }', function(err, results){
+                            expect(err).toBeNull();
+                            expect(optionalRows(results, ["s", "o", "x"])).toEqual(["b|2|30", "b|2|5", "b||"]);
+                            done();
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test OptionalFilterKeepsDuplicateLeftSolutions", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                // the UNION yields every left solution twice (a bag): the OPTIONAL keeps both copies
+                var query = 'PREFIX : <http://example/>\
+                            INSERT DATA {\
+                            :a :p 1 .\
+                            :b :p 2 .\
+                            :b :q 5 }';
+
+                engine.execute(query, function(err, result){
+                    engine.execute('PREFIX : <http://example/> SELECT ?s ?x { { { ?s :p ?o } UNION { ?s :p ?o } } OPTIONAL { ?s :q ?x FILTER(?x > 100) } }', function(err, results){
+                        expect(err).toBeNull();
+                        expect(optionalRows(results, ["s", "x"])).toEqual(["a|", "a|", "b|", "b|"]);
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
     it("Test OptionalDistinct1", function(done) {
         new Lexicon(function(lexicon){
             new QuadBackend({treeOrder: 2}, function(backend){

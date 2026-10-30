@@ -37,7 +37,7 @@ describe("Store with a large dataset", function () {
         });
     }, 60000);
 
-    // OPTIONAL used to compare every left with every right solution (about 11 s at 32000 rows).
+    // Guards the hash lookup in leftOuterJoinBindings: a nested loop takes about 11 s here.
     it("Should evaluate OPTIONAL over 32000 solutions", function (done) {
         var numSubjects = 32000;
 

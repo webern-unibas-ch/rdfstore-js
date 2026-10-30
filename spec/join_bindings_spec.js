@@ -1,8 +1,8 @@
 var QueryPlan = require("../src/query_plan").QueryPlan;
 
-// Reference implementations: the nested loops that joinBindings and leftOuterJoinBindings used
-// before the hash lookup. The hash join must return the same rows in the same order. An unmatched
-// left solution gets every variable of the right side as null.
+// Reference implementations: nested loops over areCompatibleBindings. The hash join must return the
+// same rows in the same order. An unmatched left solution gets every variable of the right side as
+// null (the nested loop before the hash join used only the last right solution's variables).
 var nestedLoopJoin = function(bindingsA, bindingsB) {
     var result = [];
     for(var i=0; i<bindingsA.length; i++) {
@@ -107,25 +107,24 @@ describe("QueryPlan joins", function() {
         expect(result).toEqual([{s: 1, x: null, y: null}]);
     });
 
-    it("Should left-join 32000 x 16000 bound rows without comparing every pair", function() {
+    it("Should compare bound rows only with the rows sharing their key", function() {
         var left = [];
         var right = [];
-        for(var i=0; i<32000; i++) {
+        for(var i=0; i<2000; i++) {
             left.push({s: i, o: 100000 + i});
         }
-        for(i=0; i<16000; i++) {
+        for(i=0; i<1000; i++) {
             right.push({s: i * 2, x: 200000 + i});
         }
+        spyOn(QueryPlan, "areCompatibleBindings").and.callThrough();
 
-        var start = Date.now();
         var result = QueryPlan.leftOuterJoinBindings(left, right);
-        var elapsed = Date.now() - start;
 
-        expect(result.length).toBe(32000);
+        expect(result.length).toBe(2000);
         expect(result[0]).toEqual({s: 0, o: 100000, x: 200000});
         expect(result[1]).toEqual({s: 1, o: 100001, x: null});
-        // the nested loop took about 13 s here
-        expect(elapsed).toBeLessThan(2000);
-    }, 60000);
+        // one candidate per matched left row; a nested loop makes 2000 * 1000 comparisons
+        expect(QueryPlan.areCompatibleBindings.calls.count()).toBe(1000);
+    });
 
 });
