@@ -27,6 +27,10 @@ var createStorePromises = function(store) {
     };
 
     var executeWithEnvironment = function(query, defaultGraphs, namedGraphs) {
+        // e.g. queries.map(execute) passes an index and the array: reject instead of querying the wrong graphs
+        if(!Array.isArray(defaultGraphs) || !Array.isArray(namedGraphs)) {
+            return Promise.reject(new TypeError("defaultGraphs and namedGraphs must be arrays of graph URIs"));
+        }
         return callStore("executeWithEnvironment", [query, defaultGraphs, namedGraphs]);
     };
 
@@ -35,7 +39,7 @@ var createStorePromises = function(store) {
             if(defaultGraphs == null && namedGraphs == null) {
                 return callStore("execute", [query]);
             }
-            return executeWithEnvironment(query, defaultGraphs || [], namedGraphs || []);
+            return executeWithEnvironment(query, defaultGraphs == null ? [] : defaultGraphs, namedGraphs == null ? [] : namedGraphs);
         },
         executeWithEnvironment: executeWithEnvironment,
         load: function(mediaType, data, graphOrOptions) {

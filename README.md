@@ -282,7 +282,7 @@ try {
 await store.promises.close();
 ```
 
-The promise methods are `execute`, `executeWithEnvironment`, `load`, `insert`, `delete`, `clear`, `graph`, `node`, `registeredGraphs` and `close`. A promise method never throws: calling it with the wrong arguments rejects too.
+The promise methods are `execute`, `executeWithEnvironment`, `load`, `insert`, `delete`, `clear`, `graph`, `node`, `registeredGraphs` and `close`. Calling a promise method with the wrong arguments rejects instead of throwing.
 
 The promise API lives in its own namespace, so the callback API keeps working unchanged. The callback methods also keep their optional callbacks: `store.execute(query)` without a callback still ignores the result instead of returning a promise. The events API has no promise version, because its listeners fire more than once.
 

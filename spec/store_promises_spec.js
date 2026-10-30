@@ -136,6 +136,14 @@ describe("Promise API", function() {
             expect(await store.promises.executeWithEnvironment(query, ["http://g"], [])).toEqual(expected);
         });
 
+        it("rejects graphs that are not arrays", async function() {
+            var err = await rejectionOf(store.promises.execute("SELECT * { ?s ?p ?o }", "http://g"));
+            expect(err instanceof TypeError).toBe(true);
+            // Array.prototype.map passes the index and the array as the graphs
+            var errors = await Promise.all(["ASK { ?s ?p ?o }"].map(store.promises.execute).map(rejectionOf));
+            expect(errors[0] instanceof TypeError).toBe(true);
+        });
+
         it("rejects a syntax error with an Error", async function() {
             var err = await rejectionOf(store.promises.execute("SELECT * WHERE { ?s "));
             expect(err instanceof Error).toBe(true);
