@@ -48,6 +48,11 @@
     "unit": "yarn parse-grammar && yarn specs",
     "test": "yarn parse-grammar && yarn specs && yarn e2e"
   },
+  "files": [
+    "src",
+    "!src/perftest",
+    "dist"
+  ],
   "main": "src/store.js",
   "type": "commonjs",
   "exports": {
