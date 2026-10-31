@@ -277,17 +277,33 @@ AbstractQueryTree.translatePathExpression  = function(pathExpression, env) {
 
 AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env) {
     var f = (node.filters || []);
-    var b = (node.binds || []);
     var g = {kind: "EMPTY_PATTERN"};
     if(node.graph != null) {
         // GRAPH over a group without triple patterns
         g.graph = node.graph;
     }
+    // variables in scope of the patterns so far
+    var scope = {};
 
     for(var i=0; i<node.patterns.length; i++) {
         var pattern = node.patterns[i];
-        if(pattern.token === 'optionalgraphpattern') {
+        if(pattern.token === 'bind') {
+            // Extend the patterns so far; the variable must not be in scope yet (SPARQL 1.1 18.2.1)
+            var variable = pattern.as.value;
+            if(scope[variable] === true) {
+                throw new SparqlParserError("BIND: variable ?" + variable + " is already in scope");
+            }
+            scope[variable] = true;
+            if(g.kind === 'EXTEND') {
+                g.binds.push(pattern);
+            } else {
+                g = { kind: 'EXTEND',
+                    value: g,
+                    binds: [pattern] };
+            }
+        } else if(pattern.token === 'optionalgraphpattern') {
             var parsedPattern = this.build(pattern.value,env);
+            AbstractQueryTree.inScopeVariables(parsedPattern, scope);
             if(parsedPattern.kind === 'FILTER') {
                 g =  { kind:'LEFT_JOIN',
                     lvalue: g,
@@ -301,6 +317,7 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env) {
             }
         } else {
             var parsedPattern = this.build(pattern,env);
+            AbstractQueryTree.inScopeVariables(parsedPattern, scope);
             if(g.kind == "EMPTY_PATTERN") {
                 g = parsedPattern;
             } else {
@@ -311,47 +328,50 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env) {
         }
     }
 
-    // set the binds back
-    g.binds = b;
-
     if(f.length != 0) {
-        if(g.kind === 'EMPTY_PATTERN') {
-            return { kind: 'FILTER',
-                filter: f,
-                value: g};
-        } else if(g.kind === 'LEFT_JOIN' && g.filter === true) {
-            return { kind: 'FILTER',
-                filter: f,
-                value: g};
-
-//            g.filter = f;
-//            return g;
-        } else if(g.kind === 'LEFT_JOIN') {
-            return { kind: 'FILTER',
-                filter: f,
-                value: g};
-        } else if(g.kind === 'JOIN') {
-            return { kind: 'FILTER',
-                filter: f,
-                value: g};
-        } else if(g.kind === 'UNION') {
-            return { kind: 'FILTER',
-                filter: f,
-                value: g};
-        } else if(g.kind === 'GRAPH') {
-            return { kind: 'FILTER',
-                filter: f,
-                value: g};
-        } else if(g.kind === 'BGP') {
-            return { kind: 'FILTER',
-                filter: f,
-                value: g};
-        } else {
-            throw new Error("Unknow kind of algebra expression: "+ g.kind);
-        }
+        return { kind: 'FILTER',
+            filter: f,
+            value: g};
     } else {
         return g;
     }
+};
+
+/**
+ * Adds the variables in scope of an algebra expression to acum (SPARQL 1.1 18.2.1). Graph variables are
+ * left out: the triple patterns inside GRAPH ?g carry ?g too, but there it is not in scope.
+ */
+AbstractQueryTree.inScopeVariables = function(aqt, acum) {
+    if(aqt.kind === 'BGP') {
+        for(var i=0; i<aqt.value.length; i++) {
+            var triple = aqt.value[i];
+            ['subject', 'predicate', 'object'].forEach(function(component) {
+                if(triple[component] != null && triple[component].token === 'var') {
+                    acum[triple[component].value] = true;
+                }
+            });
+        }
+    } else if(aqt.kind === 'ZERO_OR_MORE_PATH' || aqt.kind === 'ONE_OR_MORE_PATH') {
+        [aqt.x, aqt.y].forEach(function(term) {
+            if(term != null && term.token === 'var') {
+                acum[term.value] = true;
+            }
+        });
+    } else if(aqt.kind === 'UNION') {
+        AbstractQueryTree.inScopeVariables(aqt.value[0], acum);
+        AbstractQueryTree.inScopeVariables(aqt.value[1], acum);
+    } else if(aqt.kind === 'LEFT_JOIN' || aqt.kind === 'JOIN') {
+        AbstractQueryTree.inScopeVariables(aqt.lvalue, acum);
+        AbstractQueryTree.inScopeVariables(aqt.rvalue, acum);
+    } else if(aqt.kind === 'GRAPH' || aqt.kind === 'FILTER') {
+        AbstractQueryTree.inScopeVariables(aqt.value, acum);
+    } else if(aqt.kind === 'EXTEND') {
+        AbstractQueryTree.inScopeVariables(aqt.value, acum);
+        for(var j=0; j<aqt.binds.length; j++) {
+            acum[aqt.binds[j].as.value] = true;
+        }
+    }
+    return acum;
 };
 
 /**
@@ -376,7 +396,7 @@ AbstractQueryTree.prototype.collectBasicTriples = function(aqt, acum) {
     } else if(aqt.kind === 'LEFT_JOIN' || aqt.kind === 'JOIN') {
         acum = this.collectBasicTriples(aqt.lvalue, acum);
         acum = this.collectBasicTriples(aqt.rvalue, acum);
-    } else if(aqt.kind === 'FILTER') {
+    } else if(aqt.kind === 'FILTER' || aqt.kind === 'EXTEND') {
         acum = this.collectBasicTriples(aqt.value, acum);
     } else if(aqt.kind === 'construct') {
         acum = this.collectBasicTriples(aqt.pattern,acum);
@@ -431,6 +451,10 @@ AbstractQueryTree.prototype.bind = function(aqt, bindings) {
         var that = this;
         aqt.value = this.bind(aqt.value, bindings);
         aqt.filter = aqt.filter.map(function(f) { return { token: 'filter', value: that._bindFilter(f.value, bindings) }; });
+    } else if(aqt.kind === 'EXTEND') {
+        var that = this;
+        aqt.value = this.bind(aqt.value, bindings);
+        aqt.binds = aqt.binds.map(function(b) { return { token: 'bind', expression: that._bindFilter(b.expression, bindings), as: b.as }; });
     } else if(aqt.kind === 'EMPTY_PATTERN') {
         // nothing
     } else {
@@ -543,6 +567,8 @@ AbstractQueryTree.prototype.replace = function(aqt, from, to, ns) {
         aqt.rvalue = this.replace(aqt.rvalue, from, to, ns);
     } else if(aqt.kind === 'FILTER') {
         aqt.value = this._replaceFilter(aqt.value, from,to, ns);
+    } else if(aqt.kind === 'EXTEND') {
+        aqt.value = this.replace(aqt.value, from, to, ns);
     } else if(aqt.kind === 'EMPTY_PATTERN') {
         // nothing
     } else {
