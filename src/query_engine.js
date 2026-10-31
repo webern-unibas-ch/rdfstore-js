@@ -1144,8 +1144,9 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
     } else if(pattern.kind === "EMPTY_PATTERN") {
         // as an example of this case  check DAWG test case: algebra/filter-nested-2
         callback(null, []);
-    //} else if(pattern.kind === "ZERO_OR_MORE_PATH" || pattern.kind === 'ONE_OR_MORE_PATH') {
-    //    return this.executeZeroOrMorePath(pattern, dataset, env);
+    } else if(pattern.kind === "ZERO_OR_MORE_PATH" || pattern.kind === 'ONE_OR_MORE_PATH') {
+        // the place to evaluate them; see the commented-out executeZeroOrMorePath below
+        callback(new NonSupportedSparqlFeatureError(pattern.kind, "Property path modifiers (*, +, ?, {n,m}) are not supported"));
     } else {
         callback(new NonSupportedSparqlFeatureError(pattern.kind));
     }

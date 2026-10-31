@@ -2374,6 +2374,99 @@ describe("QueryEngine", function(){
         });
     });
 
+    it("Test DoubleLiterals", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+
+                engine.execute('PREFIX : <http://example/> INSERT DATA { :a :p 2e1 . :b :p 1.0e0 }', function(err, result){
+                    expect(err).toBeNull();
+                    engine.execute('PREFIX : <http://example/> SELECT ?s ?v (?v + 1e0 AS ?x) { ?s :p ?v } ORDER BY ?s', function(err, results){
+                        expect(err).toBeNull();
+                        expect(termRows(results, ["s", "v", "x"])).toEqual(["s=a v=2e1^^double x=21^^double", "s=b v=1.0e0^^double x=2^^double"]);
+                        engine.execute('PREFIX : <http://example/> SELECT ?s { ?s :p 1.0e0 }', function(err, results){
+                            expect(err).toBeNull();
+                            expect(termRows(results, ["s"])).toEqual(["s=b"]);
+                            done();
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test MixedCaseKeywords", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+
+                engine.execute('prefix : <http://example/> insert data { :b :p 2 . :c :p 3 . :c :q 4 }', function(err, result){
+                    expect(err).toBeNull();
+                    engine.execute('Prefix : <http://example/> Select Distinct ?s (Count(?v) As ?n) Where { ?s :p ?v Optional { ?s :q ?w } Filter(?v > 1) } Group By ?s Having (Count(?v) > 0) Order By Desc(?s) Limit 5', function(err, results){
+                        expect(err).toBeNull();
+                        expect(termRows(results, ["s", "n"])).toEqual(["s=c n=1^^integer", "s=b n=1^^integer"]);
+                        done();
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test UnsupportedPropertyPaths", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                var patterns = ['?s :p* ?o', '?s :p+ ?o', '?s :p? ?o', '?s :p{2} ?o', '?s !:p ?o', '?s ^:p ?o', '?s :p|:q ?o',
+                    // a modifier on a group
+                    '?s (:p/:p)* ?o', '?s (:p/:p)? ?o', '?s (:p|:q)+ ?o',
+                    // inside EXISTS
+                    '?s :p ?o FILTER EXISTS { ?o :p+ ?x }', '?s :p ?o FILTER NOT EXISTS { ?o :p* ?x }'];
+
+                engine.execute('PREFIX : <http://example/> INSERT DATA { :a :p :b . :b :p :c }', function(err, result){
+                    expect(err).toBeNull();
+                    async.eachSeries(patterns, function(pattern, k) {
+                        engine.execute('PREFIX : <http://example/> SELECT ?s ?o { ' + pattern + ' }', function(err, results){
+                            expect(pattern + ": " + (err == null ? "no error" : err.name)).toBe(pattern + ': NonSupportedSparqlFeatureError');
+                            k();
+                        });
+                    }, function() {
+                        // sequences, also with groups, are supported
+                        engine.execute('PREFIX : <http://example/> SELECT ?s ?o { ?s :p/(:p) ?o }', function(err, results){
+                            expect(err).toBeNull();
+                            expect(termRows(results || [], ["s", "o"])).toEqual(["s=a o=c"]);
+                            done();
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test InWithIris", function(done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+
+                engine.execute('PREFIX : <http://example/> INSERT DATA { :a :p :b . :a :p :c . :a :p :d . :a :p 2 }', function(err, result){
+                    expect(err).toBeNull();
+                    engine.execute('PREFIX : <http://example/> SELECT ?o { ?s :p ?o FILTER(?o IN (:b, :c, 2)) } ORDER BY ?o', function(err, results){
+                        expect(err).toBeNull();
+                        expect(termRows(results, ["o"])).toEqual(["o=b", "o=c", "o=2^^integer"]);
+                        engine.execute('PREFIX : <http://example/> SELECT ?o { ?s :p ?o FILTER(?o not in (:b, :c)) } ORDER BY ?o', function(err, results){
+                            expect(err).toBeNull();
+                            expect(termRows(results, ["o"])).toEqual(["o=d", "o=2^^integer"]);
+                            done();
+                        });
+                    });
+                });
+            });
+        });
+    });
+
     it("Test ChainedBinds", function(done) {
         new Lexicon(function(lexicon){
             new QuadBackend({treeOrder: 2}, function(backend){

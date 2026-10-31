@@ -205,6 +205,11 @@ AbstractQueryTree.translatePathExpressionsInBGP = function(bgp, env) {
 
 
 AbstractQueryTree.translatePathExpression  = function(pathExpression, env) {
+    // * and + on a single predicate become ZERO_OR_MORE_PATH / ONE_OR_MORE_PATH (rejected when executed)
+    var modifier = pathExpression.predicate.modifier;
+    if(modifier != null && (pathExpression.predicate.kind !== 'element' || (modifier !== '*' && modifier !== '+'))) {
+        throw new NonSupportedSparqlFeatureError("property path modifier", "Property path modifiers (*, +, ?, {n,m}) are not supported");
+    }
     // add support for different path patterns
     if(pathExpression.predicate.kind === 'element') {
         // simple paths, maybe modified
@@ -357,7 +362,7 @@ AbstractQueryTree.prototype.collectBasicTriples = function(aqt, acum) {
         acum = this.collectBasicTriples(aqt.pattern,acum);
     } else if(aqt.kind === 'BGP') {
         acum = acum.concat(aqt.value);
-    } else if(aqt.kind === 'ZERO_OR_MORE_PATH') {
+    } else if(aqt.kind === 'ZERO_OR_MORE_PATH' || aqt.kind === 'ONE_OR_MORE_PATH') {
         acum = this.collectBasicTriples(aqt.path);
     } else if(aqt.kind === 'UNION') {
         acum = this.collectBasicTriples(aqt.value[0],acum);
@@ -402,7 +407,7 @@ AbstractQueryTree.prototype.bind = function(aqt, bindings) {
     } else if(aqt.kind === 'BGP') {
         aqt.value = this._bindTripleContext(aqt.value, bindings);
         //acum = acum.concat(aqt.value);
-    } else if(aqt.kind === 'ZERO_OR_MORE_PATH') {
+    } else if(aqt.kind === 'ZERO_OR_MORE_PATH' || aqt.kind === 'ONE_OR_MORE_PATH') {
         aqt.path = this._bindTripleContext(aqt.path, bindings);
         if(aqt.x && aqt.x.token === 'var' && bindings[aqt.x.value] != null) {
             aqt.x = bindings[aqt.x.value];
@@ -516,7 +521,7 @@ AbstractQueryTree.prototype.replace = function(aqt, from, to, ns) {
         aqt.pattern = this.replace(aqt.pattern, from, to, ns);
     } else if(aqt.kind === 'BGP') {
         aqt.value = this._replaceTripleContext(aqt.value, from, to, ns);
-    } else if(aqt.kind === 'ZERO_OR_MORE_PATH') {
+    } else if(aqt.kind === 'ZERO_OR_MORE_PATH' || aqt.kind === 'ONE_OR_MORE_PATH') {
         aqt.path = this._replaceTripleContext(aqt.path, from,to, ns);
         if(aqt.x && aqt.x.token === from.token && aqt.value === from.value) {
             aqt.x = _.clone(to,true);
@@ -627,7 +632,7 @@ AbstractQueryTree.prototype.treeWithUnion = function(aqt) {
         return this.treeWithUnion(aqt.pattern);
     } else if(aqt.kind === 'BGP') {
         return this.treeWithUnion(aqt.value);
-    } else if(aqt.kind === 'ZERO_OR_MORE_PATH') {
+    } else if(aqt.kind === 'ZERO_OR_MORE_PATH' || aqt.kind === 'ONE_OR_MORE_PATH') {
         return false;
     } else if(aqt.kind === 'UNION') {
         if(aqt.value[0].value != null && aqt.value[0].value.variables != null &&

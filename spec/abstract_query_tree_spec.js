@@ -321,6 +321,30 @@ describe("Parser", function() {
         result = aqt.parseSelect(aqt.parseQueryString("SELECT (COUNT(*) AS ?c) { ?s ?p ?o } having (COUNT(*) > 1)").units[0]);
         expect(result.having.length).toBe(1);
     });
+
+    it("Should be possible to parse double literals", function(){
+        var doubles = ["1e0", "1.5E2", ".5e-3", "2E+1"];
+        for(var i=0; i<doubles.length; i++) {
+            var result = aqt.parseSelect(aqt.parseQueryString("SELECT ?s { ?s ?p " + doubles[i] + " }").units[0]);
+            var object = result.pattern.value[0].object;
+            expect(object.type).toBe("http://www.w3.org/2001/XMLSchema#double");
+            expect(object.value).toBe(doubles[i]);
+        }
+    });
+
+    it("Should match keywords in any case", function(){
+        var queries = [
+            'Select Distinct ?s Where { ?s ?p ?o Optional { ?s ?q ?x } Filter(Regex(Str(?o), "a") && Bound(?s)) } Group By ?s Having (Count(?o) > 0) Order By Desc(?s) Limit 1 Offset 0',
+            'prefix ex: <http://example/> Insert Data { ex:s ex:p ex:o }',
+            'Ask { ?s ?p ?o Minus { ?s a ?c } }',
+            'Construct { ?s ?p ?o } From Named <http://example/g> Where { Graph ?g { ?s ?p ?o } Bind(IsIri(?s) As ?i) }'
+        ];
+        for(var i=0; i<queries.length; i++) {
+            expect(function() { aqt.parseQueryString(queries[i]); }).not.toThrow();
+        }
+        // 'a' is the only case-sensitive keyword
+        expect(function() { aqt.parseQueryString('SELECT * { ?s A ?o }'); }).toThrow();
+    });
 });
 
 describe("SparqlParserError", function() {
