@@ -1154,10 +1154,10 @@ return {token:'quadsnottriples',
 
     var currentBasicGraphPatterns = [];
     var currentFilters = [];
-    var currentBinds = [];
 
+    // a BIND stays in place: it ends the basic graph pattern before it (SPARQL 1.1 18.2.2.5)
     for(var i=0; i<subpatterns.length; i++) {
-	if(subpatterns[i].token!=='triplespattern' && subpatterns[i].token !== 'filter' && subpatterns[i].token !== 'bind') {
+	if(subpatterns[i].token!=='triplespattern' && subpatterns[i].token !== 'filter') {
 	    if(currentBasicGraphPatterns.length != 0 || currentFilters.length != 0) {
 		var triplesContext = [];
 		for(var j=0; j<currentBasicGraphPatterns.length; j++) {
@@ -1173,9 +1173,6 @@ return {token:'quadsnottriples',
 	} else {
 	    if(subpatterns[i].token === 'triplespattern') {
 		currentBasicGraphPatterns.push(subpatterns[i]);
-            } else if(subpatterns[i].token === 'bind') {
-                currentBinds.push(subpatterns[i]);
-
 	    } else {
 		currentFilters.push(subpatterns[i]);
 	    }
@@ -1199,8 +1196,7 @@ return {token:'quadsnottriples',
 //      } else  {
     return { token: 'groupgraphpattern',
 	patterns: compactedSubpatterns,
-        filters: currentFilters,
-        binds: currentBinds
+        filters: currentFilters
     }
 //      }
   }
@@ -1222,9 +1218,13 @@ return {token:'triplespattern',
 	value: v }
   }
   function peg$f56(g, gg) {
+    var onlyBinds = true;
     for(var i=0; i<gg.patterns.length; i++) {
-	var quads = []
 	var ts = gg.patterns[i];
+	if(ts.token === 'bind') {
+	    continue;
+	}
+	onlyBinds = false;
 	for(var j=0; j<ts.triplesContext.length; j++) {
 	    var triple = ts.triplesContext[j]
 	    triple.graph = g;
@@ -1232,7 +1232,7 @@ return {token:'triplespattern',
     }
 
     // a group without triple patterns keeps its graph, see the EMPTY_PATTERN case of QueryEngine.executeSelectUnit
-    if(gg.patterns.length === 0) {
+    if(onlyBinds) {
 	gg.graph = g;
     }
 

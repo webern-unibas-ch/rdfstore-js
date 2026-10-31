@@ -1139,16 +1139,23 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
                 callback(null, []);
             }
         });
+    } else if(pattern.kind === "EXTEND") {
+        var that = this;
+        this.executeSelectUnit(projection, dataset, pattern.value, env, function (err, results) {
+            if (err != null) {
+                callback(err);
+            } else if (results != null) {
+                that.runBinds(pattern.binds, results, dataset, env, callback);
+            } else {
+                callback(null, []);
+            }
+        });
     } else if(pattern.kind === "EMPTY_PATTERN") {
         // the empty group has one solution without variables (its filters are a FILTER node around it, see
         // DAWG algebra/filter-nested-2). Under GRAPH, like for triple patterns (QueryPlanDPSize.executeBGPDatasets),
         // a graph variable takes each named graph of the dataset, and an IRI must be a graph of the store.
-        var that = this;
-        var extend = function(solutions) {
-            that.runBinds(pattern.binds, solutions, dataset, env, callback);
-        };
         if(pattern.graph == null) {
-            extend([{}]);
+            callback(null, [{}]);
         } else if(pattern.graph.token === 'var') {
             var solutions = [];
             var seen = {};
@@ -1160,11 +1167,12 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
                     solutions.push(solution);
                 }
             }
-            extend(solutions);
+            callback(null, solutions);
         } else {
+            var that = this;
             this.normalizeTerm(pattern.graph, env, false, function(oid){
                 that.lexicon.registeredGraphs(false, function(graphs){
-                    extend(graphs.indexOf(oid) !== -1 ? [{}] : []);
+                    callback(null, graphs.indexOf(oid) !== -1 ? [{}] : []);
                 });
             });
         }
@@ -1341,14 +1349,7 @@ QueryEngine.prototype.executeUNION = function(projection, dataset, patterns, env
         if(err != null) {
             callback(err);
         } else {
-            var result = QueryPlan.unionBindings(set1, set2);
-            that.runBinds(patterns.binds, result, dataset, env, function(err, bindings){
-                if(err != null) {
-                    callback(err);
-                } else {
-                    QueryFilters.checkFilters(patterns, bindings, false, dataset, env, that, callback);
-                }
-            });
+            QueryFilters.checkFilters(patterns, QueryPlan.unionBindings(set1, set2), false, dataset, env, that, callback);
         }
     });
 };
@@ -1373,13 +1374,7 @@ QueryEngine.prototype.executeAndBGP = function(projection, dataset, pattern, env
         if(err != null) {
             callback(err);
         } else if(result!=null) {
-            that.runBinds(pattern.binds, withoutBlankNodes(result), dataset, env, function(err, bindings){
-                if(err != null) {
-                    callback(err);
-                } else {
-                    QueryFilters.checkFilters(pattern, bindings, false, dataset, env, that, callback);
-                }
-            });
+            QueryFilters.checkFilters(pattern, withoutBlankNodes(result), false, dataset, env, that, callback);
         } else {
             callback(null, null);
         }
@@ -1388,9 +1383,8 @@ QueryEngine.prototype.executeAndBGP = function(projection, dataset, pattern, env
 
 // LeftJoin keeps a left solution if none of its merged solutions passes the OPTIONAL's filter
 // (SPARQL 1.1 §18.5). checkFilters returns the failed merged solutions wrapped (__nullify__): each
-// such left solution comes back once, with the right side's variables unbound and the values of
-// the BINDs, which ran on the merged solutions.
-var restoreFailedLeftSolutions = function(bindings, leftSolutions, set2, binds) {
+// such left solution comes back once, with the right side's variables unbound.
+var restoreFailedLeftSolutions = function(bindings, leftSolutions, set2) {
     var acum = [];
     var failed = [];
     // left solutions already represented in acum
@@ -1423,12 +1417,6 @@ var restoreFailedLeftSolutions = function(bindings, leftSolutions, set2, binds) 
             solution[p] = left[p];
         }
         QueryPlan.augmentMissingBindings(solution, rightVars);
-        for(var j=0; j<binds.length; j++) {
-            var bindVar = binds[j].as.value;
-            if(bindVar in merged) {
-                solution[bindVar] = merged[bindVar];
-            }
-        }
         acum.push(solution);
     }
     return acum;
@@ -1445,21 +1433,17 @@ QueryEngine.prototype.executeLEFT_JOIN = function(projection, dataset, patterns,
             // merged solution -> the left solution it came from, only needed to undo a failed filter
             var leftSolutions = patterns.filter != null && patterns.filter.length > 0 ? new Map() : null;
             var result = QueryPlan.leftOuterJoinBindings(set1, set2, leftSolutions);
-            that.runBinds(patterns.binds, result, dataset, env, function(err, bindings){
-                if(err != null) {
-                    callback(err);
-                } else if(leftSolutions == null) {
-                    callback(null, bindings);
-                } else {
-                    QueryFilters.checkFilters(patterns, bindings, true, dataset, env, that, function(err, bindings){
-                        if(err != null) {
-                            callback(err);
-                        } else {
-                            callback(null, restoreFailedLeftSolutions(bindings, leftSolutions, set2, patterns.binds || []));
-                        }
-                    });
-                }
-            });
+            if(leftSolutions == null) {
+                callback(null, result);
+            } else {
+                QueryFilters.checkFilters(patterns, result, true, dataset, env, that, function(err, bindings){
+                    if(err != null) {
+                        callback(err);
+                    } else {
+                        callback(null, restoreFailedLeftSolutions(bindings, leftSolutions, set2));
+                    }
+                });
+            }
         }
     });
 };
@@ -1475,13 +1459,7 @@ QueryEngine.prototype.executeJOIN = function(projection, dataset, patterns, env,
         } else if(set1.length ===0 || set2.length===0) {
             callback(null, []);
         } else {
-            that.runBinds(patterns.binds, QueryPlan.joinBindings(set1, set2), dataset, env, function(err, bindings){
-                if(err != null) {
-                    callback(err);
-                } else {
-                    QueryFilters.checkFilters(patterns, bindings, false, dataset, env, that, callback);
-                }
-            });
+            QueryFilters.checkFilters(patterns, QueryPlan.joinBindings(set1, set2), false, dataset, env, that, callback);
         }
     });
 };

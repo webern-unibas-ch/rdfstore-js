@@ -2593,6 +2593,73 @@ describe("QueryEngine", function(){
         ], done);
     });
 
+    it("Test BindPosition", function(done) {
+        // BIND extends the patterns before it in its group; FILTERs apply to the whole group
+        checkQueries(':a :p 1 . :a :q 3 . :b :p 2 . :b :q 7 . :c :p 4', [
+            // after an OPTIONAL, BIND sees the solutions its filter left
+            ['SELECT ?s ?b { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 5) } BIND(BOUND(?x) AS ?b) } ORDER BY ?s', ["s", "b"],
+                ["s=a b=false^^boolean", "s=b b=true^^boolean", "s=c b=false^^boolean"]],
+            ['SELECT ?s ?z { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 5) } BIND(STR(?x) AS ?z) } ORDER BY ?s', ["s", "z"],
+                ["s=a z=-", "s=b z=7", "s=c z=-"]],
+            // the OPTIONAL's filter does not see a later BIND
+            ['SELECT ?s ?x { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > ?m) } BIND(5 AS ?m) } ORDER BY ?s', ["s", "x"],
+                ["s=a x=-", "s=b x=-", "s=c x=-"]],
+            // the patterns after a BIND join with its value
+            ['SELECT ?o { BIND(:a AS ?s) ?s :p ?o }', ["o"], ["o=1^^integer"]],
+            ['SELECT ?s { ?s :p ?o BIND(?o + 2 AS ?y) ?s :q ?y }', ["s"], ["s=a"]],
+            ['SELECT ?s { ?s :p ?o BIND(?o * 2 AS ?d) FILTER(?d > 4) }', ["s"], ["s=c"]],
+            ['SELECT ?z { :a :p ?o BIND(?o + 1 AS ?y) BIND(?y * 10 AS ?z) }', ["z"], ["z=20^^integer"]],
+            ['SELECT ?x { :nothing :p ?o BIND(1 AS ?x) }', ["x"], []],
+            ['SELECT ?x { ?s :nothing ?o BIND(1 AS ?x) }', ["x"], []],
+            // nested groups keep their BINDs
+            ['SELECT ?k { { :a :p ?o BIND(STR(?o) AS ?k) } }', ["k"], ["k=1"]],
+            ['SELECT ?x { { :a :p ?o FILTER(true) } BIND(1 AS ?x) }', ["x"], ["x=1^^integer"]],
+            ['SELECT ?x ?y { { BIND(1 AS ?x) } BIND(2 AS ?y) }', ["x", "y"], ["x=1^^integer y=2^^integer"]]
+        ], done);
+    });
+
+    it("Test BindInGraph", function(done) {
+        checkQueries('GRAPH :g1 { :a :p 1 }', [
+            ['SELECT ?g ?x FROM NAMED <http://example/g1> { GRAPH ?g { BIND(1 AS ?x) } }', ["g", "x"], ["g=g1 x=1^^integer"]],
+            ['SELECT ?g ?k FROM NAMED <http://example/g1> { GRAPH ?g { ?s :p ?o BIND(STR(?o) AS ?k) } }', ["g", "k"], ["g=g1 k=1"]]
+        ], done);
+    });
+
+    it("Test BindScope", function(done) {
+        // the variable of a BIND must not be in scope of the patterns before it (W3C syntax-BINDscope1-8)
+        var w3c = function(n) {
+            return fs.readFileSync(__dirname + "/w3c/syntax-query/syntax-BINDscope" + n + ".rq").toString();
+        };
+        var prefixes = 'PREFIX : <http://example/> ';
+        var cases = [[w3c(1), true], [w3c(2), true], [w3c(3), true], [w3c(4), true], [w3c(5), true],
+            [w3c(6), false], [w3c(7), false], [w3c(8), false],
+            [prefixes + 'SELECT * { ?s :p ?o OPTIONAL { ?s :q ?x } BIND(1 AS ?x) }', false],
+            [prefixes + 'SELECT * { BIND(1 AS ?x) BIND(2 AS ?x) }', false],
+            [prefixes + 'INSERT { :n :p ?o } WHERE { ?s :p ?o BIND(1 AS ?o) }', false],
+            [prefixes + 'ASK { :n :p ?o }', true, false]];
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend, lexicon: lexicon});
+                engine.execute(prefixes + 'INSERT DATA { :s :p 1 }', function(err){
+                    expect(err).toBeNull();
+                    async.eachSeries(cases, function(testCase, k) {
+                        engine.execute(testCase[0], function(err, result){
+                            if(testCase[1]) {
+                                expect(err).withContext(testCase[0]).toBeNull();
+                            } else {
+                                expect(err != null && err.name).withContext(testCase[0]).toBe("SparqlParserError");
+                            }
+                            if(testCase.length > 2) {
+                                expect(result).withContext(testCase[0]).toBe(testCase[2]);
+                            }
+                            k();
+                        });
+                    }, function() { done(); });
+                });
+            });
+        });
+    });
+
     it("Test EmptyGroupPattern", function(done) {
         // the empty group has one solution, without variables
         checkQueries(':x :p 1', [
