@@ -163,6 +163,10 @@ QueryEngine.prototype.applyOrderBy = function(order, modifiedBindings, dataset, 
     }
 };
 
+var untypedOrString = function(term) {
+    return term.token === 'literal' && (term.type == null || QueryFilters.isXsdType("string", term));
+};
+
 QueryEngine.prototype.compareFilteredBindings = function(a, b, order, env) {
     var found = false;
     var i = 0;
@@ -207,17 +211,17 @@ QueryEngine.prototype.compareFilteredBindings = function(a, b, order, env) {
             filterResult = {value: true};
         } else
 
-        // simple literals
-        if(a.value[i].token === 'literal' && b.value[i].token === 'literal' && a.value[i].type == null && b.value[i].type == null) {
+        // literals without a datatype, and xsd:string (the same as a simple literal in RDF 1.1)
+        if(untypedOrString(a.value[i]) && untypedOrString(b.value[i])) {
             if(QueryFilters.runEqualityFunction(a.value[i], b.value[i], [], this, env).value == true) {
                 i++;
                 continue;
             } else {
                 filterResult = QueryFilters.runTotalGtFunction(a.value[i], b.value[i], []);
             }
-        } else if(a.value[i].token === 'literal' && a.value[i].type == null) {
+        } else if(untypedOrString(a.value[i])) {
             filterResult = {value: false};
-        } else if(b.value[i].token === 'literal' && b.value[i].type == null) {
+        } else if(untypedOrString(b.value[i])) {
             filterResult = {value: true};
         } else
 
@@ -447,7 +451,7 @@ QueryEngine.prototype.extendBindings = function(projection, results, dataset, en
     });
     var that = this;
     this.copyDenormalizedBindings(usedBindings, env.outCache, function(denormResults) {
-        var expressionEnv = {blanks:{}, outCache:{}};
+        var expressionEnv = {blanks:{}, outCache:{}, namespaces: env.namespaces, base: env.base};
         var extended = [];
         for(var i=0; i<results.length; i++) {
             var extendedResult = {};

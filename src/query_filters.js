@@ -260,6 +260,24 @@ QueryFilters.collect = function(filterExpr, bindings, dataset, env, queryEngine,
 QueryFilters.runDistinct = function(projectedBindings, projectionVariables) {
 };
 
+// A key for a whole solution, for COUNT(DISTINCT *)
+var solutionKey = function(bindings) {
+    var names = Object.keys(bindings).sort();
+    var key = [];
+    for(var i=0; i<names.length; i++) {
+        if(bindings[names[i]] != null) {
+            key.push(names[i], Utils.hashTerm(bindings[names[i]]));
+        }
+    }
+    return JSON.stringify(key);
+};
+
+// The value of an aggregate's expression for one solution; null if it is unbound or an error, which aggregates skip
+var aggregateValue = function(aggregator, bindings, queryEngine, dataset, env) {
+    var ebv = QueryFilters.runFilter(aggregator.expression.expression, bindings, queryEngine, dataset, env);
+    return QueryFilters.isEbvError(ebv) ? null : ebv;
+};
+
 // @todo add more aggregation functions here
 QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, dataset, env) {
     if(bindingsGroup == null || bindingsGroup.length === 0) {
@@ -278,56 +296,28 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
         if(aggregator.expression.expressionType === 'atomic' && aggregator.expression.primaryexpression === 'var') {
             return bindingsGroup[0][aggregator.expression.value.value];
         } else if(aggregator.expression.expressionType === 'aggregate') {
-            if(aggregator.expression.aggregateType === 'max') {
-                var max = null;
+            var aggregateType = aggregator.expression.aggregateType;
+            var isDistinct = aggregator.expression.distinct != null && aggregator.expression.distinct != '';
+            if(aggregateType === 'max' || aggregateType === 'min') {
+                // SPARQL defines MIN and MAX by the ORDER BY order, which also orders values that < can't compare
+                var sign = aggregateType === 'max' ? 1 : -1;
+                var best = null;
                 for(var i=0; i< bindingsGroup.length; i++) {
-                    var bindings = bindingsGroup[i];
-                    var ebv = QueryFilters.runFilter(aggregator.expression.expression, bindings, queryEngine, dataset, env);
-                    if(!QueryFilters.isEbvError(ebv)) {
-                        if(max === null) {
-                            max = ebv;
-                        } else {
-                            if(QueryFilters.runLtFunction(max, ebv).value === true) {
-                                max = ebv;
-                            }
-                        }
+                    var ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
+                    if(ebv != null &&
+                        (best === null || sign * queryEngine.compareFilteredBindings({value: [ebv]}, {value: [best]}, [{direction: 'ASC'}], env) > 0)) {
+                        best = ebv;
                     }
                 }
 
-                if(max===null) {
-                    return QueryFilters.ebvError();
-                } else {
-                    return max;
-                }
-            } else if(aggregator.expression.aggregateType === 'min') {
-                var min = null;
-                for(var i=0; i< bindingsGroup.length; i++) {
-                    var bindings = bindingsGroup[i];
-                    var ebv = QueryFilters.runFilter(aggregator.expression.expression, bindings, queryEngine, dataset, env);
-                    if(!QueryFilters.isEbvError(ebv)) {
-                        if(min === null) {
-                            min = ebv;
-                        } else {
-                            if(QueryFilters.runGtFunction(min, ebv).value === true) {
-                                min = ebv;
-                            }
-                        }
-                    }
-                }
-
-                if(min===null) {
-                    return QueryFilters.ebvError();
-                } else {
-                    return min;
-                }
-            } else if(aggregator.expression.aggregateType === 'count') {
+                return best === null ? QueryFilters.ebvError() : best;
+            } else if(aggregateType === 'count') {
                 var distinct = {};
                 var count = 0;
                 if(aggregator.expression.expression === '*') {
-                    if(aggregator.expression.distinct != null && aggregator.expression.distinct != '') {
+                    if(isDistinct) {
                         for(var i=0; i< bindingsGroup.length; i++) {
-                            var bindings = bindingsGroup[i];
-                            var key = Utils.hashTerm(bindings);
+                            var key = solutionKey(bindingsGroup[i]);
                             if(distinct[key] == null) {
                                 distinct[key] = true;
                                 count++;
@@ -338,10 +328,9 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
                     }
                 } else {
                     for(var i=0; i< bindingsGroup.length; i++) {
-                        var bindings = bindingsGroup[i];
-                        var ebv = QueryFilters.runFilter(aggregator.expression.expression, bindings, queryEngine, dataset, env);
-                        if(!QueryFilters.isEbvError(ebv)) {
-                            if(aggregator.expression.distinct != null && aggregator.expression.distinct != '') {
+                        var ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
+                        if(ebv != null) {
+                            if(isDistinct) {
                                 var key = Utils.hashTerm(ebv);
                                 if(distinct[key] == null) {
                                     distinct[key] = true;
@@ -355,70 +344,42 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
                 }
 
                 return {token: 'literal', type:xmlSchema+"integer", value:''+count};
-            } else if(aggregator.expression.aggregateType === 'avg') {
+            } else if(aggregateType === 'sum' || aggregateType === 'avg') {
                 var distinct = {};
                 var aggregated = {token: 'literal', type:xmlSchema+"integer", value:'0'};
                 var count = 0;
                 for(var i=0; i< bindingsGroup.length; i++) {
-                    var bindings = bindingsGroup[i];
-                    var ebv = QueryFilters.runFilter(aggregator.expression.expression, bindings, queryEngine, dataset, env);
-                    if(!QueryFilters.isEbvError(ebv)) {
-                        if(aggregator.expression.distinct != null && aggregator.expression.distinct != '') {
-                            var key = Utils.hashTerm(ebv);
-                            if(distinct[key] == null) {
-                                distinct[key] = true;
-                                if(QueryFilters.isNumeric(ebv)) {
-                                    aggregated = QueryFilters.runSumFunction(aggregated, ebv);
-                                    count++;
-                                }
-                            }
-                        } else {
-                            if(QueryFilters.isNumeric(ebv)) {
-                                aggregated = QueryFilters.runSumFunction(aggregated, ebv);
-                                count++;
-                            }
-                        }
+                    var ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
+                    if(ebv == null) {
+                        continue;
+                    } else if(!QueryFilters.isNumeric(ebv)) {
+                        // a value that is no number makes the aggregate a type error
+                        return QueryFilters.ebvError();
                     }
+                    if(isDistinct) {
+                        var key = Utils.hashTerm(ebv);
+                        if(distinct[key] != null) {
+                            continue;
+                        }
+                        distinct[key] = true;
+                    }
+                    aggregated = QueryFilters.runSumFunction(aggregated, ebv);
+                    count++;
                 }
 
-                // values but no numbers: AVG = SUM/COUNT is a type error (an empty group gives 0, see above)
-                if(count === 0) {
-                    return QueryFilters.ebvError();
+                if(aggregateType === 'sum' || count === 0) {
+                    // AVG of no values is 0, as for an empty group
+                    return QueryFilters.resultTerm(aggregated);
                 }
                 return QueryFilters.resultTerm(QueryFilters.runDivFunction(aggregated, {token: 'literal', type:xmlSchema+"integer", value:''+count}));
-            } else if(aggregator.expression.aggregateType === 'sum') {
-                var distinct = {};
-                var aggregated = {token: 'literal', type:xmlSchema+"integer", value:'0'};
-                for(var i=0; i< bindingsGroup.length; i++) {
-                    var bindings = bindingsGroup[i];
-                    var ebv = QueryFilters.runFilter(aggregator.expression.expression, bindings, queryEngine, dataset, env);
-                    if(!QueryFilters.isEbvError(ebv)) {
-                        if(aggregator.expression.distinct != null && aggregator.expression.distinct != '') {
-                            var key = Utils.hashTerm(ebv);
-                            if(distinct[key] == null) {
-                                distinct[key] = true;
-                                if(QueryFilters.isNumeric(ebv)) {
-                                    aggregated = QueryFilters.runSumFunction(aggregated, ebv);
-                                }
-                            }
-                        } else {
-                            if(QueryFilters.isNumeric(ebv)) {
-                                aggregated = QueryFilters.runSumFunction(aggregated, ebv);
-                            }
-                        }
-                    }
-                }
-
-                return QueryFilters.resultTerm(aggregated);
-            } else if(aggregator.expression.aggregateType === 'group_concat') {
+            } else if(aggregateType === 'group_concat') {
                 var distinct = {};
                 var values = [];
                 var separator = aggregator.expression.separator != null ? aggregator.expression.separator : " ";
                 for(var i=0; i< bindingsGroup.length; i++) {
-                    var bindings = bindingsGroup[i];
-                    var ebv = QueryFilters.runFilter(aggregator.expression.expression, bindings, queryEngine, dataset, env);
-                    if(!QueryFilters.isEbvError(ebv) && ebv.token === 'literal') {
-                        if(aggregator.expression.distinct != null && aggregator.expression.distinct != '') {
+                    var ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
+                    if(ebv != null && ebv.token === 'literal') {
+                        if(isDistinct) {
                             var key = Utils.hashTerm(ebv);
                             if(distinct[key] == null) {
                                 distinct[key] = true;
@@ -530,38 +491,15 @@ QueryFilters.isRDFTerm = function(val) {
  term1 and term2 are equivalent IRIs as defined in 6.4 RDF URI References of [CONCEPTS].
  term1 and term2 are equivalent literals as defined in 6.5.1 Literal Equality of [CONCEPTS].
  term1 and term2 are the same blank node as described in 6.6 Blank Nodes of [CONCEPTS].
+
+ * Two different literals that both have a known value (isKnownLiteral) are different values, so FALSE.
  */
 QueryFilters.RDFTermEquality = function(v1, v2, queryEngine, env) {
     if(v1.token === 'literal' && v2.token === 'literal') {
         if(v1.lang == v2.lang && v1.type == v2.type && v1.value == v2.value) {
-
             return true;
-        } else {
-
-
-            if(v1.type != null && v2.type != null) {
-                return  QueryFilters.ebvError();
-            } else if(QueryFilters.isSimpleLiteral(v1) && v2.type!=null){
-                return QueryFilters.ebvError();
-            } else if(QueryFilters.isSimpleLiteral(v2) && v1.type!=null){
-                return QueryFilters.ebvError();
-            } else {
-                return false;
-            }
-
-//            if(v1.value != v2.value) {
-//                return QueryFilters.ebvError();
-//            } else if(v1.type && v2.type && v1.type!=v2.type) {
-//                return QueryFilters.ebvError();
-//            } else if(QueryFilters.isSimpleLiteral(v1) && v2.type!=null){
-//                return QueryFilters.ebvError();
-//            } else if(QueryFilters.isSimpleLiteral(v2) && v1.type!=null){
-//                return QueryFilters.ebvError();
-//            } else {
-//                return false;
-//            }
-
         }
+        return QueryFilters.isKnownLiteral(v1) && QueryFilters.isKnownLiteral(v2) ? false : QueryFilters.ebvError();
     } else if(v1.token === 'uri' && v2.token === 'uri') {
         return Utils.lexicalFormBaseUri(v1, env) == Utils.lexicalFormBaseUri(v2, env);
     } else if(v1.token === 'blank' && v2.token === 'blank') {
@@ -958,84 +896,84 @@ QueryFilters.runAndFunction = function(filterExpr, bindings, queryEngine, datase
 };
 
 
+// The kind of value by which two terms compare (SPARQL operator mapping), or null if they can't be compared.
+// Simple literals and xsd:string compare as strings, as RDF 1.1 makes them the same.
+QueryFilters.comparisonKind = function(op1, op2) {
+    var isString = function(op) {
+        return QueryFilters.isSimpleLiteral(op) || QueryFilters.isXsdType("string", op);
+    };
+    if(QueryFilters.isNumeric(op1) && QueryFilters.isNumeric(op2)) {
+        return 'numeric';
+    } else if(isString(op1) && isString(op2)) {
+        return 'string';
+    }
+    var types = ["boolean", "dateTime", "date"];
+    for(var i=0; i<types.length; i++) {
+        if(QueryFilters.isXsdType(types[i], op1) && QueryFilters.isXsdType(types[i], op2)) {
+            return types[i];
+        }
+    }
+    return null;
+};
+
+// -1, 0 or 1; null if a value is NaN, which is unordered; an error if the values can't be compared or one has an
+// invalid lexical form (effectiveTypeValue gives NaN for such a number or date, undefined for such a boolean)
+QueryFilters.runCompare = function(op1, op2) {
+    if(QueryFilters.isEbvError(op1) || QueryFilters.isEbvError(op2) || QueryFilters.comparisonKind(op1, op2) == null) {
+        return QueryFilters.ebvError();
+    }
+    var isValid = function(op, value) {
+        return value !== undefined && (value === value ||
+            (QueryFilters.isNumeric(op) && (op.value === 'NaN' || typeof(op.value) === 'number')));
+    };
+    var v1 = QueryFilters.effectiveTypeValue(op1);
+    var v2 = QueryFilters.effectiveTypeValue(op2);
+    if(!isValid(op1, v1) || !isValid(op2, v2)) {
+        return QueryFilters.ebvError();
+    } else if(v1 < v2) {
+        return -1;
+    } else if(v1 > v2) {
+        return 1;
+    } else if(v1 === v2) {
+        return 0;
+    }
+    return null;
+};
+
+// A literal whose value is known: a (language-tagged) string, or a valid value of a type in comparisonKind.
+// Two different known literals are different values; with an unknown type they might still be equal.
+QueryFilters.isKnownLiteral = function(term) {
+    return term.lang != null || !QueryFilters.isEbvError(QueryFilters.runCompare(term, term));
+};
+
 QueryFilters.runEqualityFunction = function(op1, op2, bindings, queryEngine, dataset, env) {
-    if(QueryFilters.isEbvError(op1) || QueryFilters.isEbvError(op2)) {
+    if(!QueryFilters.isRDFTerm(op1) || !QueryFilters.isRDFTerm(op2)) {
+        // an error or an unbound variable
         return QueryFilters.ebvError();
     }
-    if(QueryFilters.isNumeric(op1) && QueryFilters.isNumeric(op2)) {
-        var eop1 = QueryFilters.effectiveTypeValue(op1);
-        var eop2 = QueryFilters.effectiveTypeValue(op2);
-        if(isNaN(eop1) || isNaN(eop2)) {
-            return QueryFilters.ebvBoolean(QueryFilters.RDFTermEquality(op1, op2, queryEngine, env));
-        } else {
-            return QueryFilters.ebvBoolean(eop1 == eop2);
-        }
-    } else if((QueryFilters.isSimpleLiteral(op1) || QueryFilters.isXsdType("string", op1)) &&
-        (QueryFilters.isSimpleLiteral(op2) || QueryFilters.isXsdType("string", op2))) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) == QueryFilters.effectiveTypeValue(op2));
-    } else if(QueryFilters.isXsdType("boolean", op1) && QueryFilters.isXsdType("boolean", op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) == QueryFilters.effectiveTypeValue(op2));
-    } else if((QueryFilters.isXsdType("dateTime", op1)||QueryFilters.isXsdType("date", op1)) && (QueryFilters.isXsdType("dateTime", op2)||QueryFilters.isXsdType("date", op2))) {
-        if(QueryFilters.isXsdType("dateTime", op1) && QueryFilters.isXsdType("date", op2)) {
-            return QueryFilters.ebvFalse();
-        }
-        if(QueryFilters.isXsdType("date", op1) && QueryFilters.isXsdType("dateTime", op2)) {
-            return QueryFilters.ebvFalse();
-        }
-
-        var comp = Utils.compareDateComponents(op1.value, op2.value);
-        if(comp != null) {
-            if(comp == 0) {
-                return QueryFilters.ebvTrue();
-            } else {
-                return QueryFilters.ebvFalse();
-            }
-        } else {
-            return QueryFilters.ebvError();
-        }
-    } else if(QueryFilters.isRDFTerm(op1) && QueryFilters.isRDFTerm(op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.RDFTermEquality(op1, op2, queryEngine, env));
-    } else {
+    var comp = QueryFilters.runCompare(op1, op2);
+    if(comp === null) {
         return QueryFilters.ebvFalse();
+    } else if(!QueryFilters.isEbvError(comp)) {
+        return QueryFilters.ebvBoolean(comp === 0);
     }
+    return QueryFilters.ebvBoolean(QueryFilters.RDFTermEquality(op1, op2, queryEngine, env));
 };
 
-QueryFilters.runGtFunction = function(op1, op2, bindings) {
-    if(QueryFilters.isEbvError(op1) || QueryFilters.isEbvError(op2)) {
-        return QueryFilters.ebvError();
-    }
-
-    if(QueryFilters.isNumeric(op1) && QueryFilters.isNumeric(op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) > QueryFilters.effectiveTypeValue(op2));
-    } else if(QueryFilters.isSimpleLiteral(op1) && QueryFilters.isSimpleLiteral(op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) > QueryFilters.effectiveTypeValue(op2));
-    } else if(QueryFilters.isXsdType("string", op1) && QueryFilters.isXsdType("string", op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) > QueryFilters.effectiveTypeValue(op2));
-    } else if(QueryFilters.isXsdType("boolean", op1) && QueryFilters.isXsdType("boolean", op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) > QueryFilters.effectiveTypeValue(op2));
-    } else if((QueryFilters.isXsdType("dateTime", op1) || QueryFilters.isXsdType("date", op1)) &&
-        (QueryFilters.isXsdType("dateTime", op2) || QueryFilters.isXsdType("date", op2))) {
-        if(QueryFilters.isXsdType("dateTime", op1) && QueryFilters.isXsdType("date", op2)) {
-            return QueryFilters.ebvFalse();
+var relationalFunction = function(test) {
+    return function(op1, op2) {
+        var comp = QueryFilters.runCompare(op1, op2);
+        if(QueryFilters.isEbvError(comp)) {
+            return comp;
         }
-        if(QueryFilters.isXsdType("date", op1) && QueryFilters.isXsdType("dateTime", op2)) {
-            return QueryFilters.ebvFalse();
-        }
-
-        var comp = Utils.compareDateComponents(op1.value, op2.value);
-        if(comp != null) {
-            if(comp == 1) {
-                return QueryFilters.ebvTrue();
-            } else {
-                return QueryFilters.ebvFalse();
-            }
-        } else {
-            return QueryFilters.ebvError();
-        }
-    } else {
-        return QueryFilters.ebvFalse();
-    }
+        return QueryFilters.ebvBoolean(comp != null && test(comp));
+    };
 };
+
+QueryFilters.runGtFunction = relationalFunction(function(comp) { return comp > 0; });
+QueryFilters.runLtFunction = relationalFunction(function(comp) { return comp < 0; });
+QueryFilters.runGtEqFunction = relationalFunction(function(comp) { return comp >= 0; });
+QueryFilters.runLtEqFunction = relationalFunction(function(comp) { return comp <= 0; });
 
 /**
  * Total gt function used when sorting bindings in the SORT BY clause.
@@ -1048,12 +986,9 @@ QueryFilters.runTotalGtFunction = function(op1,op2) {
         return QueryFilters.ebvError();
     }
 
-    if((QueryFilters.isNumeric(op1) && QueryFilters.isNumeric(op2)) ||
-        (QueryFilters.isSimpleLiteral(op1) && QueryFilters.isSimpleLiteral(op2)) ||
-        (QueryFilters.isXsdType("string",op1) && QueryFilters.isSimpleLiteral("string",op2)) ||
-        (QueryFilters.isXsdType("boolean",op1) && QueryFilters.isSimpleLiteral("boolean",op2)) ||
-        (QueryFilters.isXsdType("dateTime",op1) && QueryFilters.isSimpleLiteral("dateTime",op2))) {
-        return QueryFilters.runGtFunction(op1, op2, []);
+    var comp = QueryFilters.runCompare(op1, op2);
+    if(typeof(comp) === 'number') {
+        return QueryFilters.ebvBoolean(comp > 0);
     } else if(op1.token && op1.token === 'uri' && op2.token && op2.token === 'uri') {
         return QueryFilters.ebvBoolean(op1.value > op2.value);
     } else if(op1.token && op1.token === 'literal' && op2.token && op2.token === 'literal') {
@@ -1068,120 +1003,6 @@ QueryFilters.runTotalGtFunction = function(op1,op2) {
     }
 };
 
-
-QueryFilters.runLtFunction = function(op1, op2, bindings) {
-    if(QueryFilters.isEbvError(op1) || QueryFilters.isEbvError(op2)) {
-        return QueryFilters.ebvError();
-    }
-
-    if(QueryFilters.isNumeric(op1) && QueryFilters.isNumeric(op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) < QueryFilters.effectiveTypeValue(op2));
-    } else if(QueryFilters.isSimpleLiteral(op1) && QueryFilters.isSimpleLiteral(op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) < QueryFilters.effectiveTypeValue(op2));
-    } else if(QueryFilters.isXsdType("string", op1) && QueryFilters.isXsdType("string", op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) < QueryFilters.effectiveTypeValue(op2));
-    } else if(QueryFilters.isXsdType("boolean", op1) && QueryFilters.isXsdType("boolean", op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) < QueryFilters.effectiveTypeValue(op2));
-    } else if((QueryFilters.isXsdType("dateTime", op1) || QueryFilters.isXsdType("date", op1)) &&
-        (QueryFilters.isXsdType("dateTime", op2) || QueryFilters.isXsdType("date", op2))) {
-        if(QueryFilters.isXsdType("dateTime", op1) && QueryFilters.isXsdType("date", op2)) {
-            return QueryFilters.ebvFalse();
-        }
-        if(QueryFilters.isXsdType("date", op1) && QueryFilters.isXsdType("dateTime", op2)) {
-            return QueryFilters.ebvFalse();
-        }
-
-        var comp = Utils.compareDateComponents(op1.value, op2.value);
-        if(comp != null) {
-            if(comp == -1) {
-                return QueryFilters.ebvTrue();
-            } else {
-                return QueryFilters.ebvFalse();
-            }
-        } else {
-            return QueryFilters.ebvError();
-        }
-    } else {
-        return QueryFilters.ebvFalse();
-    }
-};
-
-
-QueryFilters.runGtEqFunction = function(op1, op2, bindings) {
-    if(QueryFilters.isEbvError(op1) || QueryFilters.isEbvError(op2)) {
-        return QueryFilters.ebvError();
-    }
-
-    if(QueryFilters.isNumeric(op1) && QueryFilters.isNumeric(op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) >= QueryFilters.effectiveTypeValue(op2));
-    } else if(QueryFilters.isSimpleLiteral(op1) && QueryFilters.isSimpleLiteral(op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) >= QueryFilters.effectiveTypeValue(op2));
-    } else if(QueryFilters.isXsdType("string", op1) && QueryFilters.isXsdType("string", op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) >= QueryFilters.effectiveTypeValue(op2));
-    } else if(QueryFilters.isXsdType("boolean", op1) && QueryFilters.isXsdType("boolean", op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) >= QueryFilters.effectiveTypeValue(op2));
-    } else if((QueryFilters.isXsdType("dateTime", op1) || QueryFilters.isXsdType("date", op1)) &&
-        (QueryFilters.isXsdType("dateTime", op2) || QueryFilters.isXsdType("date", op2))) {
-        if(QueryFilters.isXsdType("dateTime", op1) && QueryFilters.isXsdType("date", op2)) {
-            return QueryFilters.ebvFalse();
-        }
-        if(QueryFilters.isXsdType("date", op1) && QueryFilters.isXsdType("dateTime", op2)) {
-            return QueryFilters.ebvFalse();
-        }
-
-        var comp = Utils.compareDateComponents(op1.value, op2.value);
-        if(comp != null) {
-            if(comp != -1) {
-                return QueryFilters.ebvTrue();
-            } else {
-                return QueryFilters.ebvFalse();
-            }
-        } else {
-            return QueryFilters.ebvError();
-        }
-
-    } else {
-        return QueryFilters.ebvFalse();
-    }
-};
-
-
-QueryFilters.runLtEqFunction = function(op1, op2, bindings) {
-    if(QueryFilters.isEbvError(op1) || QueryFilters.isEbvError(op2)) {
-        return QueryFilters.ebvError();
-    }
-
-    if(QueryFilters.isNumeric(op1) && QueryFilters.isNumeric(op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) <= QueryFilters.effectiveTypeValue(op2));
-    } else if(QueryFilters.isSimpleLiteral(op1) && QueryFilters.isSimpleLiteral(op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) <= QueryFilters.effectiveTypeValue(op2));
-    } else if(QueryFilters.isXsdType("string", op1) && QueryFilters.isXsdType("string", op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) <= QueryFilters.effectiveTypeValue(op2));
-    } else if(QueryFilters.isXsdType("boolean", op1) && QueryFilters.isXsdType("boolean", op2)) {
-        return QueryFilters.ebvBoolean(QueryFilters.effectiveTypeValue(op1) <= QueryFilters.effectiveTypeValue(op2));
-    } else if((QueryFilters.isXsdType("dateTime", op1) || QueryFilters.isXsdType("date", op1)) &&
-        (QueryFilters.isXsdType("dateTime", op2) || QueryFilters.isXsdType("date", op2))) {
-        if(QueryFilters.isXsdType("dateTime", op1) && QueryFilters.isXsdType("date", op2)) {
-            return QueryFilters.ebvFalse();
-        }
-        if(QueryFilters.isXsdType("date", op1) && QueryFilters.isXsdType("dateTime", op2)) {
-            return QueryFilters.ebvFalse();
-        }
-
-        var comp = Utils.compareDateComponents(op1.value, op2.value);
-        if(comp != null) {
-            if(comp != 1) {
-                return QueryFilters.ebvTrue();
-            } else {
-                return QueryFilters.ebvFalse();
-            }
-        } else {
-            return QueryFilters.ebvError();
-        }
-    } else {
-        return QueryFilters.ebvFalse();
-    }
-};
 
 QueryFilters.runAddition = function(summand, summands, bindings, queryEngine, dataset, env) {
     var summandOp = QueryFilters.runFilter(summand,bindings,queryEngine, dataset, env);

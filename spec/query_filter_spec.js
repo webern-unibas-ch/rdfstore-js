@@ -140,6 +140,42 @@ describe('QueryFilters', function() {
         expect(divide(createLiteralExpression('1', xsd + 'double'), createIntegerExpression('0')).value).toBe(Infinity);
     });
 
+    it('should compare only comparable values', function() {
+        var xsd = 'http://www.w3.org/2001/XMLSchema#';
+        var one = createLiteral('1', xsd + 'integer');
+        var english = {token: 'literal', value: 'x', lang: 'en'};
+        var iri = {token: 'uri', value: 'http://example/iri'};
+        var custom = createLiteral('z', 'http://example/c');
+        var date = createLiteral('2020-01-01', xsd + 'date');
+        var dateTime = createLiteral('2020-01-01T00:00:00Z', xsd + 'dateTime');
+        var relational = function(operator, a, b) {
+            return QueryFilters.runRelationalFilter({operator: operator}, a, b, {}, null, null, null);
+        };
+
+        // <, >, <= and >= on values that can't be compared are an error
+        expect(QueryFilters.isEbvError(relational('>', english, one))).toBe(true);
+        expect(QueryFilters.isEbvError(relational('<', iri, one))).toBe(true);
+        expect(QueryFilters.isEbvError(relational('>=', custom, one))).toBe(true);
+        expect(QueryFilters.isEbvError(relational('<=', date, dateTime))).toBe(true);
+        // simple literals and xsd:string compare as strings
+        expect(relational('<', createLiteral('a'), createLiteral('b', xsd + 'string')).value).toBe(true);
+        // different known types are unequal, an unknown type can't be compared
+        expect(relational('=', one, createLiteral('y')).value).toBe(false);
+        expect(relational('!=', one, createLiteral('y')).value).toBe(true);
+        expect(relational('=', createLiteral('true', xsd + 'boolean'), one).value).toBe(false);
+        expect(QueryFilters.isEbvError(relational('=', custom, one))).toBe(true);
+        expect(QueryFilters.isEbvError(relational('=', custom, createLiteral('z', 'http://example/d')))).toBe(true);
+        expect(relational('=', custom, createLiteral('z', 'http://example/c')).value).toBe(true);
+        // NaN equals nothing; an invalid lexical form is no known value and can't be compared; neither can an unbound value
+        var nan = createLiteral('NaN', xsd + 'double');
+        expect(relational('=', nan, nan).value).toBe(false);
+        expect(relational('<', nan, one).value).toBe(false);
+        expect(QueryFilters.isEbvError(relational('<', createLiteral('yes', xsd + 'boolean'), createLiteral('no', xsd + 'boolean')))).toBe(true);
+        expect(QueryFilters.isEbvError(relational('<', createLiteral('abc', xsd + 'integer'), one))).toBe(true);
+        expect(QueryFilters.isEbvError(relational('!=', undefined, one))).toBe(true);
+        expect(QueryFilters.isEbvError(relational('=', createLiteral('yes', xsd + 'boolean'), createLiteral('no', xsd + 'boolean')))).toBe(true);
+    });
+
     it('should run regex filters', function(done) {
         var text = {
             expressionType: 'atomic',

@@ -130,19 +130,6 @@ var iso8601 = function(date) {
     return date.toISOString();
 };
 
-var compareDateComponents = function(stra,strb) {
-    var dateA = parseISO8601(stra);
-    var dateB = parseISO8601(strb);
-
-    if(dateA == dateB) {
-        return 0;
-    } else if(dateA < dateB) {
-        return -1;
-    } else {
-        return 1;
-    }
-};
-
 var lexicalFormLiteral = function(term, env) {
     var value = term.value;
     var lang = term.lang;
@@ -518,7 +505,6 @@ module.exports = {
     hasTerm: hashTerm,
     lexicalFormBaseUri: lexicalFormBaseUri,
     parseISO8601: parseISO8601,
-    compareDateComponents: compareDateComponents,
     iso8601: iso8601,
     normalizeUnicodeLiterals: normalizeUnicodeLiterals,
     lexicalFormLiteral: lexicalFormLiteral,

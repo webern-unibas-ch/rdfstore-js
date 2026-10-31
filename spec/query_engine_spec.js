@@ -2467,6 +2467,102 @@ describe("QueryEngine", function(){
         });
     });
 
+    // inserts the data into a new engine, then runs each [query, variables, expected termRows] in order
+    var checkQueries = function(data, cases, done) {
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend,
+                    lexicon: lexicon});
+                engine.execute('PREFIX : <http://example/> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> INSERT DATA { ' + data + ' }', function(err, result){
+                    expect(err).toBeNull();
+                    async.eachSeries(cases, function(testCase, k) {
+                        engine.execute('PREFIX : <http://example/> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> ' + testCase[0], function(err, results){
+                            expect(err).toBeNull();
+                            expect(termRows(results || [], testCase[1])).withContext(testCase[0]).toEqual(testCase[2]);
+                            k();
+                        });
+                    }, function() { done(); });
+                });
+            });
+        });
+    };
+
+    var mixedTypes = ':a :v 1 . :b :v 2 . :c :v "x"@en . :e :v "y" . :f :v :iri . :g :v "z"^^:custom . ' +
+        ':a :d "2020-01-01"^^xsd:date ; :t "2020-01-01T00:00:00Z"^^xsd:dateTime';
+
+    it("Test RelationalTypeErrors", function(done) {
+        checkQueries(mixedTypes, [
+            // values that can't be compared with a number give an error, and so does its negation
+            ['SELECT ?s { ?s :v ?o FILTER(!(?o > 1)) } ORDER BY ?s', ["s"], ["s=a"]],
+            ['SELECT ?s (?o > 1 AS ?gt) { ?s :v ?o } ORDER BY ?s', ["s", "gt"],
+                ["s=a gt=false^^boolean", "s=b gt=true^^boolean", "s=c gt=-", "s=e gt=-", "s=f gt=-", "s=g gt=-"]],
+            ['SELECT (?d < ?t AS ?lt) (?d = ?t AS ?eq) { :a :d ?d ; :t ?t }', ["lt", "eq"], ["lt=- eq=false^^boolean"]],
+            ['SELECT ("a" < "b"^^xsd:string AS ?lt) { :a :v 1 }', ["lt"], ["lt=true^^boolean"]]
+        ], done);
+    });
+
+    it("Test MixedTypeEquality", function(done) {
+        checkQueries(mixedTypes, [
+            // literals of different known types are unequal; a literal of an unknown type can't be compared
+            ['SELECT ?s { ?s :v ?o FILTER(?o != "y") } ORDER BY ?s', ["s"], ["s=a", "s=b", "s=c", "s=f"]],
+            ['SELECT ?s { ?s :v ?o FILTER(?o NOT IN ("y", 2)) } ORDER BY ?s', ["s"], ["s=a", "s=c", "s=f"]],
+            // an unbound value can't be compared either
+            ['SELECT ?s { ?s :v ?o OPTIONAL { ?s :d ?d } FILTER(?d != "x") }', ["s"], ["s=a"]],
+            ['SELECT (1 = "1" AS ?x) (true = 1 AS ?y) ("z"^^:c = 1 AS ?z) ("z"^^:c = "z"^^:d AS ?w) (1 = 1.0 AS ?n) { :a :v 1 }',
+                ["x", "y", "z", "w", "n"], ["x=false^^boolean y=false^^boolean z=- w=- n=true^^boolean"]]
+        ], done);
+    });
+
+    it("Test CountDistinctStar", function(done) {
+        checkQueries(':a :p 1 . :a :p 2 . :b :p 1', [
+            ['SELECT (COUNT(DISTINCT *) AS ?c) (COUNT(*) AS ?n) { { ?s :p ?o } UNION { ?s :p ?o } }', ["c", "n"], ["c=3^^integer n=6^^integer"]],
+            ['SELECT ?s (COUNT(DISTINCT *) AS ?c) { { ?s :p ?o } UNION { ?s :p ?o } } GROUP BY ?s ORDER BY ?s', ["s", "c"],
+                ["s=a c=2^^integer", "s=b c=1^^integer"]]
+        ], done);
+    });
+
+    it("Test SumAvgTypeErrors", function(done) {
+        checkQueries(':a :v 1 , 2 , "a" . :b :v 3 , 4 . :c :k 1 ; :n 3 . :d :k 1 ; :n 5 . :e :k 1', [
+            // a value that is no number makes SUM and AVG unbound
+            ['SELECT ?s (SUM(?o) AS ?sum) (SUM(DISTINCT ?o) AS ?sd) (AVG(?o) AS ?avg) { ?s :v ?o } GROUP BY ?s ORDER BY ?s', ["s", "sum", "sd", "avg"],
+                ["s=a sum=- sd=- avg=-", "s=b sum=7^^integer sd=7^^integer avg=3.5^^decimal"]],
+            // unbound values are skipped, also by COUNT
+            ['SELECT (SUM(?o) AS ?sum) (AVG(?o) AS ?avg) (COUNT(?o) AS ?n) { ?s :k ?k OPTIONAL { ?s :n ?o } }', ["sum", "avg", "n"],
+                ["sum=8^^integer avg=4^^decimal n=2^^integer"]],
+            // AVG of no values is 0, as for an empty group
+            ['SELECT (AVG(?o) AS ?avg) { ?s :k ?k OPTIONAL { ?s :zz ?o } }', ["avg"], ["avg=0^^integer"]]
+        ], done);
+    });
+
+    it("Test OrderByTypedValues", function(done) {
+        checkQueries(':a :s "ab"^^xsd:string , "b" , "a"^^xsd:string . :a :x "foo"^^xsd:date , "2020-01-01"^^xsd:date , "bar"^^xsd:date . :a :b "1"^^xsd:boolean , "false"^^xsd:boolean . ' +
+            ':a :t "2020-01-01T10:00:00+05:00"^^xsd:dateTime , "2020-01-01T06:00:00Z"^^xsd:dateTime', [
+            // by value, not by lexical form; xsd:string together with simple literals
+            ['SELECT ?v { :a :s ?v } ORDER BY ?v', ["v"], ["v=a^^string", "v=ab^^string", "v=b"]],
+            // invalid dates by lexical form, whatever the input order
+            ['SELECT ?v { :a :x ?v } ORDER BY ?v', ["v"], ["v=2020-01-01^^date", "v=bar^^date", "v=foo^^date"]],
+            ['SELECT ?v { :a :b ?v } ORDER BY ?v', ["v"], ["v=false^^boolean", "v=1^^boolean"]],
+            ['SELECT ?v { :a :t ?v } ORDER BY ?v', ["v"], ["v=2020-01-01T10:00:00+05:00^^dateTime", "v=2020-01-01T06:00:00Z^^dateTime"]]
+        ], done);
+    });
+
+    it("Test GroupConcatUnbound", function(done) {
+        // an unbound value is skipped (it crashed the process)
+        checkQueries(':c :k 1 ; :n "x" . :e :k 1', [
+            ['SELECT (GROUP_CONCAT(?o) AS ?g) { ?s :k ?k OPTIONAL { ?s :n ?o } }', ["g"], ["g=x"]]
+        ], done);
+    });
+
+    it("Test MinMaxMixedTypes", function(done) {
+        // MIN and MAX follow the ORDER BY order (IRIs before literals without a datatype before typed literals), whatever the insertion order
+        var query = 'SELECT (MIN(?o) AS ?min) (MAX(?o) AS ?max) { ?s :v ?o }';
+        checkQueries(':s :v "x"@en , "y" , :iri , 2', [[query, ["min", "max"], ["min=iri max=2^^integer"]]], function() {
+            checkQueries(':s :v 2 , :iri , "y" , "x"@en', [[query, ["min", "max"], ["min=iri max=2^^integer"]]], function() {
+                checkQueries(':s :v "b" , "a"^^xsd:string', [[query, ["min", "max"], ["min=a^^string max=b"]]], done);
+            });
+        });
+    });
+
     it("Test ChainedBinds", function(done) {
         new Lexicon(function(lexicon){
             new QuadBackend({treeOrder: 2}, function(backend){
