@@ -329,44 +329,9 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env) {
     }
 
     if(f.length != 0) {
-        if(g.kind === 'EMPTY_PATTERN') {
-            return { kind: 'FILTER',
-                filter: f,
-                value: g};
-        } else if(g.kind === 'LEFT_JOIN' && g.filter === true) {
-            return { kind: 'FILTER',
-                filter: f,
-                value: g};
-
-//            g.filter = f;
-//            return g;
-        } else if(g.kind === 'LEFT_JOIN') {
-            return { kind: 'FILTER',
-                filter: f,
-                value: g};
-        } else if(g.kind === 'JOIN') {
-            return { kind: 'FILTER',
-                filter: f,
-                value: g};
-        } else if(g.kind === 'UNION') {
-            return { kind: 'FILTER',
-                filter: f,
-                value: g};
-        } else if(g.kind === 'GRAPH') {
-            return { kind: 'FILTER',
-                filter: f,
-                value: g};
-        } else if(g.kind === 'BGP') {
-            return { kind: 'FILTER',
-                filter: f,
-                value: g};
-        } else if(g.kind === 'EXTEND') {
-            return { kind: 'FILTER',
-                filter: f,
-                value: g};
-        } else {
-            throw new Error("Unknow kind of algebra expression: "+ g.kind);
-        }
+        return { kind: 'FILTER',
+            filter: f,
+            value: g};
     } else {
         return g;
     }
@@ -487,7 +452,9 @@ AbstractQueryTree.prototype.bind = function(aqt, bindings) {
         aqt.value = this.bind(aqt.value, bindings);
         aqt.filter = aqt.filter.map(function(f) { return { token: 'filter', value: that._bindFilter(f.value, bindings) }; });
     } else if(aqt.kind === 'EXTEND') {
+        var that = this;
         aqt.value = this.bind(aqt.value, bindings);
+        aqt.binds = aqt.binds.map(function(b) { return { token: 'bind', expression: that._bindFilter(b.expression, bindings), as: b.as }; });
     } else if(aqt.kind === 'EMPTY_PATTERN') {
         // nothing
     } else {

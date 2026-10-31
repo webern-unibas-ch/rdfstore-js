@@ -2030,14 +2030,15 @@ QueryEngine.prototype.runBinds = function(binds, bindings, dataset, env, callbac
                     // SPARQL 1.1 Extend: if the expression raises an error, the variable stays unbound;
                     // otherwise the following BINDs see it
                     if(!QueryFilters.isEbvError(ebv)) {
+                        // null for an unbound variable (BIND(?unbound AS ?y))
                         var term = QueryFilters.resultTerm(ebv);
-                        if(term.token === 'uri') {
+                        if(term != null && term.token === 'uri') {
                             // a prefixed or relative IRI from the query
                             term = {token: 'uri', value: Utils.lexicalFormBaseUri(term, env)};
                         }
                         originalBindings[i][bind.as.value] = term;
                         thisDenormBindings[bind.as.value] = term;
-                        if(term.token === 'uri' || term.token === 'literal') {
+                        if(term != null && (term.token === 'uri' || term.token === 'literal')) {
                             terms.push({solution: originalBindings[i], variable: bind.as.value, term: term});
                         }
                     }
@@ -2046,13 +2047,24 @@ QueryEngine.prototype.runBinds = function(binds, bindings, dataset, env, callbac
             // An IRI or literal of the store gets its OID, like a term matched by a triple pattern, so such a
             // term object in a solution is never in the lexicon: joins (areCompatibleBindings), GROUP BY and
             // DISTINCT can then compare OIDs and term objects as they are.
+            // lexical form -> OID or -1, for values that repeat (e.g. a constant)
+            var oids = new Map();
             async.eachSeries(terms, function(entry, k){
-                that.normalizeTerm(entry.term, env, false, function(oid){
+                var key = entry.term.token === 'uri' ? "u" + entry.term.value : "l" + Utils.lexicalFormLiteral(entry.term, env);
+                var replace = function(oid) {
                     if(oid != null && oid !== -1) {
                         entry.solution[entry.variable] = oid;
                     }
                     k();
-                });
+                };
+                if(oids.has(key)) {
+                    replace(oids.get(key));
+                } else {
+                    that.normalizeTerm(entry.term, env, false, function(oid){
+                        oids.set(key, oid);
+                        replace(oid);
+                    });
+                }
             }, function(){
                 callback(null, bindings);
             });

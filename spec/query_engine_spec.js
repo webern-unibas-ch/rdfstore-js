@@ -2609,6 +2609,9 @@ describe("QueryEngine", function(){
             ['SELECT ?s { ?s :p ?o BIND(?o + 2 AS ?y) ?s :q ?y }', ["s"], ["s=a"]],
             ['SELECT ?s { ?s :p ?o BIND(?o * 2 AS ?d) FILTER(?d > 4) }', ["s"], ["s=c"]],
             ['SELECT ?z { :a :p ?o BIND(?o + 1 AS ?y) BIND(?y * 10 AS ?z) }', ["z"], ["z=20^^integer"]],
+            ['SELECT ?s ?y { ?s :p ?o BIND(?x AS ?y) } ORDER BY ?s', ["s", "y"], ["s=a y=-", "s=b y=-", "s=c y=-"]],
+            // inside EXISTS, a BIND sees the outer solution
+            ['SELECT ?s { ?s :p ?o FILTER EXISTS { ?s :q ?z BIND(?o + 2 AS ?w) FILTER(?w = ?z) } }', ["s"], ["s=a"]],
             ['SELECT ?x { :nothing :p ?o BIND(1 AS ?x) }', ["x"], []],
             ['SELECT ?x { ?s :nothing ?o BIND(1 AS ?x) }', ["x"], []],
             // nested groups keep their BINDs
@@ -2631,23 +2634,31 @@ describe("QueryEngine", function(){
             return fs.readFileSync(__dirname + "/w3c/syntax-query/syntax-BINDscope" + n + ".rq").toString();
         };
         var prefixes = 'PREFIX : <http://example/> ';
-        var cases = [[w3c(1), true], [w3c(2), true], [w3c(3), true], [w3c(4), true], [w3c(5), true],
-            [w3c(6), false], [w3c(7), false], [w3c(8), false],
-            [prefixes + 'SELECT * { ?s :p ?o OPTIONAL { ?s :q ?x } BIND(1 AS ?x) }', false],
-            [prefixes + 'SELECT * { BIND(1 AS ?x) BIND(2 AS ?x) }', false],
-            [prefixes + 'INSERT { :n :p ?o } WHERE { ?s :p ?o BIND(1 AS ?o) }', false],
-            [prefixes + 'ASK { :n :p ?o }', true, false]];
+        var data = [];
+        for(var i=0; i<150; i++) {
+            data.push(':s' + i + ' :p ' + i);
+        }
+        // [query, expected error name or null, expected result]
+        var cases = [[w3c(1), null], [w3c(2), null], [w3c(3), null], [w3c(4), null], [w3c(5), null],
+            [w3c(6), "SparqlParserError"], [w3c(7), "SparqlParserError"], [w3c(8), "SparqlParserError"],
+            [prefixes + 'SELECT * { ?s :p ?o OPTIONAL { ?s :q ?x } BIND(1 AS ?x) }', "SparqlParserError"],
+            [prefixes + 'SELECT * { BIND(1 AS ?x) BIND(2 AS ?x) }', "SparqlParserError"],
+            // EXISTS builds its pattern per solution, after a nextTick
+            [prefixes + 'SELECT ?s { ?s :p ?o FILTER EXISTS { ?s :p ?z BIND(1 AS ?z) } }', "SparqlParserError"],
+            [prefixes + 'INSERT { :n :p ?o } WHERE { ?s :p ?o BIND(1 AS ?o) }', "SparqlParserError"],
+            [prefixes + 'ASK { :n :p ?o }', null, false],
+            [prefixes + 'SELECT * { ?s :p* ?o FILTER(true) }', "NonSupportedSparqlFeatureError"]];
         new Lexicon(function(lexicon){
             new QuadBackend({treeOrder: 2}, function(backend){
                 var engine = new QueryEngine({backend: backend, lexicon: lexicon});
-                engine.execute(prefixes + 'INSERT DATA { :s :p 1 }', function(err){
+                engine.execute(prefixes + 'INSERT DATA { ' + data.join(' . ') + ' }', function(err){
                     expect(err).toBeNull();
                     async.eachSeries(cases, function(testCase, k) {
                         engine.execute(testCase[0], function(err, result){
-                            if(testCase[1]) {
+                            if(testCase[1] == null) {
                                 expect(err).withContext(testCase[0]).toBeNull();
                             } else {
-                                expect(err != null && err.name).withContext(testCase[0]).toBe("SparqlParserError");
+                                expect(err != null && err.name).withContext(testCase[0]).toBe(testCase[1]);
                             }
                             if(testCase.length > 2) {
                                 expect(result).withContext(testCase[0]).toBe(testCase[2]);

@@ -1155,7 +1155,7 @@ return {token:'quadsnottriples',
     var currentBasicGraphPatterns = [];
     var currentFilters = [];
 
-    // a BIND stays in place: it ends the basic graph pattern before it (SPARQL 1.1 18.2.2.5)
+    // a BIND stays in place: it ends the basic graph pattern before it (SPARQL 1.1 18.2.2.6)
     for(var i=0; i<subpatterns.length; i++) {
 	if(subpatterns[i].token!=='triplespattern' && subpatterns[i].token !== 'filter') {
 	    if(currentBasicGraphPatterns.length != 0 || currentFilters.length != 0) {

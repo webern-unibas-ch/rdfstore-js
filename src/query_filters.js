@@ -60,9 +60,14 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
             var bindingsResults = {};
             queryEngine.copyDenormalizedBindings(bindings, env.outCache, function(denormBindings){
                 async.eachSeries(denormBindings, function(bindings, kk) {
-                    var cloned = _.clone(args[0],true);
-                    var ast = queryEngine.abstractQueryTree.parseSelect({pattern:cloned}, bindings);
-                    ast = queryEngine.abstractQueryTree.bind(ast.pattern, bindings);
+                    var ast;
+                    try {
+                        // this runs after a nextTick, so an error in the pattern (e.g. a BIND to a variable in scope) must not throw
+                        ast = queryEngine.abstractQueryTree.parseSelect({pattern: _.clone(args[0],true)}, bindings);
+                        ast = queryEngine.abstractQueryTree.bind(ast.pattern, bindings);
+                    } catch(e) {
+                        return kk(Utils.toError(e));
+                    }
                     queryEngine.executeSelectUnit([ {kind:'*'} ], dataset, ast, env, function(err, result){
                         if(err != null) {
                             return kk(err);
