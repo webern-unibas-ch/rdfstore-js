@@ -2577,6 +2577,22 @@ describe("QueryEngine", function(){
         ], done);
     });
 
+    it("Test BindStoredTerms", function(done) {
+        // a BIND result that is a term of the store is the same term as one matched by a triple pattern
+        checkQueries(':a :p :b . :a :p :c . :b :p "x" . :c :p "x"@en . :d :p 1', [
+            ['SELECT ?o { ?s :p ?o . { BIND(:a AS ?s) } } ORDER BY ?o', ["o"], ["o=b", "o=c"]],
+            ['SELECT ?s { ?s :p ?o . { BIND("x" AS ?o) } }', ["s"], ["s=b"]],
+            ['SELECT ?s { ?s :p ?o . { BIND("x"@en AS ?o) } }', ["s"], ["s=c"]],
+            ['SELECT ?s { ?s :p ?o . { BIND(1 AS ?o) } }', ["s"], ["s=d"]],
+            ['SELECT ?s (COUNT(*) AS ?n) { { ?s :p ?o } UNION { BIND(:a AS ?s) } } GROUP BY ?s ORDER BY ?s', ["s", "n"],
+                ["s=a n=3^^integer", "s=b n=1^^integer", "s=c n=1^^integer", "s=d n=1^^integer"]],
+            ['SELECT DISTINCT ?s { { ?s :p ?o } UNION { BIND(:a AS ?s) } } ORDER BY ?s', ["s"], ["s=a", "s=b", "s=c", "s=d"]],
+            // a term that is not in the store stays a term
+            ['SELECT ?s { BIND(:new AS ?s) }', ["s"], ["s=new"]],
+            ['SELECT ?o { ?s :p ?o . { BIND(:new AS ?s) } }', ["o"], []]
+        ], done);
+    });
+
     it("Test EmptyGroupPattern", function(done) {
         // the empty group has one solution, without variables
         checkQueries(':x :p 1', [

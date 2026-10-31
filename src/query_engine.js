@@ -2042,6 +2042,8 @@ QueryEngine.prototype.runBinds = function(binds, bindings, dataset, env, callbac
     var originalBindings = bindings;
     if(binds != null && binds.length > 0) {
         that.copyDenormalizedBindings(bindings, env.outCache, function(denormBindings){
+            // IRIs and literals to replace by their OID
+            var terms = [];
             for(var i=0; i<bindings.length; i++) {
                 for(var j=0; j<binds.length; j++) {
                     var bind = binds[j];
@@ -2050,12 +2052,32 @@ QueryEngine.prototype.runBinds = function(binds, bindings, dataset, env, callbac
                     // SPARQL 1.1 Extend: if the expression raises an error, the variable stays unbound;
                     // otherwise the following BINDs see it
                     if(!QueryFilters.isEbvError(ebv)) {
-                        originalBindings[i][bind.as.value] = QueryFilters.resultTerm(ebv);
-                        thisDenormBindings[bind.as.value] = originalBindings[i][bind.as.value];
+                        var term = QueryFilters.resultTerm(ebv);
+                        if(term.token === 'uri') {
+                            // a prefixed or relative IRI from the query
+                            term = {token: 'uri', value: Utils.lexicalFormBaseUri(term, env)};
+                        }
+                        originalBindings[i][bind.as.value] = term;
+                        thisDenormBindings[bind.as.value] = term;
+                        if(term.token === 'uri' || term.token === 'literal') {
+                            terms.push({solution: originalBindings[i], variable: bind.as.value, term: term});
+                        }
                     }
                 }
             }
-            callback(null, bindings);
+            // An IRI or literal of the store gets its OID, like a term matched by a triple pattern, so such a
+            // term object in a solution is never in the lexicon: joins (areCompatibleBindings), GROUP BY and
+            // DISTINCT can then compare OIDs and term objects as they are.
+            async.eachSeries(terms, function(entry, k){
+                that.normalizeTerm(entry.term, env, false, function(oid){
+                    if(oid != null && oid !== -1) {
+                        entry.solution[entry.variable] = oid;
+                    }
+                    k();
+                });
+            }, function(){
+                callback(null, bindings);
+            });
         });
     } else {
         callback(null, bindings);
