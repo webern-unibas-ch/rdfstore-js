@@ -2467,7 +2467,8 @@ describe("QueryEngine", function(){
         });
     });
 
-    // inserts the data into a new engine, then runs each [query, variables, expected termRows] in order
+    // inserts the data into a new engine, then runs each [query, variables, expected termRows] in order;
+    // without variables (null) the raw result is compared, a query alone is only run
     var checkQueries = function(data, cases, done) {
         new Lexicon(function(lexicon){
             new QuadBackend({treeOrder: 2}, function(backend){
@@ -2478,7 +2479,9 @@ describe("QueryEngine", function(){
                     async.eachSeries(cases, function(testCase, k) {
                         engine.execute('PREFIX : <http://example/> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> ' + testCase[0], function(err, results){
                             expect(err).toBeNull();
-                            expect(termRows(results || [], testCase[1])).withContext(testCase[0]).toEqual(testCase[2]);
+                            if(testCase.length > 1) {
+                                expect(testCase[1] == null ? results : termRows(results || [], testCase[1])).withContext(testCase[0]).toEqual(testCase[2]);
+                            }
                             k();
                         });
                     }, function() { done(); });
@@ -2561,6 +2564,55 @@ describe("QueryEngine", function(){
                 checkQueries(':s :v "b" , "a"^^xsd:string', [[query, ["min", "max"], ["min=a^^string max=b"]]], done);
             });
         });
+    });
+
+    it("Test JoinUnboundVariables", function(done) {
+        checkQueries(':a :p :b . :b :p :c . :a :q 1 . :t1 :r 1 . :t2 :r 2', [
+            // an unbound variable is compatible with any value, on either side
+            ['SELECT ?s ?x ?t { { ?s :p ?o OPTIONAL { ?s :q ?x } } { ?t :r ?x } } ORDER BY ?s ?t', ["s", "x", "t"],
+                ["s=a x=1^^integer t=t1", "s=b x=1^^integer t=t1", "s=b x=2^^integer t=t2"]],
+            ['SELECT ?s ?x { { ?s :q ?x } { ?s :p ?o OPTIONAL { ?s :zz ?x } } }', ["s", "x"], ["s=a x=1^^integer"]],
+            // BIND results join as RDF terms
+            ['SELECT ?k { { :a :p ?o BIND(STR(?o) AS ?k) } { ?s :p ?o2 BIND(STR(?o2) AS ?k) } }', ["k"], ["k=b"]]
+        ], done);
+    });
+
+    it("Test EmptyGroupPattern", function(done) {
+        // the empty group has one solution, without variables
+        checkQueries(':x :p 1', [
+            ['ASK {}', null, true],
+            ['SELECT * {}', [], [""]],
+            ['SELECT ?x { FILTER(true) }', ["x"], ["x=-"]],
+            ['SELECT ?x { FILTER(false) }', ["x"], []],
+            // ?v is not in scope inside the inner group (W3C algebra/filter-nested-2)
+            ['SELECT ?v { :x :p ?v . { FILTER(?v = 1) } }', ["v"], []],
+            ['SELECT * { OPTIONAL { :nothing :p ?o } }', ["o"], ["o=-"]],
+            ['SELECT ?x { BIND(1 AS ?x) }', ["x"], ["x=1^^integer"]],
+            ['INSERT { :n :p :m } WHERE {}'],
+            ['SELECT ?o { :n :p ?o }', ["o"], ["o=m"]]
+        ], done);
+    });
+
+    it("Test GraphEmptyGroup", function(done) {
+        // like GRAPH over triple patterns: a variable takes each named graph of the dataset, an IRI must be a graph of the store
+        checkQueries('GRAPH :g1 { :x :y :z }', [
+            ['ASK { GRAPH :g1 {} }', null, true],
+            ['ASK { GRAPH :nothing {} }', null, false],
+            ['SELECT ?g FROM NAMED <http://example/g1> { GRAPH ?g {} }', ["g"], ["g=g1"]],
+            ['SELECT ?g { GRAPH ?g {} }', ["g"], []]
+        ], done);
+    });
+
+    it("Test BlankNodesInPatterns", function(done) {
+        // a blank node in a query pattern matches like a variable that is not returned
+        checkQueries(':a :p :b . :b :p :c . :b :q :d . :e :q :d', [
+            ['SELECT ?o { [ :p ?s ] :p ?o } ORDER BY ?o', ["o"], ["o=b", "o=c"]],
+            ['SELECT ?o { _:x :p ?o } ORDER BY ?o', ["o"], ["o=b", "o=c"]],
+            ['SELECT * { _:x :q ?o }', null, [{o: {token: "uri", value: "http://example/d"}}, {o: {token: "uri", value: "http://example/d"}}]],
+            // only ?o is in scope, also for COUNT(DISTINCT *)
+            ['SELECT (COUNT(DISTINCT *) AS ?c) { _:x :q ?o }', ["c"], ["c=1^^integer"]],
+            ['SELECT ?y ?z { _:x :p ?y . _:x :q ?z }', ["y", "z"], ["y=c z=d"]]
+        ], done);
     });
 
     it("Test ChainedBinds", function(done) {

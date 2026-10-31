@@ -279,6 +279,10 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env) {
     var f = (node.filters || []);
     var b = (node.binds || []);
     var g = {kind: "EMPTY_PATTERN"};
+    if(node.graph != null) {
+        // GRAPH over a group without triple patterns
+        g.graph = node.graph;
+    }
 
     for(var i=0; i<node.patterns.length; i++) {
         var pattern = node.patterns[i];
@@ -621,46 +625,6 @@ AbstractQueryTree.prototype._replaceFilter = function(filterExpr, from, to, ns) 
     }
 
     return filterExpr;
-};
-
-AbstractQueryTree.prototype.treeWithUnion = function(aqt) {
-    if(aqt == null)
-        return false;
-    if(aqt.kind == null)
-        return false;
-    if(aqt.kind === 'select') {
-        return this.treeWithUnion(aqt.pattern);
-    } else if(aqt.kind === 'BGP') {
-        return this.treeWithUnion(aqt.value);
-    } else if(aqt.kind === 'ZERO_OR_MORE_PATH' || aqt.kind === 'ONE_OR_MORE_PATH') {
-        return false;
-    } else if(aqt.kind === 'UNION') {
-        if(aqt.value[0].value != null && aqt.value[0].value.variables != null &&
-            aqt.value[1].value != null && aqt.value[1].value.variables != null) {
-            if(aqt.value[0].variables.join("/") === aqt.values[1].variables.join("/")) {
-                if(this.treeWithUnion(aqt.value[0]))
-                    return true;
-                else
-                    return this.treeWithUnion(aqt.value[1]);
-            }
-        } else {
-            return true;
-        }
-    } else if(aqt.kind === 'GRAPH') {
-        return false;
-    } else if(aqt.kind === 'LEFT_JOIN' || aqt.kind === 'JOIN') {
-        var leftUnion  = this.treeWithUnion(aqt.lvalue);
-        if(leftUnion)
-            return true;
-        else
-            this.treeWithUnion(aqt.rvalue);
-    } else if(aqt.kind === 'FILTER') {
-        return false;
-    } else if(aqt.kind === 'EMPTY_PATTERN') {
-        return false;
-    } else {
-        return false;
-    }
 };
 
 module.exports = {

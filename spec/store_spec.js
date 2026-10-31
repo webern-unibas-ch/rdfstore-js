@@ -1270,6 +1270,8 @@ describe("Store", function () {
                                         ["http://example.org/alice","http://example.org/bob"],
                                         function (err, results) {
                                             expect(results.length).toBe(2);
+                                            // no ORDER BY: the order of the rows is not defined
+                                            results.sort(function(a, b) { return a.who.value < b.who.value ? -1 : 1; });
                                             expect(results[0].who.value).toBe('Alice Hacker');
                                             expect(results[0].g.value).toBe('http://example.org/alice');
                                             expect(results[0].mbox.value).toBe('mailto:alice@work.example.org');

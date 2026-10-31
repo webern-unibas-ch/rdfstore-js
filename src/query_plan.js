@@ -218,11 +218,7 @@ QueryPlanDPSize.createJoinTree = function(leftPlan, rightPlan) {
     // the left plan and the right plan.
     for(var i=0; i<rightPlan.vars.length; i++) {
         if(varsLeft.indexOf("/"+rightPlan.vars[i]+"/") != -1) {
-            if(rightPlan.vars[i].indexOf("_:") == 0) {
-                join.push("blank:"+rightPlan.vars[i]);
-            } else {
-                join.push(rightPlan.vars[i]);
-            }
+            join.push(rightPlan.vars[i]);
         } else {
             accumVars.push(rightPlan.vars[i]);
         }
@@ -320,7 +316,8 @@ QueryPlanDPSize.executeAndBGPsDPSize = function(allBgps, dataset, queryEngine, e
                         if(bgps[i][comp].token === 'var') {
                             vars.push(bgps[i][comp].value);
                         } else if(bgps[i][comp].token === 'blank') {
-                            vars.push(bgps[i][comp].value);
+                            // named like the bindings (buildBindingsFromRange), so blank nodes join
+                            vars.push("blank:"+bgps[i][comp].value);
                         }
                     }
                 }
@@ -540,10 +537,19 @@ QueryPlanDPSize.buildBindingsFromRange = function(results, bgp) {
 };
 
 
-// @used
+// Two term objects (no OIDs) for the same RDF term
+var sameTerm = function(a, b) {
+    return typeof(a) === "object" && typeof(b) === "object" && a.token === b.token && a.value == b.value &&
+        (a.type || null) === (b.type || null) && (a.lang || null) === (b.lang || null);
+};
+
+// Two solutions are compatible if every variable bound in both has the same value: the same OID, or the
+// same RDF term for values that are no OIDs (e.g. BIND results). An unbound (null) variable matches anything.
 QueryPlanDPSize.areCompatibleBindings = function(bindingsA, bindingsB) {
     for(var variable in bindingsA) {
-        if(bindingsB[variable]!=null && (bindingsB[variable] != bindingsA[variable])) {
+        var a = bindingsA[variable];
+        var b = bindingsB[variable];
+        if(a != null && b != null && a !== b && !sameTerm(a, b)) {
             return false;
         }
     }
@@ -572,8 +578,11 @@ QueryPlanDPSize.mergeBindings = function(bindingsA, bindingsB) {
         merged[variable] = bindingsA[variable];
     }
 
+    // an unbound value on the right doesn't replace a bound one on the left
     for(var variable in bindingsB) {
-        merged[variable] = bindingsB[variable];
+        if(bindingsB[variable] != null || !(variable in merged)) {
+            merged[variable] = bindingsB[variable];
+        }
     }
 
     return merged;
