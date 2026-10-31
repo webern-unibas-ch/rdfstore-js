@@ -293,8 +293,7 @@ describe("Error contract", function() {
         it("reports a missing file via the callback", function(done) {
             withStore(null, function(store) {
                 callsBackOnce(function(cb) {
-                    // a local path: on Windows, file:///x would become //x, a network share that takes seconds to fail
-                    store.load("text/turtle", "file://" + __dirname + "/does-not-exist.ttl", cb);
+                    store.load("text/turtle", require("url").pathToFileURL(__dirname + "/does-not-exist.ttl").href, cb);
                 }, expectError, done);
             });
         });

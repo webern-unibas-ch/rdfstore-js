@@ -178,7 +178,24 @@ create(function(err, store) {
 });
 ```
 
-The browser bundles replace Node's `http`, `https`, `url`, `fs` and `path` modules with empty stubs. Loading data from a remote URL or a local file therefore only works through the Node.js entry. In the browser, load data from strings.
+The browser bundles replace Node's `http`, `https`, `url`, `fs` and `path` modules with empty stubs. Loading a local file therefore only works through the Node.js entry. In the browser, load data from strings, or give the store a network transport for remote URLs (`LOAD <url>`), for example one based on `fetch`:
+
+```javascript
+store.setNetworkTransport({
+  load: function(uri, accept, callback) {
+    fetch(uri, { headers: { Accept: accept } })
+      .then(function(res) {
+        if (!res.ok) throw new Error('HTTP error: ' + res.status);
+        return res.text().then(function(data) {
+          return { headers: { 'content-type': res.headers.get('content-type') }, data: data };
+        });
+      })
+      .then(function(result) { callback(null, result); }, callback);
+  }
+});
+```
+
+The transport applies to that store only. *Since v0.9.18-alpha.25.*
 
 *Since v0.9.18-alpha.25.*
 

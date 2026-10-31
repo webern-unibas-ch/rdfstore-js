@@ -170,17 +170,11 @@ var lexicalFormLiteral = function(term, env) {
     return indexedValue;
 };
 
+// Replaces \uXXXX escapes with their characters, without eval (which a CSP without 'unsafe-eval' blocks).
 var normalizeUnicodeLiterals = function (string) {
-    var escapedUnicode = string.match(/\\u[0-9abcdefABCDEF]{4,4}/g) || [];
-    var dups = {};
-    for (var i = 0; i < escapedUnicode.length; i++) {
-        if (dups[escapedUnicode[i]] == null) {
-            dups[escapedUnicode[i]] = true;
-            string = string.replace(new RegExp("\\" + escapedUnicode[i], "g"), eval("'" + escapedUnicode[i] + "'"));
-        }
-    }
-
-    return string;
+    return string.replace(/\\u([0-9a-fA-F]{4})/g, function (escape, hex) {
+        return String.fromCharCode(parseInt(hex, 16));
+    });
 };
 
 // Persistence relies on the native IndexedDB of the runtime (browser window or worker).
@@ -210,43 +204,32 @@ var guid = function() {
         s4() + '-' + s4() + s4() + s4();
 };
 
-hashTerm = function(term) {
-    try {
-        if(term == null) {
-            return "";
-        } if(term.token==='uri') {
-            return "u"+term.value;
-        } else if(term.token === 'blank') {
-            return "b"+term.value;
-        } else if(term.token === 'literal') {
-            var l = "l"+term.value;
-            l = l + (term.type || "");
-            l = l + (term.lang || "");
-
-            return l;
-        }
-    } catch(e) {
-        if(typeof(term) === 'object') {
-            var key = "";
-            for(var p in term) {
-                key = key + p + term[p];
-            }
-
-            return key;
-        }
-        return term;
-    }
-};
-
+// Returns a new array without the elements matching p.
 var reject = function(xs,p) {
     var acc = [];
     for(var i=0; i<xs.length; i++) {
-        if(p(xs[i])) {
+        if(!p(xs[i])) {
             acc.push(xs[i]);
         }
     }
 
     return acc;
+};
+
+// Removes the elements matching p from xs itself and returns them.
+var remove = function(xs,p) {
+    var removed = [];
+    var kept = 0;
+    for(var i=0; i<xs.length; i++) {
+        if(p(xs[i])) {
+            removed.push(xs[i]);
+        } else {
+            xs[kept++] = xs[i];
+        }
+    }
+    xs.length = kept;
+
+    return removed;
 };
 
 var include = function(xs,p) {
@@ -502,7 +485,6 @@ var isWorker = function() {
 module.exports = {
     isWorker: isWorker,
     nextTick: nextTick,
-    hasTerm: hashTerm,
     lexicalFormBaseUri: lexicalFormBaseUri,
     parseISO8601: parseISO8601,
     iso8601: iso8601,
@@ -519,7 +501,7 @@ module.exports = {
     forEach: each,
     include: include,
     reject: reject,
-    remove: reject,
+    remove: remove,
     clone: clone,
     create: create,
     whilst: whilst,

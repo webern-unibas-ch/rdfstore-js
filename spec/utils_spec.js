@@ -59,4 +59,35 @@ describe("Utils", function () {
             expect(result).toBe(1);
         });
     });
+
+    describe("reject and remove", function() {
+        var isEven = function(x) { return x % 2 === 0; };
+
+        it("reject returns a new array without the matches", function() {
+            var xs = [1, 2, 3, 4];
+            expect(Utils.reject(xs, isEven)).toEqual([1, 3]);
+            expect(xs).toEqual([1, 2, 3, 4]);
+        });
+
+        it("remove takes the matches out of the array itself and returns them", function() {
+            var xs = [1, 2, 3, 4, 6];
+            expect(Utils.remove(xs, isEven)).toEqual([2, 4, 6]);
+            expect(xs).toEqual([1, 3]);
+        });
+    });
+
+    describe("normalizeUnicodeLiterals", function() {
+
+        it("replaces \\uXXXX escapes in any case with their characters", function() {
+            expect(Utils.normalizeUnicodeLiterals('"caf\\u00e9" "\\u00C9t\\u00e9"')).toBe('"café" "Été"');
+        });
+
+        it("replaces escapes of quotes and backslashes", function() {
+            expect(Utils.normalizeUnicodeLiterals("a\\u0027b\\u0022c\\u005Cd")).toBe("a'b\"c\\d");
+        });
+
+        it("leaves incomplete escapes alone", function() {
+            expect(Utils.normalizeUnicodeLiterals("\\u12 \\uZZZZ")).toBe("\\u12 \\uZZZZ");
+        });
+    });
 });

@@ -23,7 +23,9 @@ Callbacks.CallbacksBackend = function() {
     this.aqt = new AbstractQueryTree();
     this.engine = arguments[0];
     this.indexMap = {};
-    this.observersMap = {};
+    // node listener -> its observers (one per startObservingNode call), keyed by function
+    // identity: a plain object would key by the function's source text
+    this.observersMap = new Map();
     this.queriesIndexMap = {};
     this.emptyNotificationsMap = {};
     this.queriesList = [];
@@ -42,7 +44,7 @@ Callbacks.CallbacksBackend = function() {
 
     this.callbackCounter = 0;
     this.callbacksMap = {};
-    this.callbacksInverseMap = {};
+    this.callbacksInverseMap = new Map();
 
     this.queryCounter = 0;
     this.queriesMap = {};
@@ -212,7 +214,7 @@ Callbacks.CallbacksBackend.prototype.subscribe = function(s,p,o,g,callback, done
 		that.callbackCounter++;
 		index['_'].push(that.callbackCounter);
 		that.callbacksMap[that.callbackCounter] = callback;
-		that.callbacksInverseMap[callback] = that.callbackCounter;
+		that.callbacksInverseMap.set(callback, that.callbackCounter);
 		break;
 	    } else {
 		if(i===indexOrder.length-1) {
@@ -220,7 +222,7 @@ Callbacks.CallbacksBackend.prototype.subscribe = function(s,p,o,g,callback, done
 		    that.callbackCounter++;
 		    index[quadValue]['_'].push(that.callbackCounter);
 		    that.callbacksMap[that.callbackCounter] = callback;
-		    that.callbacksInverseMap[callback] = that.callbackCounter;
+		    that.callbacksInverseMap.set(callback, that.callbackCounter);
 		} else {
 		    index[quadValue] = index[quadValue] || {};
 		    index = index[quadValue];
@@ -233,9 +235,9 @@ Callbacks.CallbacksBackend.prototype.subscribe = function(s,p,o,g,callback, done
 };
 
 Callbacks.CallbacksBackend.prototype.unsubscribe = function(callback) {
-    var id = this.callbacksInverseMap[callback];
+    var id = this.callbacksInverseMap.get(callback);
     if(id != null) {
-	delete this.callbacksInverseMap[callback];
+	this.callbacksInverseMap.delete(callback);
 	delete this.callbacksMap[id];
     }
 };
@@ -341,7 +343,7 @@ Callbacks.CallbacksBackend.prototype.observeNode = function() {
 		    }
 		}
 	    };
-	    that.observersMap[callback] = observer;
+	    that.observersMap.set(callback, (that.observersMap.get(callback) || []).concat(observer));
 	    that.subscribeEmpty(Callbacks['eventsFlushed'], observer);
 	    that.subscribe(uri,null,null,null,observer,function(){
 		try {
@@ -359,10 +361,13 @@ Callbacks.CallbacksBackend.prototype.observeNode = function() {
 };
 
 Callbacks.CallbacksBackend.prototype.stopObservingNode = function(callback) {
-    var observer = this.observersMap[callback];
-    if(observer) {
-	this.unsubscribe(observer);
-	this.unsubscribeEmpty(Callbacks['eventsFlushed'],observer);
+    var observers = this.observersMap.get(callback);
+    if(observers) {
+	this.observersMap.delete(callback);
+	for(var i=0; i<observers.length; i++) {
+	    this.unsubscribe(observers[i]);
+	    this.unsubscribeEmpty(Callbacks['eventsFlushed'],observers[i]);
+	}
 	return true;
     } else {
 	return false;
@@ -381,7 +386,8 @@ Callbacks.CallbacksBackend.prototype.observeQuery = function(query, callback, en
     var counter = this.queryCounter;
     this.queryCounter++;
     this.queriesMap[counter] = query;
-    this.queriesInverseMap[query] = counter;
+    // a query observed more than once has one id per call
+    this.queriesInverseMap[query] = (this.queriesInverseMap[query] || []).concat(counter);
     this.queriesList.push(counter);
     this.queriesCallbacksMap[counter] = callback;
 
@@ -433,11 +439,14 @@ Callbacks.CallbacksBackend.prototype.observeQuery = function(query, callback, en
 };
 
 Callbacks.CallbacksBackend.prototype.stopObservingQuery = function(query) {
-    var id = this.queriesInverseMap[query];
-    if(id != null) {
+    var ids = this.queriesInverseMap[query];
+    if(ids != null) {
 	delete this.queriesInverseMap[query];
-	delete this.queriesMap[id];
-	this.queriesList = _.reject(this.queriesList, function(queryId){ return queryId === id });
+	for(var i=0; i<ids.length; i++) {
+	    delete this.queriesMap[ids[i]];
+	    delete this.queriesCallbacksMap[ids[i]];
+	}
+	this.queriesList = _.reject(this.queriesList, function(queryId){ return _.include(ids, queryId) });
     }
 };
 
