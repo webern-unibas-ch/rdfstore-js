@@ -147,26 +147,6 @@ Lexicon.prototype.resolveUri = function(uri,callback) {
 
 
 /**
- * Returns the cost associated to the URI.
- * If the URI hasn't been associated in the lexicon, -1 is returned.
- * @param uri
- * @returns {*}
- */
-Lexicon.prototype.resolveUriCost = function(uri, callback) {
-    if(uri === this.defaultGraphUri) {
-        callback(0);
-    } else {
-        this.uris.search(uri, function(oidData){
-            if(oidData != null) {
-                callback(oidData[1]);
-            } else {
-                callback(-1);
-            }
-        });
-    }
-};
-
-/**
  * Register a new blank node in the lexicon.
  * @param label
  * @returns {string}
@@ -178,37 +158,6 @@ Lexicon.prototype.registerBlank = function(callback) {
     this.oidBlanks.insert(oidStr, oidStr, function(){
         callback(oid);
     })
-};
-
-/**
- * @TODO: check this implementation. It shouldn't be possible to
- * use blank nodes by name, but it's not clear what happens when parsing.
- * @param label
- * @param callback
- */
-Lexicon.prototype.resolveBlank = function(label,callback) {
-    var that = this;
-    this.oidBlanks.search(label, function(oidData){
-        if(oidData != null) {
-            callback(oidData);
-        } else {
-            // ??
-            var oid = that.oidCounter;
-            that.oidCounter++;
-            callback(""+oid);
-            //
-        }
-    });
-};
-
-/**
- * Blank nodes don't have an associated cost.
- * @param label
- * @param callback
- * @returns {number}
- */
-Lexicon.prototype.resolveBlankCost = function(label, callback) {
-    callback(0);
 };
 
 /**
@@ -255,21 +204,6 @@ Lexicon.prototype.resolveLiteral = function (literal,callback) {
     this.literals.search(literal, function(oidData){
         if(oidData != null) {
             callback(oidData[0]);
-        } else {
-            callback(-1);
-        }
-    });
-};
-
-/**
- * Returns the cost associated to the literal or -1 if no literal is found.
- * @param literal
- * @param callback
- */
-Lexicon.prototype.resolveLiteralCost = function (literal,callback) {
-    this.literals.search(literal, function(oidData){
-        if(oidData != null) {
-            callback(oidData[1]);
         } else {
             callback(-1);
         }

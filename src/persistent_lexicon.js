@@ -172,30 +172,6 @@ PersistentLexicon.prototype.resolveUri = function(uri,callback) {
 };
 
 /**
- * Returns the cost associated to the URI.
- * If the URI hasn't been associated in the lexicon, -1 is returned.
- * @param uri
- * @returns {*}
- */
-PersistentLexicon.prototype.resolveUriCost = function(uri, callback) {
-    if(uri === this.defaultGraphUri) {
-        callback(0);
-    } else {
-        var objectStore = this.db.transaction(["components"]).objectStore("components");
-        var request = objectStore.index("value").get("_u:"+uri);
-        request.onsuccess = function(event) {
-            if(event.target.result != null)
-                callback(event.target.result.cost);
-            else
-                callback(-1);
-        };
-        request.onerror = function(event) {
-            callback(null, new Error("Error retrieving uri data "+event.target.errorCode));
-        };
-    }
-};
-
-/**
  * Register a new blank node in the lexicon.
  * @param label
  * @returns {string}
@@ -212,49 +188,6 @@ PersistentLexicon.prototype.registerBlank = function(callback) {
     requestAdd.onerror = function(event){
         callback(null, new Error("Error inserting the URI data"+event.target.errorCode));
     };
-};
-
-/**
- * Resolves a blank node OID
- * @param oid
- * @param callback
- */
-//PersistentLexicon.prototype.resolveBlank = function(oid,callback) {
-//    var that = this;
-//    var objectStore = that.db.transaction(["blanks"]).objectStore("blanks");
-//    var request = objectStore.get(oid);
-//    request.onsuccess = function(event) {
-//        if(event.target.result != null)
-//            callback(event.target.result.id);
-//        else {
-//            // we register it if it doesn't exist
-//        }
-//    };
-//    request.onerror = function(event) {
-//        callback(null, new Error("Error retrieving blank data "+event.target.errorCode));
-//    }
-//
-//    this.oidBlanks.search(label, function(oidData){
-//        if(oidData != null) {
-//            callback(oidData);
-//        } else {
-//            // ??
-//            var oid = that.oidCounter;
-//            this.oidCounter++;
-//            callback(""+oid);
-//            //
-//        }
-//    });
-//};
-
-/**
- * Blank nodes don't have an associated cost.
- * @param label
- * @param callback
- * @returns {number}
- */
-PersistentLexicon.prototype.resolveBlankCost = function(label, callback) {
-    callback(0);
 };
 
 /**
@@ -314,25 +247,6 @@ PersistentLexicon.prototype.resolveLiteral = function (literal,callback) {
     request.onerror = function(event) {
         callback(null, new Error("Error retrieving literal data "+event.target.errorCode));
     }
-};
-
-/**
- * Returns the cost associated to the literal or -1 if no literal is found.
- * @param literal
- * @param callback
- */
-PersistentLexicon.prototype.resolveLiteralCost = function (literal,callback) {
-    var objectStore = this.db.transaction(["components"]).objectStore("components");
-    var request = objectStore.index("components").get(literal);
-    request.onsuccess = function(event) {
-        if(event.target.result != null)
-            callback(event.target.result.cost);
-        else
-            callback(-1);
-    };
-    request.onerror = function(event) {
-        callback(null, new Error("Error retrieving literal data "+event.target.errorCode));
-    };
 };
 
 

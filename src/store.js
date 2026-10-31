@@ -8,7 +8,6 @@ var InMemoryLexicon = require("./lexicon").Lexicon;
 var PersistentLexicon = require("./persistent_lexicon").PersistentLexicon;
 var RDFModel = require("./rdf_model");
 var _ = require("./utils");
-var NetworkTransport = require("./network_transport").NetworkTransport;
 var createStorePromises = require("./store_promises").createStorePromises;
 
 
@@ -56,7 +55,9 @@ var Store = function(arg1, arg2) {
 		Lexicon = PersistentLexicon;
 		QuadBackend = PersistentBackend;
     }
-    this.functionMap = {};
+    // subscribe listener -> its adapters (one per subscribe call), keyed by function identity
+    // (an object would key by source text)
+    this.functionMap = new Map();
 
     var that = this;
     this.customFns = {};
@@ -356,7 +357,7 @@ Store.prototype.startObservingNode = function() {
 };
 
 /**
- * Removes a callback function associated to a node.<br/>
+ * Removes a callback function associated to a node, from every node it was registered for.<br/>
  * The event listener function object must be passed as an argument.<br/>
  *
  * @arguments
@@ -399,11 +400,10 @@ Store.prototype.startObservingQuery = function() {
 };
 
 /**
- * Removes a callback function associated to a SPARQL query.<br/>
- * The event listener function object must be passed as an argument.
+ * Stops observing a SPARQL query: removes every callback registered for it.<br/>
  *
  * @arguments
- * @param {Function} eventListener The event listener function to remove, the same passed as an argument to startObservingQuery
+ * @param {String} query The query string, the same passed as an argument to startObservingQuery
  */
 Store.prototype.stopObservingQuery = function(query) {
     this.engine.callbacksBackend.stopObservingQuery(query);
@@ -452,13 +452,13 @@ Store.prototype.subscribe = function(s, p, o, g, callback, readyCallback) {
 		callback(event,acum);
     };
 
-    this.functionMap[callback] = adapterCb;
+    this.functionMap.set(callback, (this.functionMap.get(callback) || []).concat(adapterCb));
 	this.engine.callbacksBackend.subscribe(s,p,o,g,adapterCb,
 		typeof readyCallback === 'function' ? readyCallback : function(){});
 };
 
 /**
- * Removes an event listener associated to a certain pattern.
+ * Removes an event listener from every pattern it was subscribed to.
  * The function passed as an argument to <code>subscribe</code> must be
  * passed as an argument.
  *
@@ -466,9 +466,11 @@ Store.prototype.subscribe = function(s, p, o, g, callback, readyCallback) {
  * @param {Function} callback The event listener to be removed
  */
 Store.prototype.unsubscribe = function(callback) {
-    var adapterCb = this.functionMap[callback];
-    this.engine.callbacksBackend.unsubscribe(adapterCb);
-    delete this.functionMap[callback];
+    var adapters = this.functionMap.get(callback) || [];
+    for(var i=0; i<adapters.length; i++) {
+        this.engine.callbacksBackend.unsubscribe(adapters[i]);
+    }
+    this.functionMap.delete(callback);
 };
 
 /**
@@ -814,37 +816,28 @@ Store.prototype.registeredGraphs = function(callback) {
 };
 
 /**
- * Returns the current network transport being used by the
- * the store.
+ * Returns the network transport this store uses to fetch remote graphs (SPARQL <code>LOAD</code>).
  *
- * The default transport uses TCP sockets in the Node.js version
- * and relies on jQuery in the browser version. This can be overriden
- * using the <code>setNetworkTransport</code> function.
+ * The default transport uses Node's http/https modules. The browser bundles have no default
+ * transport that works: set one with the <code>setNetworkTransport</code> function.
  */
 Store.prototype.getNetworkTransport = function() {
-    return NetworkTransport;
+    return this.engine.rdfLoader.networkTransport;
 };
 
 /**
- * Sets the network transport used by the store.<br/>
+ * Sets the network transport this store uses to fetch remote graphs. It applies to this store only.<br/>
  * <br/>
- * Network transport consist of an object implementing the <code>load</code>
- * function, receiving the URI to load, a string with the value
- * of the HTTP 'Accept' header for the store registered parsers,
- * a callback function where the retrieved data and the success notification
- * must be returned.<br/>
- *<br/>
- * Different examples with implementations of different transports can be found
- * in the source code of the store:
- *<ul>
- * <li>src/js-communication/src/tcp_transport.js</li>
- * <li>src/js-communication/src/ajax_transport.js</li>
- *</ul>
+ * A network transport is an object implementing the <code>load(uri, accept, callback)</code>
+ * function. It receives the URI to load and the value of the HTTP 'Accept' header for the
+ * store's registered parsers, and calls <code>callback(err)</code> on failure or
+ * <code>callback(null, {headers: {'content-type': ...}, data: string})</code> on success.
+ *
  * @arguments
  * @param networkTransportImpl object implementing the transport *load* function.
  */
 Store.prototype.setNetworkTransport = function(networkTransportImpl) {
-    NetworkTransport = networkTransportImpl;
+    this.engine.rdfLoader.networkTransport = networkTransportImpl;
 };
 
 
