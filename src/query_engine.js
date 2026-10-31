@@ -512,23 +512,17 @@ QueryEngine.prototype.normalizeTerm = function(term, env, shouldIndex, callback)
         }
     } else if(term.token === 'blank') {
         var label = term.value;
-        var oid = env.blanks[label];
-        if( oid != null) {
-            callback(oid);
+        if(!shouldIndex) {
+            // in a query pattern a blank node matches like a variable (see QueryPlanDPSize.variablesInBGP, withoutBlankNodes),
+            // never a data blank node with the same label in env.blanks
+            callback("blank:" + label);
+        } else if(env.blanks[label] != null) {
+            callback(env.blanks[label]);
         } else {
-            if(shouldIndex) {
-                this.lexicon.registerBlank(function(oid){
-                    env.blanks[label] = oid;
-                    callback(oid);
-                });
-            } else {
-                // should never get here...
-                // is resolveBlank useful?
-                this.lexicon.resolveBlank(function(oid) {
-                    env.blanks[label] = oid;
-                    callback(oid);
-                });
-            }
+            this.lexicon.registerBlank(function(oid){
+                env.blanks[label] = oid;
+                callback(oid);
+            });
         }
     } else if(term.token === 'var') {
         callback(term.value);
@@ -1146,8 +1140,34 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
             }
         });
     } else if(pattern.kind === "EMPTY_PATTERN") {
-        // as an example of this case  check DAWG test case: algebra/filter-nested-2
-        callback(null, []);
+        // the empty group has one solution without variables (its filters are a FILTER node around it, see
+        // DAWG algebra/filter-nested-2). Under GRAPH, like for triple patterns (QueryPlanDPSize.executeBGPDatasets),
+        // a graph variable takes each named graph of the dataset, and an IRI must be a graph of the store.
+        var that = this;
+        var extend = function(solutions) {
+            that.runBinds(pattern.binds, solutions, dataset, env, callback);
+        };
+        if(pattern.graph == null) {
+            extend([{}]);
+        } else if(pattern.graph.token === 'var') {
+            var solutions = [];
+            var seen = {};
+            for(var i=0; i<dataset.named.length; i++) {
+                if(seen[dataset.named[i].oid] == null) {
+                    seen[dataset.named[i].oid] = true;
+                    var solution = {};
+                    solution[pattern.graph.value] = dataset.named[i].oid;
+                    solutions.push(solution);
+                }
+            }
+            extend(solutions);
+        } else {
+            this.normalizeTerm(pattern.graph, env, false, function(oid){
+                that.lexicon.registeredGraphs(false, function(graphs){
+                    extend(graphs.indexOf(oid) !== -1 ? [{}] : []);
+                });
+            });
+        }
     } else if(pattern.kind === "ZERO_OR_MORE_PATH" || pattern.kind === 'ONE_OR_MORE_PATH') {
         // the place to evaluate them; see the commented-out executeZeroOrMorePath below
         callback(new NonSupportedSparqlFeatureError(pattern.kind, "Property path modifiers (*, +, ?, {n,m}) are not supported"));
@@ -1333,13 +1353,27 @@ QueryEngine.prototype.executeUNION = function(projection, dataset, patterns, env
     });
 };
 
+// The blank nodes of a basic graph pattern match like variables (see normalizeTerm), but are scoped to it:
+// they are dropped from its solutions.
+var withoutBlankNodes = function(results) {
+    return results.map(function(result) {
+        var solution = {};
+        for(var name in result) {
+            if(name.indexOf("blank:") !== 0) {
+                solution[name] = result[name];
+            }
+        }
+        return solution;
+    });
+};
+
 QueryEngine.prototype.executeAndBGP = function(projection, dataset, pattern, env, callback) {
     var that = this;
     QueryPlan.executeAndBGPsDPSize(pattern.value, dataset, this, env, function(err, result){
         if(err != null) {
             callback(err);
         } else if(result!=null) {
-            that.runBinds(pattern.binds, result, dataset, env, function(err, bindings){
+            that.runBinds(pattern.binds, withoutBlankNodes(result), dataset, env, function(err, bindings){
                 if(err != null) {
                     callback(err);
                 } else {
@@ -1403,37 +1437,31 @@ var restoreFailedLeftSolutions = function(bindings, leftSolutions, set2, binds) 
 QueryEngine.prototype.executeLEFT_JOIN = function(projection, dataset, patterns, env, callback) {
     var setQuery1 = patterns.lvalue;
     var setQuery2 = patterns.rvalue;
-    if(setQuery1.kind === "EMPTY_PATTERN") {
-        // LEFT JOIN ( Z | X) => X
-        this.executeSelectUnit(projection, dataset, setQuery2, env, callback);
-    } else {
-        var that = this;
-
-        this.executeSelectUnits(projection, dataset, setQuery1, setQuery2, env, true, function(err, set1, set2){
-            if(err != null) {
-                callback(err);
-            } else {
-                // merged solution -> the left solution it came from, only needed to undo a failed filter
-                var leftSolutions = patterns.filter != null && patterns.filter.length > 0 ? new Map() : null;
-                var result = QueryPlan.leftOuterJoinBindings(set1, set2, leftSolutions);
-                that.runBinds(patterns.binds, result, dataset, env, function(err, bindings){
-                    if(err != null) {
-                        callback(err);
-                    } else if(leftSolutions == null) {
-                        callback(null, bindings);
-                    } else {
-                        QueryFilters.checkFilters(patterns, bindings, true, dataset, env, that, function(err, bindings){
-                            if(err != null) {
-                                callback(err);
-                            } else {
-                                callback(null, restoreFailedLeftSolutions(bindings, leftSolutions, set2, patterns.binds || []));
-                            }
-                        });
-                    }
-                });
-            }
-        });
-    }
+    var that = this;
+    this.executeSelectUnits(projection, dataset, setQuery1, setQuery2, env, true, function(err, set1, set2){
+        if(err != null) {
+            callback(err);
+        } else {
+            // merged solution -> the left solution it came from, only needed to undo a failed filter
+            var leftSolutions = patterns.filter != null && patterns.filter.length > 0 ? new Map() : null;
+            var result = QueryPlan.leftOuterJoinBindings(set1, set2, leftSolutions);
+            that.runBinds(patterns.binds, result, dataset, env, function(err, bindings){
+                if(err != null) {
+                    callback(err);
+                } else if(leftSolutions == null) {
+                    callback(null, bindings);
+                } else {
+                    QueryFilters.checkFilters(patterns, bindings, true, dataset, env, that, function(err, bindings){
+                        if(err != null) {
+                            callback(err);
+                        } else {
+                            callback(null, restoreFailedLeftSolutions(bindings, leftSolutions, set2, patterns.binds || []));
+                        }
+                    });
+                }
+            });
+        }
+    });
 };
 
 QueryEngine.prototype.executeJOIN = function(projection, dataset, patterns, env, callback) {
@@ -1442,31 +1470,12 @@ QueryEngine.prototype.executeJOIN = function(projection, dataset, patterns, env,
     var that = this;
 
     this.executeSelectUnits(projection, dataset, setQuery1, setQuery2, env, true, function(err, set1, set2){
-        var result = null;
         if(err != null) {
             callback(err);
         } else if(set1.length ===0 || set2.length===0) {
             callback(null, []);
         } else {
-            var commonVarsTmp = {};
-            var commonVars = [];
-
-            for(var p in set1[0])
-                commonVarsTmp[p] = false;
-            for(var p  in set2[0]) {
-                if(commonVarsTmp[p] === false)
-                    commonVars.push(p);
-            }
-
-            if(commonVars.length == 0) {
-                result = QueryPlan.joinBindings(set1,set2);
-            } else if(that.abstractQueryTree.treeWithUnion(setQuery1) ||
-                that.abstractQueryTree.treeWithUnion(setQuery2)) {
-                result = QueryPlan.joinBindings(set1,set2);
-            } else {
-                result = QueryPlan.joinBindings2(commonVars, set1, set2);
-            }
-            that.runBinds(patterns.binds, result, dataset, env, function(err, bindings){
+            that.runBinds(patterns.binds, QueryPlan.joinBindings(set1, set2), dataset, env, function(err, bindings){
                 if(err != null) {
                     callback(err);
                 } else {

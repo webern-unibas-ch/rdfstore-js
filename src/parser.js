@@ -1231,6 +1231,11 @@ return {token:'triplespattern',
 	}
     }
 
+    // a group without triple patterns keeps its graph, see the EMPTY_PATTERN case of QueryEngine.executeSelectUnit
+    if(gg.patterns.length === 0) {
+	gg.graph = g;
+    }
+
     gg.token = 'groupgraphpattern'
     return gg;
   }

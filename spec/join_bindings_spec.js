@@ -47,7 +47,7 @@ var makeRandom = function(seed) {
     };
 };
 
-// Two shared objects stand in for BIND results: equal only by reference.
+// Two shared objects stand in for BIND results: the same RDF term.
 var objA = {token: "literal", value: "a"};
 var objB = {token: "literal", value: "a"};
 var oddValues = [null, objA, objB, false, "1"];
@@ -100,6 +100,20 @@ describe("QueryPlan joins", function() {
             expect(QueryPlan.leftOuterJoinBindings(copyRows(rowsA), copyRows(rowsB)))
                 .toEqual(nestedLoopLeftOuterJoin(copyRows(rowsA), copyRows(rowsB)));
         }
+    });
+
+    it("Should treat an unbound variable as compatible on either side", function() {
+        expect(QueryPlan.joinBindings([{x: null}], [{x: 5}])).toEqual([{x: 5}]);
+        // a bound value is not overwritten by an unbound one
+        expect(QueryPlan.joinBindings([{x: 5}], [{x: null, y: 1}])).toEqual([{x: 5, y: 1}]);
+        expect(QueryPlan.leftOuterJoinBindings([{s: 1, x: null}], [{s: 1, x: 7}])).toEqual([{s: 1, x: 7}]);
+    });
+
+    it("Should compare values that are no OIDs as RDF terms", function() {
+        expect(QueryPlan.joinBindings([{k: objA}], [{k: objB, s: 1}])).toEqual([{k: objB, s: 1}]);
+        expect(QueryPlan.joinBindings([{k: objA}], [{k: {token: "literal", value: "a", lang: "en"}}])).toEqual([]);
+        expect(QueryPlan.joinBindings([{k: objA}], [{k: 1}])).toEqual([]);
+        expect(QueryPlan.joinBindings([{k: {token: "literal", value: "chat", lang: "fr"}}], [{k: {token: "literal", value: "chatfr"}}])).toEqual([]);
     });
 
     it("Should add every variable of the right side to an unmatched left solution", function() {
