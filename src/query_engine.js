@@ -25,6 +25,9 @@ var QueryEngine = function(params) {
         this.rdfLoader = new RDFLoader(params['communication']);
         this.callbacksBackend = new Callbacks(this);
         this.customFns = params.customFns || {};
+        // labels of the blank nodes BNODE() creates, unique for the engine; per solution, BNODE(str) -> label
+        this.bnodeCounter = 0;
+        this.bnodeLabels = new WeakMap();
     }
 };
 
@@ -513,7 +516,10 @@ QueryEngine.prototype.normalizeTerm = function(term, env, shouldIndex, callback)
         }
     } else if(term.token === 'blank') {
         var label = term.value;
-        if(!shouldIndex) {
+        if(term.oid != null) {
+            // a blank node of the store bound into an EXISTS pattern
+            callback(term.oid);
+        } else if(!shouldIndex) {
             // in a query pattern a blank node matches like a variable (see QueryPlanDPSize.variablesInBGP, withoutBlankNodes),
             // never a data blank node with the same label in env.blanks
             callback("blank:" + label);
@@ -741,8 +747,6 @@ QueryEngine.prototype.denormalizeBindings = function(bindings, env, callback) {
             } else {
                 that.lexicon.retrieve(oid, function(val){
                     bindings[variable] = val;
-                    if(val.token === 'blank')
-                        env.blanks[val.value] = oid;
                     k();
                 });
             }
@@ -1575,7 +1579,7 @@ QueryEngine.prototype._executeUpdateUnit = function(aqt, queryEnv, callback) {
         });
     } else if(aqt.kind === 'deletedata') {
         async.eachSeries(aqt.quads, function(quad, k){
-            that._executeQuadDelete(quad, queryEnv, k);
+            that._executeQuadDelete(quad, queryEnv, null, k);
         }, function(err){
             if(err != null)
                 callback(err);
@@ -1736,8 +1740,10 @@ QueryEngine.prototype._executeModifyQuery = function(aqt, queryEnv, callback) {
     var that = this;
     var querySuccess = true;
     var error = new Error("Error executing modify query");
+    var solutions = null;
     var bindings = null;
-    var components = ['subject', 'predicate', 'object', 'graph'];
+    // blank nodes of deleted quads and of the insert template: released at the end unless a quad uses them
+    var blanks = [];
 
     aqt.insert = aqt.insert == null ? [] : aqt.insert;
     aqt.delete = aqt.delete == null ? [] : aqt.delete;
@@ -1774,97 +1780,121 @@ QueryEngine.prototype._executeModifyQuery = function(aqt, queryEnv, callback) {
                     querySuccess = false;
                     return k();
                 } else {
-                    that.denormalizeBindingsList(result, queryEnv, function(result){
-                        if(result!=null) {
-                            bindings = result;
-                        } else {
-                            error = new Error("Error denormalizing bindings list");
-                            querySuccess = false;
-                        }
+                    // keeps the OIDs in result: the data blank nodes of a solution are found by them
+                    solutions = result;
+                    that.copyDenormalizedBindings(result, queryEnv.outCache, function(result){
+                        bindings = result;
                         k();
                     });
                 }
             });
         },function(k) {
             // delete query
-
-            var defaultGraph = aqt.with;
             if(querySuccess) {
-                var quads = [];
-                for(var i=0; i<aqt.delete.length; i++) {
-                    var src = aqt.delete[i];
-
-                    for(var j=0; j<bindings.length; j++) {
-                        var quad = {};
-                        var binding = bindings[j];
-
-                        for(var c=0; c<components.length; c++) {
-                            var component = components[c];
-                            if(component == 'graph' && src[component] == null) {
-                                quad['graph'] = defaultGraph;
-                            } else if(src[component].token === 'var') {
-                                quad[component] = binding[src[component].value];
-                            } else {
-                                quad[component] = src[component];
-                            }
-                        }
-
-                        quads.push(quad);
-                    }
-                }
-
-                // a template quad that cannot be built (e.g. an unbound variable) is skipped, as SPARQL 1.1 Update specifies
-                async.eachSeries(quads, function(quad,kk) {
-                    that._executeQuadDelete(quad, queryEnv, function(){
-                        kk();
-                    });
-                },function(){ k(); });
+                that.instantiateTemplate(aqt.delete, solutions, bindings, aqt.with, null, queryEnv, function(instances){
+                    async.eachSeries(instances, function(instance, kk) {
+                        that._executeQuadDelete(instance.quad, instance.env, blanks, function(){
+                            kk();
+                        });
+                    },function(){ k(); });
+                });
             } else {
                 k();
             }
         },function(k) {
             // insert query
-            var defaultGraph = aqt.with;
-
             if(querySuccess) {
-                var quads = [];
-                for(var i=0; i<aqt.insert.length; i++) {
-                    var src = aqt.insert[i];
-
-                    for(var j=0; j<bindings.length; j++) {
-                        var quad = {};
-                        var binding = bindings[j];
-
-                        for(var c=0; c<components.length; c++) {
-                            var component = components[c];
-                            if(component == 'graph' && src[component] == null) {
-                                quad['graph'] = defaultGraph;
-                            } else if(src[component].token === 'var') {
-                                quad[component] = binding[src[component].value];
-                            } else {
-                                quad[component] = src[component];
-                            }
-                        }
-
-                        quads.push(quad);
-                    }
-                }
-
-                // as for DELETE: template quads that cannot be built are skipped
-                async.eachSeries(quads, function(quad,kk) {
-                    that._executeQuadInsert(quad, queryEnv, function(){
-                        kk();
-                    });
-                },function(){ k(); });
+                that.instantiateTemplate(aqt.insert, solutions, bindings, aqt.with, blanks, queryEnv, function(instances){
+                    async.eachSeries(instances, function(instance, kk) {
+                        that._executeQuadInsert(instance.quad, instance.env, function(){
+                            kk();
+                        });
+                    },function(){ k(); });
+                });
             } else {
                 k();
             }
+        },function(k) {
+            that._releaseBlanks(blanks, function(){ k(); });
         }
     )(function(){
         if(querySuccess)
             callback(null, true);
         else
             callback(error);
+    });
+};
+
+/**
+ * Builds the quads of an INSERT or DELETE template for every solution (SPARQL 1.1 Update 3.1.3) and calls back
+ * with [{quad, env}]. A quad with an unbound variable is skipped. Each solution gets its own blank node map in
+ * env: a data blank node it binds keeps its OID, and a blank node of the template or one from BNODE() becomes a
+ * new blank node per solution, its OID added to newBlanks. Without newBlanks (DELETE) such a quad is skipped: a
+ * DELETE template must not contain blank nodes, and a new blank node is in no quad.
+ */
+QueryEngine.prototype.instantiateTemplate = function(template, solutions, bindings, defaultGraph, newBlanks, queryEnv, callback) {
+    var that = this;
+    var components = ['subject', 'predicate', 'object', 'graph'];
+    var instances = [];
+    var index = 0;
+    async.eachSeries(bindings, function(binding, k) {
+        var solution = solutions[index++];
+        var env = {blanks: {}, outCache: queryEnv.outCache, namespaces: queryEnv.namespaces, base: queryEnv.base};
+        for(var variable in solution) {
+            if(typeof(solution[variable]) === 'number' && binding[variable] != null && binding[variable].token === 'blank') {
+                env.blanks[binding[variable].value] = solution[variable];
+            }
+        }
+        // template label or BNODE() label -> blank node of this solution, with the label the lexicon gives its OID
+        var fresh = {};
+        async.eachSeries(template, function(src, kk) {
+            var quad = {};
+            // [component, key in fresh]
+            var newTerms = [];
+            for(var c=0; c<components.length; c++) {
+                var component = components[c];
+                var term = src[component];
+                if(component === 'graph' && term == null) {
+                    quad.graph = defaultGraph;
+                } else if(term.token === 'var') {
+                    var value = binding[term.value];
+                    if(value == null)
+                        return kk();
+                    if(value.token === 'blank' && env.blanks[value.value] == null) {
+                        if(newBlanks == null)
+                            return kk();
+                        newTerms.push([component, 'v' + value.value]);
+                    }
+                    quad[component] = value;
+                } else if(term.token === 'blank') {
+                    if(newBlanks == null)
+                        return kk();
+                    newTerms.push([component, 't' + term.value]);
+                    quad[component] = term;
+                } else {
+                    quad[component] = term;
+                }
+            }
+            async.eachSeries(newTerms, function(newTerm, kkk) {
+                var component = newTerm[0], key = newTerm[1];
+                if(fresh[key] != null) {
+                    quad[component] = fresh[key];
+                    return kkk();
+                }
+                that.lexicon.registerBlank(function(oid){
+                    fresh[key] = {token: 'blank', value: '_:' + oid};
+                    env.blanks[fresh[key].value] = oid;
+                    newBlanks.push(oid);
+                    quad[component] = fresh[key];
+                    kkk();
+                });
+            }, function(){
+                instances.push({quad: quad, env: env});
+                kk();
+            });
+        }, function(){ k(); });
+    }, function(){
+        callback(instances);
     });
 };
 
@@ -1911,10 +1941,13 @@ QueryEngine.prototype._executeQuadInsert = function(quad, queryEnv, callback) {
         });
 };
 
-QueryEngine.prototype._executeQuadDelete = function(quad, queryEnv, callback) {
+// Deletes a quad if the store has it. The OIDs of its blank nodes are added to deletedBlanks, to be released
+// later with _releaseBlanks (null: released right away).
+QueryEngine.prototype._executeQuadDelete = function(quad, queryEnv, deletedBlanks, callback) {
     var that = this;
     var normalized;
     var error = false;
+    var found = false;
     var errorMessage, key;
     async.seq(
         function(k){
@@ -1931,8 +1964,13 @@ QueryEngine.prototype._executeQuadDelete = function(quad, queryEnv, callback) {
         function(k){
             if(error === false) {
                 key = new QuadIndex.NodeKey(normalized);
-                that.backend.delete(key, function(){
+                that.backend.search(key, function(result){
+                    found = result === true;
+                    if(found) {
+                        that.backend.delete(key, function(){ k(); });
+                    } else {
                         k();
+                    }
                 });
             } else {
                 k();
@@ -1940,12 +1978,24 @@ QueryEngine.prototype._executeQuadDelete = function(quad, queryEnv, callback) {
         },
         function(k){
             if(error === false) {
+                // also for a missing quad: normalizeQuad registered its terms. Blank nodes are left to _releaseBlanks,
+                // other quads may still use them
                 that.lexicon.unregister(quad, key, function(){
-                    that.callbacksBackend.nextGraphModification(Callbacks['deleted'], [quad, normalized]);
+                    if(found)
+                        that.callbacksBackend.nextGraphModification(Callbacks['deleted'], [quad, normalized]);
                     k();
                 });
             } else {
                 k();
+            }
+        },
+        function(k){
+            var blanks = error === false ? that._blankOids(quad, normalized) : [];
+            if(deletedBlanks != null) {
+                Array.prototype.push.apply(deletedBlanks, blanks);
+                k();
+            } else {
+                that._releaseBlanks(blanks, function(){ k(); });
             }
         })(
         function(){
@@ -1955,6 +2005,34 @@ QueryEngine.prototype._executeQuadDelete = function(quad, queryEnv, callback) {
                 callback(null, true);
             }
         });
+};
+
+// The OIDs of the blank nodes of a quad (subject or object; a predicate or graph name is never a blank node)
+QueryEngine.prototype._blankOids = function(quad, normalized) {
+    var oids = [];
+    if(quad.subject.token === 'blank')
+        oids.push(normalized.subject);
+    if(quad.object.token === 'blank')
+        oids.push(normalized.object);
+    return oids;
+};
+
+// Removes the blank nodes with these OIDs from the lexicon if no quad uses them anymore.
+QueryEngine.prototype._releaseBlanks = function(oids, callback) {
+    var that = this;
+    async.eachSeries(Array.from(new Set(oids)), function(oid, k){
+        that.backend.range(new QuadIndex.Pattern({subject: oid, predicate: 'p', object: 'o', graph: 'g'}), function(asSubject){
+            if(asSubject != null && asSubject.length > 0)
+                return k();
+            that.backend.range(new QuadIndex.Pattern({subject: 's', predicate: 'p', object: oid, graph: 'g'}), function(asObject){
+                if(asObject != null && asObject.length > 0)
+                    return k();
+                that.lexicon.unregisterBlank(oid, function(){ k(); });
+            });
+        });
+    }, function(){
+        callback();
+    });
 };
 
 // Runs an update inside the update that is already in progress: unlike execute(), it neither starts
@@ -2083,13 +2161,23 @@ QueryEngine.prototype.runBinds = function(binds, bindings, dataset, env, callbac
                         var term = QueryFilters.resultTerm(ebv);
                         originalBindings[i][bind.as.value] = term;
                         thisDenormBindings[bind.as.value] = term;
-                        if(term != null && (term.token === 'uri' || term.token === 'literal')) {
+                        if(term != null && term.token === 'blank') {
+                            // a blank node of the store can only come from a variable of the solution: it takes
+                            // that OID (a new one from BNODE() has none)
+                            for(var v in originalBindings[i]) {
+                                var bound = thisDenormBindings[v];
+                                if(typeof(originalBindings[i][v]) === 'number' && bound != null && bound.token === 'blank' && bound.value === term.value) {
+                                    originalBindings[i][bind.as.value] = originalBindings[i][v];
+                                    break;
+                                }
+                            }
+                        } else if(term != null && (term.token === 'uri' || term.token === 'literal')) {
                             terms.push({solution: originalBindings[i], variable: bind.as.value, term: term});
                         }
                     }
                 }
             }
-            // An IRI or literal of the store gets its OID, like a term matched by a triple pattern, so such a
+            // An IRI, literal or blank node of the store gets its OID, like a term matched by a triple pattern, so such a
             // term object in a solution is never in the lexicon: joins (areCompatibleBindings), GROUP BY and
             // DISTINCT can then compare OIDs and term objects as they are.
             // lexical form -> OID or -1, for values that repeat (e.g. a constant)

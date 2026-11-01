@@ -150,3 +150,26 @@ describe("Events API unsubscribing", function() {
         });
     });
 });
+
+describe("Events API deleted events", function() {
+
+    it("reports only quads the store had", function(done) {
+        withStore(function(store) {
+            var events = [];
+            insertAB(store, function() {
+                store.subscribe("http://a", null, null, null, function(event, triples) {
+                    events.push(event + " " + triples.length);
+                }, function() {
+                    store.execute("DELETE DATA { <http://a> <http://p> <http://none> }", function(err) {
+                        expect(err).toBe(null);
+                        store.execute("DELETE { ?s <http://p> <http://o1> . ?s <http://p> <http://none> } WHERE { ?s <http://p> ?o }", function(err) {
+                            expect(err).toBe(null);
+                            expect(events).toEqual(["deleted 1"]);
+                            done();
+                        });
+                    });
+                });
+            });
+        });
+    });
+});

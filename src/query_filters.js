@@ -58,8 +58,11 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
             var args = filter.value.args;
 
             var bindingsResults = {};
+            var solutionsWithOids = bindings;
             queryEngine.copyDenormalizedBindings(bindings, env.outCache, function(denormBindings){
+                var index = 0;
                 async.eachSeries(denormBindings, function(bindings, kk) {
+                    var solution = solutionsWithOids[index++];
                     var ast;
                     // inside GRAPH, the active graph of this solution (see AbstractQueryTree.setExistsGraph)
                     var graph = filter.value.graph;
@@ -69,7 +72,17 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
                     try {
                         // this runs after a nextTick, so an error in the pattern (e.g. a BIND to a variable in scope) must not throw
                         ast = queryEngine.abstractQueryTree.parseSelect({pattern: _.clone(args[0],true)}, graph);
-                        ast = queryEngine.abstractQueryTree.bind(ast.pattern, bindings);
+                        // in the pattern a blank node matches like a variable: a bound one keeps its OID, and
+                        // one from BNODE(), not in the store, gets -1 (matches nothing)
+                        var patternBindings = {};
+                        for(var v in bindings) {
+                            var bound = bindings[v];
+                            if(bound != null && bound.token === 'blank') {
+                                bound = {token: 'blank', value: bound.value, oid: typeof(solution[v]) === 'number' ? solution[v] : -1};
+                            }
+                            patternBindings[v] = bound;
+                        }
+                        ast = queryEngine.abstractQueryTree.bind(ast.pattern, patternBindings);
                     } catch(e) {
                         return kk(Utils.toError(e));
                     }
@@ -1246,6 +1259,24 @@ QueryFilters.runBuiltInCall = function(builtincall, args, bindings, queryEngine,
             } else {
                 return QueryFilters.ebvFalse();
             }
+        } else if(builtincall === 'bnode') {
+            // a new blank node per call; BNODE(str) gives the same one for the same string within a solution.
+            // Its label never matches a blank node of the store (_:<oid>) or of a CONSTRUCT template (_:b<n>).
+            if(ops.length === 0) {
+                return {token: 'blank', value: '_:bnode' + (++queryEngine.bnodeCounter)};
+            }
+            if(!QueryFilters.isSimpleLiteral(ops[0]) && !QueryFilters.isXsdType("string", ops[0])) {
+                return QueryFilters.ebvError();
+            }
+            var labels = queryEngine.bnodeLabels.get(bindings);
+            if(labels == null) {
+                labels = new Map();
+                queryEngine.bnodeLabels.set(bindings, labels);
+            }
+            if(!labels.has(ops[0].value)) {
+                labels.set(ops[0].value, '_:bnode' + (++queryEngine.bnodeCounter));
+            }
+            return {token: 'blank', value: labels.get(ops[0].value)};
         } else if(queryEngine.customFns[builtincall] != null) {
             return queryEngine.customFns[builtincall](QueryFilters, ops);
         } else {

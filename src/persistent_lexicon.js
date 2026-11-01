@@ -338,28 +338,41 @@ PersistentLexicon.prototype.clear = function(callback) {
 
 /**
  * Removes the values associated to the subject, predicate, object and graph
- * values of the provided quad.
+ * values of the provided quad. Blank nodes are left alone: other quads may still
+ * use them, so the query engine releases them with unregisterBlank.
  * @param quad
  * @param key
  * @param callback
  */
 PersistentLexicon.prototype.unregister = function (quad, key, callback) {
     var that = this;
-    async.seq(function(k){
-        that._unregisterTerm(quad.subject.token, key.subject,k);
-    }, function(k){
-        that._unregisterTerm(quad.predicate.token, key.predicate,k);
-    }, function(k){
-        that._unregisterTerm(quad.object.token, key.object, k);
-    }, function(k){
-        if (quad.graph != null) {
-            that._unregisterTerm(quad.graph.token, key.graph, k);
-        } else {
+    var unregisterTerm = function(term, oid, k) {
+        if (term == null || term.token === 'blank') {
             k();
+        } else {
+            that._unregisterTerm(term.token, oid, k);
         }
+    };
+    async.seq(function(k){
+        unregisterTerm(quad.subject, key.subject, k);
+    }, function(k){
+        unregisterTerm(quad.predicate, key.predicate, k);
+    }, function(k){
+        unregisterTerm(quad.object, key.object, k);
+    }, function(k){
+        unregisterTerm(quad.graph, key.graph, k);
     })(function(){
         callback(true);
     });
+};
+
+/**
+ * Removes a blank node that no quad uses anymore.
+ * @param oid
+ * @param callback
+ */
+PersistentLexicon.prototype.unregisterBlank = function (oid, callback) {
+    this._unregisterTerm('blank', oid, callback);
 };
 
 /**

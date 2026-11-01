@@ -2471,7 +2471,8 @@ describe("QueryEngine", function(){
     });
 
     // inserts the data into a new engine, then runs each [query, variables, expected termRows] in order;
-    // without variables (null) the raw result is compared, a query alone is only run
+    // without variables (null) the raw result is compared, a function instead of variables checks the results,
+    // a query alone is only run
     var checkQueries = function(data, cases, done) {
         new Lexicon(function(lexicon){
             new QuadBackend({treeOrder: 2}, function(backend){
@@ -2481,8 +2482,10 @@ describe("QueryEngine", function(){
                     expect(err).toBeNull();
                     async.eachSeries(cases, function(testCase, k) {
                         engine.execute('PREFIX : <http://example/> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> ' + testCase[0], function(err, results){
-                            expect(err).toBeNull();
-                            if(testCase.length > 1) {
+                            expect(err).withContext(testCase[0]).toBeNull();
+                            if(typeof(testCase[1]) === 'function') {
+                                testCase[1](results || [], testCase[0]);
+                            } else if(testCase.length > 1) {
                                 expect(testCase[1] == null ? results : termRows(results || [], testCase[1])).withContext(testCase[0]).toEqual(testCase[2]);
                             }
                             k();
@@ -2744,6 +2747,169 @@ describe("QueryEngine", function(){
             ['SELECT ?g FROM NAMED <http://example/g1> { GRAPH ?g {} }', ["g"], ["g=g1"]],
             ['SELECT ?g { GRAPH ?g {} }', ["g"], []]
         ], done);
+    });
+
+    // every value of these variables is a blank node; the labels of different rows differ
+    var expectNewBlanks = function(vars) {
+        return function(results, query) {
+            expect(results.length).withContext(query).toBeGreaterThan(0);
+            var labels = [];
+            results.forEach(function(result) {
+                vars.forEach(function(v) {
+                    expect(result[v] && result[v].token).withContext(query).toBe('blank');
+                    labels.push(result[v] && result[v].value);
+                });
+            });
+            expect(_.uniq(labels).length).withContext(query).toBe(labels.length);
+        };
+    };
+
+    it("Test InsertTemplateBlankNodes", function(done) {
+        // a blank node of an INSERT template is a new blank node per solution, shared by the quads of one solution
+        checkQueries(':a :p 1 . :b :p 2 . :c :p 3', [
+            ['INSERT { [] :q ?o } WHERE { ?s :p ?o }'],
+            ['SELECT (COUNT(DISTINCT ?b) AS ?n) { ?b :q ?o FILTER(isBlank(?b)) }', ["n"], ["n=3^^integer"]],
+            ['INSERT { _:x :r ?o . _:x :t ?s } WHERE { ?s :p ?o }'],
+            ['SELECT ?s ?o { ?b :r ?o ; :t ?s } ORDER BY ?o', ["s", "o"], ["s=a o=1^^integer", "s=b o=2^^integer", "s=c o=3^^integer"]],
+            ['SELECT (COUNT(DISTINCT ?b) AS ?n) { ?b :r ?o }', ["n"], ["n=3^^integer"]],
+            // the same label in a second operation of the request is another blank node
+            ['INSERT { _:y :u ?o } WHERE { :a :p ?o } ; INSERT { _:y :u ?o } WHERE { :b :p ?o }'],
+            ['SELECT (COUNT(DISTINCT ?b) AS ?n) { ?b :u ?o }', ["n"], ["n=2^^integer"]],
+            // a quad with an unbound variable is skipped, the other quads of the solution are inserted
+            ['INSERT { :n :w ?x . :n :v ?o } WHERE { ?s :p ?o OPTIONAL { ?s :none ?x } }'],
+            ['SELECT ?o { :n :v ?o } ORDER BY ?o', ["o"], ["o=1^^integer", "o=2^^integer", "o=3^^integer"]],
+            ['ASK { :n :w ?x }', null, false]
+        ], done);
+    });
+
+    it("Test InsertTemplateBlankLabels", function(done) {
+        // a template label equal to the label of a blank node of the store is still a new blank node
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend, lexicon: lexicon});
+                var prefix = 'PREFIX : <http://example/> ';
+                engine.execute(prefix + 'INSERT DATA { _:d :p 1 }', function(err){
+                    expect(err).toBeNull();
+                    engine.execute(prefix + 'SELECT ?b { ?b :p 1 }', function(err, results){
+                        expect(err).toBeNull();
+                        var label = results[0].b.value;
+                        engine.execute(prefix + 'INSERT { ' + label + ' :q ?o } WHERE { ?b :p ?o }', function(err){
+                            expect(err).toBeNull();
+                            engine.execute(prefix + 'ASK { ?b :p 1 ; :q 1 }', function(err, result){
+                                expect(err).toBeNull();
+                                expect(result).toBe(false);
+                                engine.execute(prefix + 'SELECT ?b { ?b :q 1 FILTER(isBlank(?b)) }', function(err, results){
+                                    expect(err).toBeNull();
+                                    expect(results.length).toBe(1);
+                                    expect(results[0].b.value).not.toBe(label);
+                                    done();
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    it("Test ModifyBoundBlankNodes", function(done) {
+        // a blank node of the store bound by WHERE is that blank node in the templates, also after a BIND, and
+        // deleting one of its quads keeps it for the others
+        checkQueries('_:x :p 1 . _:x :k "keep" . :a :p 2', [
+            ['INSERT { ?b :r ?z } WHERE { ?b :p 1 BIND(5 AS ?z) }'],
+            ['SELECT ?k { ?b :r 5 ; :k ?k }', ["k"], ["k=keep"]],
+            ['DELETE { ?b :r ?z } WHERE { ?b :p 1 BIND(5 AS ?z) }'],
+            ['ASK { ?b :r 5 }', null, false],
+            ['DELETE { ?b :p 1 } WHERE { ?b :p 1 }'],
+            ['SELECT ?k { ?b :k ?k }', ["k"], ["k=keep"]],
+            // deleting a quad the store does not have changes nothing
+            ['DELETE { ?b :none 1 } WHERE { ?b :k ?k }'],
+            ['SELECT ?k { ?b :k ?k }', ["k"], ["k=keep"]],
+            // the insert still finds a blank node whose last quad the delete removed
+            ['DELETE { ?b :k ?k } INSERT { ?b :k2 ?k } WHERE { ?b :k ?k }'],
+            ['SELECT ?k { ?b :k2 ?k FILTER(isBlank(?b)) }', ["k"], ["k=keep"]],
+            ['DELETE { _:t :p ?o } WHERE { ?s :p ?o }'],
+            ['SELECT ?s ?o { ?s :p ?o }', ["s", "o"], ["s=a o=2^^integer"]]
+        ], done);
+    });
+
+    it("Test BNodeFunction", function(done) {
+        checkQueries(':a :p 1 . :b :p 2', [
+            ['SELECT ?x ?y { ?s :p ?o BIND(BNODE() AS ?x) BIND(BNODE() AS ?y) }', expectNewBlanks(["x", "y"])],
+            ['SELECT (BNODE() AS ?x) { ?s :p ?o }', expectNewBlanks(["x"])],
+            // BNODE(str): the same blank node for the same string within a solution
+            ['SELECT ?x ?y { ?s :p ?o BIND(BNODE("k") AS ?x) BIND(BNODE("k") AS ?y) }', function(results, query) {
+                expect(results.length).withContext(query).toBe(2);
+                results.forEach(function(result) {
+                    expect(result.x.token).withContext(query).toBe('blank');
+                    expect(result.y.value).withContext(query).toBe(result.x.value);
+                });
+                expect(results[0].x.value).withContext(query).not.toBe(results[1].x.value);
+            }],
+            ['SELECT ?x { ?s :p ?o BIND(BNODE(STR(?s)) AS ?x) }', expectNewBlanks(["x"])],
+            ['SELECT ?x { :a :p ?o BIND(BNODE(1) AS ?x) }', ["x"], ["x=-"]],
+            ['SELECT ?x { :a :p ?o BIND(BNODE("k"@en) AS ?x) }', ["x"], ["x=-"]],
+            ['SELECT ?s { ?s :p ?o FILTER EXISTS { ?s ?q ?v FILTER(isBlank(BNODE())) } } ORDER BY ?s', ["s"], ["s=a", "s=b"]],
+            // a new blank node matches no quad of the store
+            ['SELECT ?s { ?s :p ?o BIND(BNODE() AS ?x) ?x ?q ?v }', ["s"], []],
+            ['INSERT { ?x :q ?o } WHERE { ?s :p ?o BIND(BNODE() AS ?x) }'],
+            ['SELECT (COUNT(DISTINCT ?x) AS ?n) { ?x :q ?o FILTER(isBlank(?x)) }', ["n"], ["n=2^^integer"]],
+            ['INSERT { ?x :u ?o . ?x :w ?s } WHERE { ?s :p ?o BIND(BNODE() AS ?x) }'],
+            ['SELECT ?s ?o { ?x :u ?o ; :w ?s } ORDER BY ?s', ["s", "o"], ["s=a o=1^^integer", "s=b o=2^^integer"]],
+            // one blank node per solution, used by both template triples
+            ['CONSTRUCT { ?x :r ?o . ?x :t ?s } WHERE { ?s :p ?o BIND(BNODE() AS ?x) }', function(graph, query) {
+                var subjects = graph.toArray().map(function(triple) { return triple.subject; });
+                expect(subjects.length).withContext(query).toBe(4);
+                subjects.forEach(function(subject) { expect(subject.interfaceName).withContext(query).toBe('BlankNode'); });
+                expect(_.uniq(subjects.map(String)).length).withContext(query).toBe(2);
+            }]
+        ], done);
+    });
+
+    it("Test BoundBlankNodes", function(done) {
+        // a blank node of the store from a BIND joins with the same blank node from a triple pattern, and
+        // one bound into an EXISTS pattern matches only itself
+        checkQueries(':a :p _:x . _:x :q "v" . :b :p _:y', [
+            ['SELECT ?v { :a :p ?o BIND(?o AS ?x) ?x :q ?v }', ["v"], ["v=v"]],
+            ['SELECT ?v { { :a :p ?o BIND(?o AS ?x) } { ?x :q ?v } }', ["v"], ["v=v"]],
+            ['SELECT ?s { ?s :p ?o FILTER EXISTS { ?o :q ?v } }', ["s"], ["s=a"]],
+            ['SELECT ?s { ?s :p ?o FILTER NOT EXISTS { ?o :q ?v } }', ["s"], ["s=b"]],
+            ['SELECT ?s { ?s :p ?o BIND(?o AS ?x) FILTER NOT EXISTS { ?x :q ?v } }', ["s"], ["s=b"]],
+            ['SELECT ?s { ?s :p ?o FILTER EXISTS { ?o :q ?v FILTER(isBlank(?o)) } }', ["s"], ["s=a"]],
+            // a new blank node from BNODE() matches no quad inside EXISTS either
+            ['SELECT ?s { ?s :p ?o BIND(BNODE() AS ?x) FILTER EXISTS { ?x ?q ?v } }', ["s"], []]
+        ], done);
+    });
+
+    it("Test DeleteMissingQuadsLeaveNoTerms", function(done) {
+        // deleting quads the store does not have leaves no graph and no blank node in the lexicon
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend, lexicon: lexicon});
+                var registered = 0, released = 0;
+                var registerBlank = lexicon.registerBlank.bind(lexicon);
+                var unregisterTerm = lexicon._unregisterTerm.bind(lexicon);
+                lexicon.registerBlank = function(cb) { registered++; registerBlank(cb); };
+                lexicon._unregisterTerm = function(kind, oid, cb) { if(kind === 'blank') released++; unregisterTerm(kind, oid, cb); };
+                var prefix = 'PREFIX : <http://example/> ';
+                engine.execute(prefix + 'DELETE DATA { GRAPH :g { :a :b :c } }', function(err){
+                    expect(err).toBeNull();
+                    lexicon.registeredGraphs(true, function(graphs){
+                        expect(graphs).toEqual([]);
+                        engine.execute(prefix + 'INSERT DATA { :a :p 1 . :b :p 2 }', function(err){
+                            expect(err).toBeNull();
+                            engine.execute(prefix + 'DELETE { ?x :p 1 } WHERE { ?s :p ?o BIND(BNODE() AS ?x) }', function(err){
+                                expect(err).toBeNull();
+                                // a new blank node from BNODE() is in no quad, so there is nothing to delete
+                                expect(registered).toBe(0);
+                                expect(released).toBe(0);
+                                done();
+                            });
+                        });
+                    });
+                });
+            });
+        });
     });
 
     it("Test GraphNestedPatterns", function(done) {
