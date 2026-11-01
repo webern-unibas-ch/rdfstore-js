@@ -61,9 +61,14 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
             queryEngine.copyDenormalizedBindings(bindings, env.outCache, function(denormBindings){
                 async.eachSeries(denormBindings, function(bindings, kk) {
                     var ast;
+                    // inside GRAPH, the active graph of this solution (see AbstractQueryTree.setExistsGraph)
+                    var graph = filter.value.graph;
+                    if(graph != null && graph.token === 'var' && bindings[graph.value] != null) {
+                        graph = bindings[graph.value];
+                    }
                     try {
                         // this runs after a nextTick, so an error in the pattern (e.g. a BIND to a variable in scope) must not throw
-                        ast = queryEngine.abstractQueryTree.parseSelect({pattern: _.clone(args[0],true)}, bindings);
+                        ast = queryEngine.abstractQueryTree.parseSelect({pattern: _.clone(args[0],true)}, graph);
                         ast = queryEngine.abstractQueryTree.bind(ast.pattern, bindings);
                     } catch(e) {
                         return kk(Utils.toError(e));

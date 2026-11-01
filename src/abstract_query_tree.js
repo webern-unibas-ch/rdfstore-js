@@ -60,14 +60,14 @@ AbstractQueryTree.prototype.parseExecutableUnit = function(executableUnit) {
     }
 };
 
-AbstractQueryTree.prototype.parseSelect = function(syntaxTree){
+AbstractQueryTree.prototype.parseSelect = function(syntaxTree, graph){
 
     if(syntaxTree == null) {
         console.log("error parsing query");
         return null;
     } else {
         var env = { freshCounter: 0 };
-        syntaxTree.pattern = this.build(syntaxTree.pattern, env);
+        syntaxTree.pattern = this.build(syntaxTree.pattern, env, graph);
         return syntaxTree;
     }
 };
@@ -114,10 +114,6 @@ AbstractQueryTree.prototype.build = function(node, env, graph) {
             value: [a,b]
         };
     } else if(node.token === 'graphgraphpattern') {
-        if(node.internal === true) {
-            // the pattern of an EXISTS inside GRAPH, see AbstractQueryTree.wrapExistsInGraph
-            return this.build(node.value, env, node.graph);
-        }
         var internal = null;
         if(node.graph.token === 'var') {
             internal = {token: 'var', value: 'graph:' + graphVariableCounter++};
@@ -307,7 +303,7 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env, graph)
         // QueryEngine.executeSelectUnit, so every solution binds the graph
         g.graph = _.clone(graph, true);
         for(var i=0; i<f.length; i++) {
-            AbstractQueryTree.wrapExistsInGraph(f[i].value, graph);
+            AbstractQueryTree.setExistsGraph(f[i].value, graph);
         }
     }
     // variables in scope of the patterns so far
@@ -346,9 +342,9 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env, graph)
         } else {
             var parsedPattern = this.build(pattern, env, graph);
             AbstractQueryTree.inScopeVariables(parsedPattern, scope);
-            // a BGP inside GRAPH binds the graph itself; any other pattern (a nested group or GRAPH, a UNION)
-            // may not, so it joins the start of the group (W3C graph-nested-2/3)
-            if(g.kind == "EMPTY_PATTERN" && (graph == null || parsedPattern.kind === 'BGP')) {
+            // the patterns inside GRAPH bind the active graph, except an inner GRAPH: it joins the start of the
+            // group (W3C graph-nested-2/3)
+            if(g.kind == "EMPTY_PATTERN" && (graph == null || parsedPattern.kind !== 'GRAPH')) {
                 g = parsedPattern;
             } else {
                 g = { kind: 'JOIN',
@@ -368,20 +364,20 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env, graph)
 };
 
 /**
- * Makes the pattern of every EXISTS / NOT EXISTS in a filter expression of a group inside GRAPH match the
- * active graph. The pattern is built per solution (QueryFilters.preprocessExistentialFilters), and bind()
- * replaces an internal graph variable by the graph of that solution.
+ * Records the active graph on every EXISTS / NOT EXISTS in a filter expression of a group inside GRAPH.
+ * QueryFilters.preprocessExistentialFilters builds the EXISTS pattern per solution with that graph, an
+ * internal graph variable replaced by its value in the solution.
  */
-AbstractQueryTree.wrapExistsInGraph = function(expression, graph) {
+AbstractQueryTree.setExistsGraph = function(expression, graph) {
     if(expression == null || typeof(expression) !== 'object') {
         return;
     }
     if(expression.expressionType === 'builtincall' &&
         (expression.builtincall === 'exists' || expression.builtincall === 'notexists')) {
-        expression.args[0] = {token: 'graphgraphpattern', graph: _.clone(graph, true), internal: true, value: expression.args[0]};
+        expression.graph = _.clone(graph, true);
     } else {
         for(var p in expression) {
-            AbstractQueryTree.wrapExistsInGraph(expression[p], graph);
+            AbstractQueryTree.setExistsGraph(expression[p], graph);
         }
     }
 };
@@ -546,11 +542,7 @@ AbstractQueryTree.prototype._bindTripleContext = function(triples, bindings) {
 
 
 AbstractQueryTree.prototype._bindFilter = function(filterExpr, bindings) {
-    if(filterExpr.token === 'graphgraphpattern' && filterExpr.internal === true &&
-        filterExpr.graph.token === 'var' && bindings[filterExpr.graph.value] != null) {
-        // a nested EXISTS inside GRAPH, see AbstractQueryTree.wrapExistsInGraph
-        filterExpr.graph = bindings[filterExpr.graph.value];
-    } else if(filterExpr.expressionType != null) {
+    if(filterExpr.expressionType != null) {
         var expressionType = filterExpr.expressionType;
         if(expressionType == 'relationalexpression') {
             filterExpr.op1 = this._bindFilter(filterExpr.op1, bindings);

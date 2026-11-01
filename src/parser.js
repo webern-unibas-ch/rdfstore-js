@@ -997,26 +997,23 @@ return query;
     query.with = null;
     query.using = null;
 
+    // the template: the triple patterns of the group and of its GRAPH blocks
     var quads = [];
-
-
-    var patternsCollection = p.patterns[0];
-    if(patternsCollection.triplesContext == null && patternsCollection.patterns!=null) {
-	patternsCollection = patternsCollection.patterns[0].triplesContext;
-    } else {
-	patternsCollection = patternsCollection.triplesContext;
-    }
-
-    for(var i=0; i<patternsCollection.length; i++) {
-	var quad = {};
-	var contextQuad = patternsCollection[i];
-
-	quad['subject'] = contextQuad['subject'];
-	quad['predicate'] = contextQuad['predicate'];
-	quad['object'] = contextQuad['object'];
-	quad['graph'] = contextQuad['graph'];
-
-	quads.push(quad);
+    var collectQuads = function(group, graph) {
+	for(var i=0; i<group.patterns.length; i++) {
+	    var pattern = group.patterns[i];
+	    if(pattern.token === 'basicgraphpattern') {
+		for(var j=0; j<pattern.triplesContext.length; j++) {
+		    var triple = pattern.triplesContext[j];
+		    quads.push({subject: triple.subject, predicate: triple.predicate, object: triple.object, graph: graph});
+		}
+	    } else if(pattern.token === 'graphgraphpattern' && pattern.value.patterns != null) {
+		collectQuads(pattern.value, pattern.graph);
+	    }
+	}
+    };
+    if(p.patterns != null) {
+	collectQuads(p, null);
     }
 
     query.delete = quads;

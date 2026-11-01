@@ -2802,7 +2802,11 @@ describe("QueryEngine", function(){
             ['SELECT ?g ?o ' + named + '{ GRAPH ?g { :a :p ?o } } ORDER BY ?o', ["g", "o"], ["g=g3 o=5^^integer"]],
             ['INSERT { GRAPH :h1 { ?s :q ?o } GRAPH :h2 { ?s :q ?o } } WHERE { ?s :p ?o FILTER(?o = 1) }'],
             ['SELECT ?g FROM NAMED <http://example/h1> FROM NAMED <http://example/h2> { GRAPH ?g { :a :q 1 } } ORDER BY ?g', ["g"],
-                ["g=h1", "g=h2"]]
+                ["g=h1", "g=h2"]],
+            ['DELETE WHERE { :a :p 1 . GRAPH :g3 { :a :p ?o } GRAPH :h1 { ?s :q ?x } }'],
+            ['SELECT ?o { :a :p ?o }', ["o"], ["o=3^^integer"]],
+            ['SELECT ?g ?o FROM NAMED <http://example/g3> FROM NAMED <http://example/h1> FROM NAMED <http://example/h2> { GRAPH ?g { ?s ?p ?o } }',
+                ["g", "o"], ["g=h2 o=1^^integer"]]
         ], done);
     });
 
