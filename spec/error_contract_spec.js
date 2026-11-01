@@ -394,6 +394,24 @@ describe("Error contract", function() {
                 }, done);
             });
         });
+
+        it("reports an unsupported builtin without arguments as an error", function(done) {
+            withStore(data, function(store) {
+                callsBackOnce(function(cb) {
+                    store.execute('SELECT * { ?s ?p ?o BIND(BNODE() AS ?x) }', cb);
+                }, function(err) {
+                    expectError(err);
+                    expect(err.name).toBe("NonSupportedSparqlFeatureError");
+                }, function() {
+                    callsBackOnce(function(cb) {
+                        store.execute('SELECT * { ?s ?p ?o FILTER EXISTS { ?s ?p ?x FILTER(isBlank(BNODE())) } }', cb);
+                    }, function(err) {
+                        expectError(err);
+                        expect(err.name).toBe("NonSupportedSparqlFeatureError");
+                    }, done);
+                });
+            });
+        });
     });
 
     describe("expression errors outside FILTER and BIND", function() {

@@ -2191,7 +2191,7 @@ return {token:'triplestemplate',
     if(arg.length === 5) {
 	ex.args = [arg[2]];
     } else {
-	ex.args = null;
+	ex.args = [];
     }
 
     return ex;

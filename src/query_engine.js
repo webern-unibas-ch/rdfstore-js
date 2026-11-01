@@ -199,7 +199,7 @@ QueryEngine.prototype.compareFilteredBindings = function(a, b, order, env) {
 
         // uris
         if(a.value[i].token === 'uri' && b.value[i].token === 'uri') {
-            if(QueryFilters.runEqualityFunction(a.value[i], b.value[i], [], this, env).value == true) {
+            if(QueryFilters.runEqualityFunction(a.value[i], b.value[i], [], this, null, env).value == true) {
                 i++;
                 continue;
             } else {
@@ -213,7 +213,7 @@ QueryEngine.prototype.compareFilteredBindings = function(a, b, order, env) {
 
         // literals without a datatype, and xsd:string (the same as a simple literal in RDF 1.1)
         if(untypedOrString(a.value[i]) && untypedOrString(b.value[i])) {
-            if(QueryFilters.runEqualityFunction(a.value[i], b.value[i], [], this, env).value == true) {
+            if(QueryFilters.runEqualityFunction(a.value[i], b.value[i], [], this, null, env).value == true) {
                 i++;
                 continue;
             } else {
@@ -226,7 +226,7 @@ QueryEngine.prototype.compareFilteredBindings = function(a, b, order, env) {
         } else
 
         // literals
-        if(QueryFilters.runEqualityFunction(a.value[i], b.value[i], [], this, env).value == true) {
+        if(QueryFilters.runEqualityFunction(a.value[i], b.value[i], [], this, null, env).value == true) {
             i++;
             continue;
         } else {
@@ -367,13 +367,14 @@ QueryEngine.planGroups = function(group, projection, having, order) {
     var expressions = [];
     for(var i=0; i<projection.length; i++) {
         var expression = projection[i].expression;
-        var nested = expression != null && expression.expressionType !== 'aggregate' && QueryEngine.containsAggregate(expression);
+        // a single aggregate is computed over the group, any other expression evaluated on the group's scope
+        var evaluated = expression != null && expression.expressionType !== 'aggregate';
         plan.projection.push({
             name: projection[i].alias ? projection[i].alias.value : projection[i].value.value,
             item: projection[i],
-            expression: nested ? QueryEngine.extractAggregates(expression, plan.aggregates) : null
+            expression: evaluated ? QueryEngine.extractAggregates(expression, plan.aggregates) : null
         });
-        if(nested) {
+        if(evaluated) {
             expressions.push(plan.projection[i].expression);
         }
     }
@@ -1539,11 +1540,12 @@ QueryEngine.prototype._executeUpdateUnit = function(aqt, queryEnv, callback) {
     } else if(aqt.kind === 'create') {
         callback(null, true);
     } else if(aqt.kind === 'load') {
-        var graph = {'uri': Utils.lexicalFormBaseUri(aqt.sourceGraph, queryEnv)};
+        // without INTO GRAPH, LOAD adds to the default graph (SPARQL 1.1 Update 3.1.4)
+        var graph = {'uri': this.lexicon.defaultGraphUri};
         if(aqt.destinyGraph != null) {
             graph = {'uri': Utils.lexicalFormBaseUri(aqt.destinyGraph, queryEnv)};
         }
-        this.rdfLoader.load(aqt.sourceGraph.value, graph, function(err, result){
+        this.rdfLoader.load(Utils.lexicalFormBaseUri(aqt.sourceGraph, queryEnv), graph, function(err, result){
             if(err) {
                 callback(err);
             } else {
@@ -2032,10 +2034,6 @@ QueryEngine.prototype.runBinds = function(binds, bindings, dataset, env, callbac
                     if(!QueryFilters.isEbvError(ebv)) {
                         // null for an unbound variable (BIND(?unbound AS ?y))
                         var term = QueryFilters.resultTerm(ebv);
-                        if(term != null && term.token === 'uri') {
-                            // a prefixed or relative IRI from the query
-                            term = {token: 'uri', value: Utils.lexicalFormBaseUri(term, env)};
-                        }
                         originalBindings[i][bind.as.value] = term;
                         thisDenormBindings[bind.as.value] = term;
                         if(term != null && (term.token === 'uri' || term.token === 'literal')) {
