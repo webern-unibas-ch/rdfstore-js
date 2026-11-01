@@ -327,15 +327,16 @@ store.execute(query, function(err, graph){
 
 rdfstore-js will try to retrieve remote RDF resources across the network when a 'LOAD' SPARQL query is executed.
 The node.js build of the library will use regular TCP sockets and perform proper content negotiation. It will also follow a limited number of redirections.
-The browser build, will try to perform an AJAX request to retrieve the resource using the correct HTTP headers. Nevertheless, this implementation is subjected to the limitations of the Same Domain Policy implemented in current browsers that prevents cross domain requests. Redirections, even for the same domain, may also fail due to the browser removing the 'Accept' HTTP header of the original request.
-rdfstore-js relies in on the jQuery Javascript library to peform cross-browser AJAX requests. This library must be linked in order to exeucte 'LOAD' requests in the browser.
+The browser bundles have no HTTP client of their own: give the store a network transport, as shown in [Module formats](#module-formats).
+
+`LOAD <uri>` adds the triples to the default graph, `LOAD <uri> INTO GRAPH <g>` to the graph `<g>`. *Since v0.9.18-alpha.25; before, `LOAD <uri>` loaded into the graph `<uri>`.*
 
 ```javascript
 store.execute('LOAD <http://dbpedialite.org/titles/Lisp_%28programming_language%29>\
-			   INTO GRAPH <lisp>', function(err){
-  if(err) {
+			   INTO GRAPH <http://example.org/lisp>', function(err){
+  if(!err) {
 	var query = 'PREFIX foaf:<http://xmlns.com/foaf/0.1/> SELECT ?o \
-				 FROM NAMED <lisp> { GRAPH <lisp> { ?s foaf:page ?o} }';
+				 FROM NAMED <http://example.org/lisp> { GRAPH <http://example.org/lisp> { ?s foaf:page ?o} }';
 	store.execute(query, function(err, results) {
 	  // process results
 	});

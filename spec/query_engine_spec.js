@@ -2053,11 +2053,14 @@ describe("QueryEngine", function(){
                                 expect(err.message).toBe("Variable ?s is neither grouped nor aggregated");
                                 engine.execute('PREFIX : <http://example/> SELECT ?class { ?s a ?class } GROUP BY ?class ORDER BY ?s', function(err, results){
                                     expect(err.message).toBe("Variable ?s is neither grouped nor aggregated");
-                                    engine.execute('PREFIX : <http://example/> CONSTRUCT { ?class a ?class } WHERE { ?s a ?class } GROUP BY ?class HAVING (COUNT(?s) > 100)', function(err, results){
-                                        expect(err.name).toBe('NonSupportedSparqlFeatureError');
-                                        engine.execute('PREFIX : <http://example/> CONSTRUCT { ?class a ?class } WHERE { ?s a ?class } GROUP BY ?class', function(err, results){
+                                    engine.execute('PREFIX : <http://example/> SELECT (STR(?s) AS ?x) { ?s a ?class } GROUP BY ?class', function(err, results){
+                                        expect(err.message).toBe("Variable ?s is neither grouped nor aggregated");
+                                        engine.execute('PREFIX : <http://example/> CONSTRUCT { ?class a ?class } WHERE { ?s a ?class } GROUP BY ?class HAVING (COUNT(?s) > 100)', function(err, results){
                                             expect(err.name).toBe('NonSupportedSparqlFeatureError');
-                                            done();
+                                            engine.execute('PREFIX : <http://example/> CONSTRUCT { ?class a ?class } WHERE { ?s a ?class } GROUP BY ?class', function(err, results){
+                                                expect(err.name).toBe('NonSupportedSparqlFeatureError');
+                                                done();
+                                            });
                                         });
                                     });
                                 });
@@ -2562,6 +2565,36 @@ describe("QueryEngine", function(){
         checkQueries(':s :v "x"@en , "y" , :iri , 2', [[query, ["min", "max"], ["min=iri max=2^^integer"]]], function() {
             checkQueries(':s :v 2 , :iri , "y" , "x"@en', [[query, ["min", "max"], ["min=iri max=2^^integer"]]], function() {
                 checkQueries(':s :v "b" , "a"^^xsd:string', [[query, ["min", "max"], ["min=a^^string max=b"]]], done);
+            });
+        });
+    });
+
+    it("Test IriConstantsAndGroupedExpressions", function(done) {
+        checkQueries(':a :p 1 , 2 . :b :p 3', [
+            // prefixed IRIs in expressions are resolved, also when grouped, aggregated or sorted
+            ['SELECT (:c AS ?x) (STR(:c) AS ?y) {}', ["x", "y"], ["x=c y=c"]],
+            ['SELECT ?s (:c AS ?x) { ?s :p ?o } GROUP BY ?s ORDER BY ?s', ["s", "x"], ["s=a x=c", "s=b x=c"]],
+            ['SELECT ?k (COUNT(*) AS ?n) { ?s :p ?o } GROUP BY (:c AS ?k)', ["k", "n"], ["k=c n=3^^integer"]],
+            ['SELECT (MAX(:c) AS ?x) { ?s :p ?o }', ["x"], ["x=c"]],
+            ['SELECT ?o { ?s :p ?o } ORDER BY (:c) ?o', ["o"], ["o=1^^integer", "o=2^^integer", "o=3^^integer"]],
+            ['SELECT DISTINCT ?s { ?s :p ?o FILTER(STR(?s) = STR(:b)) }', ["s"], ["s=b"]],
+            ['SELECT DISTINCT ?s { ?s :p ?o FILTER EXISTS { ?s :p ?x FILTER(?s = :b) } }', ["s"], ["s=b"]],
+            // a grouped expression without an aggregate is evaluated (it was missing from the result)
+            ['SELECT (STR(?s) AS ?x) ("k" AS ?y) { ?s :p ?o } GROUP BY ?s ORDER BY ?x', ["x", "y"], ["x=a y=k", "x=b y=k"]]
+        ], function() {
+            new Lexicon(function(lexicon){
+                new QuadBackend({treeOrder: 2}, function(backend){
+                    var engine = new QueryEngine({backend: backend, lexicon: lexicon});
+                    engine.execute('INSERT DATA { <r> <http://example/p> 1 }', function(err){
+                        expect(err).toBeNull();
+                        // BASE resolves relative IRIs of the query, not the stored IRI <r>
+                        engine.execute('BASE <http://example/> SELECT (<d> AS ?x) (?s AS ?y) ?z { ?s <p> ?o BIND(?s AS ?z) }', function(err, results){
+                            expect(err).toBeNull();
+                            expect([results[0].x.value, results[0].y.value, results[0].z.value]).toEqual(["http://example/d", "r", "r"]);
+                            done();
+                        });
+                    });
+                });
             });
         });
     });

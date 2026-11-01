@@ -17,7 +17,7 @@ var withStore = function(cb) {
     });
 };
 
-// LOAD <uri> stores the triples in the graph <uri>, store.load in the default graph
+// LOAD <uri> and store.load add to the default graph, LOAD <uri> INTO GRAPH <g> to the graph <g>
 var countTriples = function(store, graph, cb) {
     var pattern = graph == null ? "?s ?p ?o" : "GRAPH <" + graph + "> { ?s ?p ?o }";
     store.execute("SELECT * { " + pattern + " }", function(err, results) {
@@ -45,9 +45,51 @@ describe("RDFLoader", function() {
                 store.execute("LOAD <http://example.org/data>", function(err) {
                     expect(err).toBe(null);
                     expect(requests).toEqual(["http://example.org/data"]);
-                    countTriples(store, "http://example.org/data", function(count) {
+                    countTriples(store, null, function(count) {
                         expect(count).toBe(1);
                         done();
+                    });
+                });
+            });
+        });
+
+        it("resolves a prefixed or relative source IRI of LOAD", function(done) {
+            withStore(function(store) {
+                var requests = [];
+                store.setNetworkTransport({load: function(uri, accept, callback) {
+                    requests.push(uri);
+                    callback(null, {headers: {"content-type": "text/turtle"}, data: TURTLE});
+                }});
+                store.execute("PREFIX ex: <http://example.org/> LOAD ex:data", function(err) {
+                    expect(err).toBe(null);
+                    store.execute("BASE <http://example.org/> LOAD <rel>", function(err) {
+                        expect(err).toBe(null);
+                        expect(requests).toEqual(["http://example.org/data", "http://example.org/rel"]);
+                        done();
+                    });
+                });
+            });
+        });
+
+        it("makes LOAD add to the default graph, or to the graph INTO GRAPH names", function(done) {
+            withStore(function(store) {
+                store.setNetworkTransport({load: function(uri, accept, callback) {
+                    callback(null, {headers: {"content-type": "text/turtle"}, data: TURTLE});
+                }});
+                store.execute("LOAD <http://example.org/data>", function(err) {
+                    expect(err).toBe(null);
+                    store.execute("LOAD <http://example.org/data> INTO GRAPH <http://example.org/g>", function(err) {
+                        expect(err).toBe(null);
+                        countTriples(store, null, function(count) {
+                            expect(count).toBe(1);
+                            countTriples(store, "http://example.org/g", function(count) {
+                                expect(count).toBe(1);
+                                countTriples(store, "http://example.org/data", function(count) {
+                                    expect(count).toBe(0);
+                                    done();
+                                });
+                            });
+                        });
                     });
                 });
             });
@@ -131,7 +173,7 @@ describe("RDFLoader", function() {
                 store.execute("LOAD <" + base + "/dir/data.ttl?x=1>", function(err) {
                     expect(err).toBe(null);
                     expect(requested).toEqual(["/dir/data.ttl?x=1"]);
-                    countTriples(store, base + "/dir/data.ttl?x=1", function(count) {
+                    countTriples(store, null, function(count) {
                         expect(count).toBe(1);
                         done();
                     });
@@ -144,7 +186,7 @@ describe("RDFLoader", function() {
                 store.execute("LOAD <" + base + "/dir/moved>", function(err) {
                     expect(err).toBe(null);
                     expect(requested).toEqual(["/dir/moved", "/dir/data.ttl?x=1"]);
-                    countTriples(store, base + "/dir/moved", function(count) {
+                    countTriples(store, null, function(count) {
                         expect(count).toBe(1);
                         done();
                     });
@@ -156,7 +198,7 @@ describe("RDFLoader", function() {
             withStore(function(store) {
                 store.execute("LOAD <" + base + "/split>", function(err) {
                     expect(err).toBe(null);
-                    store.execute("SELECT ?o { GRAPH <" + base + "/split> { ?s ?p ?o } }", function(err, results) {
+                    store.execute("SELECT ?o { ?s ?p ?o }", function(err, results) {
                         expect(err).toBe(null);
                         expect(results[0].o.value).toBe("Mü");
                         done();

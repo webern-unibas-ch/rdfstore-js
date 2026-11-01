@@ -507,7 +507,7 @@ AbstractQueryTree.prototype._bindFilter = function(filterExpr, bindings) {
         } else if(expressionType == 'unaryexpression') {
             filterExpr.expression = this._bindFilter(filterExpr.expression, bindings);
         } else if(expressionType == 'irireforfunction') {
-            for(var i=0; i<filterExpr.factors.args; i++) {
+            for(var i=0; filterExpr.args != null && i<filterExpr.args.length; i++) {
                 filterExpr.args[i] = this._bindFilter(filterExpr.args[i], bindings);
             }
         } else if(expressionType == 'atomic') {
@@ -627,7 +627,7 @@ AbstractQueryTree.prototype._replaceFilter = function(filterExpr, from, to, ns) 
         } else if(expressionType == 'unaryexpression') {
             filterExpr.expression = this._replaceFilter(filterExpr.expression, from, to, ns);
         } else if(expressionType == 'irireforfunction') {
-            for(var i=0; i<filterExpr.factors.args; i++) {
+            for(var i=0; filterExpr.args != null && i<filterExpr.args.length; i++) {
                 filterExpr.args[i] = this._replaceFilter(filterExpr.args[i], from, to, ns);
             }
         } else if(expressionType == 'atomic') {

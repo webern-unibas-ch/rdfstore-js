@@ -298,9 +298,7 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
     } else if(aggregator.token === 'variable' && aggregator.kind == 'var') {
         return bindingsGroup[0][aggregator.value.value];
     } else if(aggregator.token === 'variable' && aggregator.kind === 'aliased') {
-        if(aggregator.expression.expressionType === 'atomic' && aggregator.expression.primaryexpression === 'var') {
-            return bindingsGroup[0][aggregator.expression.value.value];
-        } else if(aggregator.expression.expressionType === 'aggregate') {
+        if(aggregator.expression.expressionType === 'aggregate') {
             var aggregateType = aggregator.expression.aggregateType;
             var isDistinct = aggregator.expression.distinct != null && aggregator.expression.distinct != '';
             if(aggregateType === 'max' || aggregateType === 'min') {
@@ -1351,7 +1349,8 @@ QueryFilters.normalizeLiteralDatatype = function(literal, queryEngine, env) {
 
 QueryFilters.runIriRefOrFunction = function(iriref, args, bindings,queryEngine, dataset, env) {
     if(args == null) {
-        return iriref;
+        // an IRI of the query, possibly prefixed or relative
+        return {token: 'uri', value: Utils.lexicalFormBaseUri(iriref, env)};
     } else {
         var ops = [];
         for(var i=0; i<args.length; i++) {
