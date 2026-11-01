@@ -2730,6 +2730,30 @@ describe("QueryEngine", function(){
         ], done);
     });
 
+    it("Test QuadsWithSeveralGraphs", function(done) {
+        // every GRAPH block of INSERT DATA, DELETE DATA and update templates counts, and so do the triples between them
+        var named = 'FROM NAMED <http://example/g1> FROM NAMED <http://example/g2> FROM NAMED <http://example/g3> ';
+        checkQueries(':a :p 1 . GRAPH :g1 { :a :p 2 } :a :p 3 . GRAPH :g2 { :a :p 4 } GRAPH :g3 { :a :p 5 } :a :p 6', [
+            ['SELECT ?o { :a :p ?o } ORDER BY ?o', ["o"], ["o=1^^integer", "o=3^^integer", "o=6^^integer"]],
+            ['SELECT ?g ?o ' + named + '{ GRAPH ?g { :a :p ?o } } ORDER BY ?o', ["g", "o"],
+                ["g=g1 o=2^^integer", "g=g2 o=4^^integer", "g=g3 o=5^^integer"]],
+            ['DELETE DATA { GRAPH :g1 { :a :p 2 } GRAPH :g2 { :a :p 4 } :a :p 6 }'],
+            ['SELECT ?o { :a :p ?o } ORDER BY ?o', ["o"], ["o=1^^integer", "o=3^^integer"]],
+            ['SELECT ?g ?o ' + named + '{ GRAPH ?g { :a :p ?o } } ORDER BY ?o', ["g", "o"], ["g=g3 o=5^^integer"]],
+            ['INSERT { GRAPH :h1 { ?s :q ?o } GRAPH :h2 { ?s :q ?o } } WHERE { ?s :p ?o FILTER(?o = 1) }'],
+            ['SELECT ?g FROM NAMED <http://example/h1> FROM NAMED <http://example/h2> { GRAPH ?g { :a :q 1 } } ORDER BY ?g', ["g"],
+                ["g=h1", "g=h2"]]
+        ], done);
+    });
+
+    it("Test PrologueOrder", function(done) {
+        // BASE and PREFIX in any order (checkQueries puts PREFIX declarations first); the last BASE applies
+        checkQueries(':a :p 1', [
+            ['BASE <http://example/> SELECT ?o { <a> :p ?o }', ["o"], ["o=1^^integer"]],
+            ['BASE <http://other/> PREFIX q: <http://example/> BASE <http://example/> SELECT ?o { <a> q:p ?o }', ["o"], ["o=1^^integer"]]
+        ], done);
+    });
+
     it("Test BlankNodesInPatterns", function(done) {
         // a blank node in a query pattern matches like a variable that is not returned
         checkQueries(':a :p :b . :b :p :c . :b :q :d . :e :q :d', [

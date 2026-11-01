@@ -69,10 +69,20 @@ Query "[2] Query"
 }
 
 /*
- [3]	Prologue	  ::=	BaseDecl? PrefixDecl*
+ [3]	Prologue	  ::=	( BaseDecl | PrefixDecl )*
  */
 Prologue "[3] Prologue"
-    = b:BaseDecl? WS* pfx:PrefixDecl* {
+    = decls:( BaseDecl / PrefixDecl )* {
+    // the last BASE applies
+    var b = null;
+    var pfx = [];
+    for(var i=0; i<decls.length; i++) {
+	if(decls[i].token === 'base') {
+	    b = decls[i];
+	} else {
+	    pfx.push(decls[i]);
+	}
+    }
     return { token: 'prologue',
 	base: b,
 	prefixes: pfx }
@@ -819,12 +829,12 @@ Quads "[47] Quads"
 	}
     }
 
-    if(qs && qs.length>0 && qs[0].length > 0) {
-	quads = quads.concat(qs[0][0].quadsContext);
+    for(var j=0; j<qs.length; j++) {
+	quads = quads.concat(qs[j][0].quadsContext);
 
-	if( qs[0][2] != null && qs[0][2].triplesContext != null) {
-	    for(var i=0; i<qs[0][2].triplesContext.length; i++) {
-		var triple = qs[0][2].triplesContext[i]
+	if( qs[j][2] != null && qs[j][2].triplesContext != null) {
+	    for(var i=0; i<qs[j][2].triplesContext.length; i++) {
+		var triple = qs[j][2].triplesContext[i]
 		triple.graph = null;
 		quads.push(triple)
 	    }

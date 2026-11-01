@@ -577,7 +577,17 @@ function peg$parse(input, options) {
 	inlineData: v
     }
   }
-  function peg$f1(b, pfx) {
+  function peg$f1(decls) {
+    // the last BASE applies
+    var b = null;
+    var pfx = [];
+    for(var i=0; i<decls.length; i++) {
+	if(decls[i].token === 'base') {
+	    b = decls[i];
+	} else {
+	    pfx.push(decls[i]);
+	}
+    }
     return { token: 'prologue',
 	base: b,
 	prefixes: pfx }
@@ -1087,12 +1097,12 @@ return query;
 	}
     }
 
-    if(qs && qs.length>0 && qs[0].length > 0) {
-	quads = quads.concat(qs[0][0].quadsContext);
+    for(var j=0; j<qs.length; j++) {
+	quads = quads.concat(qs[j][0].quadsContext);
 
-	if( qs[0][2] != null && qs[0][2].triplesContext != null) {
-	    for(var i=0; i<qs[0][2].triplesContext.length; i++) {
-		var triple = qs[0][2].triplesContext[i]
+	if( qs[j][2] != null && qs[j][2].triplesContext != null) {
+	    for(var i=0; i<qs[j][2].triplesContext.length; i++) {
+		var triple = qs[j][2].triplesContext[i]
 		triple.graph = null;
 		quads.push(triple)
 	    }
@@ -2740,28 +2750,22 @@ return fcall;
   }
 
   function peg$parsePrologue() {
-    let s0, s1, s2, s3, s4;
+    let s0, s1, s2;
 
     peg$silentFails++;
     s0 = peg$currPos;
-    s1 = peg$parseBaseDecl();
-    if (s1 === peg$FAILED) {
-      s1 = null;
-    }
-    s2 = [];
+    s1 = [];
     for (;;) {
-      s3 = peg$parseWS();
-      if (s3 === peg$FAILED) { break; }
-      s2.push(s3);
-    }
-    s3 = [];
-    for (;;) {
-      s4 = peg$parsePrefixDecl();
-      if (s4 === peg$FAILED) { break; }
-      s3.push(s4);
+      s2 = peg$parseBaseDecl();
+      if (s2 === peg$FAILED) {
+        s2 = peg$parsePrefixDecl();
+      }
+      if (s2 === peg$FAILED) { break; }
+      s1.push(s2);
     }
     peg$savedPos = s0;
-    s0 = peg$f1(s1, s3);
+    s1 = peg$f1(s1);
+    s0 = s1;
     peg$silentFails--;
 
     return s0;
