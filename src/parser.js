@@ -577,7 +577,17 @@ function peg$parse(input, options) {
 	inlineData: v
     }
   }
-  function peg$f1(b, pfx) {
+  function peg$f1(decls) {
+    // the last BASE applies
+    var b = null;
+    var pfx = [];
+    for(var i=0; i<decls.length; i++) {
+	if(decls[i].token === 'base') {
+	    b = decls[i];
+	} else {
+	    pfx.push(decls[i]);
+	}
+    }
     return { token: 'prologue',
 	base: b,
 	prefixes: pfx }
@@ -987,27 +997,30 @@ return query;
     query.with = null;
     query.using = null;
 
+    // the template: the triple patterns of the group and of its GRAPH blocks (a QuadPattern); nested groups
+    // are accepted as before
     var quads = [];
-
-
-    var patternsCollection = p.patterns[0];
-    if(patternsCollection.triplesContext == null && patternsCollection.patterns!=null) {
-	patternsCollection = patternsCollection.patterns[0].triplesContext;
-    } else {
-	patternsCollection = patternsCollection.triplesContext;
-    }
-
-    for(var i=0; i<patternsCollection.length; i++) {
-	var quad = {};
-	var contextQuad = patternsCollection[i];
-
-	quad['subject'] = contextQuad['subject'];
-	quad['predicate'] = contextQuad['predicate'];
-	quad['object'] = contextQuad['object'];
-	quad['graph'] = contextQuad['graph'];
-
-	quads.push(quad);
-    }
+    var collectQuads = function(group, graph) {
+	if(group.patterns == null || group.filters.length > 0) {
+	    error("DELETE WHERE takes only triple patterns and GRAPH blocks");
+	}
+	for(var i=0; i<group.patterns.length; i++) {
+	    var pattern = group.patterns[i];
+	    if(pattern.token === 'basicgraphpattern') {
+		for(var j=0; j<pattern.triplesContext.length; j++) {
+		    var triple = pattern.triplesContext[j];
+		    quads.push({subject: triple.subject, predicate: triple.predicate, object: triple.object, graph: graph});
+		}
+	    } else if(pattern.token === 'graphgraphpattern') {
+		collectQuads(pattern.value, pattern.graph);
+	    } else if(pattern.token === 'groupgraphpattern') {
+		collectQuads(pattern, graph);
+	    } else {
+		error("DELETE WHERE takes only triple patterns and GRAPH blocks");
+	    }
+	}
+    };
+    collectQuads(p, null);
 
     query.delete = quads;
 
@@ -1087,12 +1100,12 @@ return query;
 	}
     }
 
-    if(qs && qs.length>0 && qs[0].length > 0) {
-	quads = quads.concat(qs[0][0].quadsContext);
+    for(var j=0; j<qs.length; j++) {
+	quads = quads.concat(qs[j][0].quadsContext);
 
-	if( qs[0][2] != null && qs[0][2].triplesContext != null) {
-	    for(var i=0; i<qs[0][2].triplesContext.length; i++) {
-		var triple = qs[0][2].triplesContext[i]
+	if( qs[j][2] != null && qs[j][2].triplesContext != null) {
+	    for(var i=0; i<qs[j][2].triplesContext.length; i++) {
+		var triple = qs[j][2].triplesContext[i]
 		triple.graph = null;
 		quads.push(triple)
 	    }
@@ -1218,26 +1231,10 @@ return {token:'triplespattern',
 	value: v }
   }
   function peg$f56(g, gg) {
-    var onlyBinds = true;
-    for(var i=0; i<gg.patterns.length; i++) {
-	var ts = gg.patterns[i];
-	if(ts.token === 'bind') {
-	    continue;
-	}
-	onlyBinds = false;
-	for(var j=0; j<ts.triplesContext.length; j++) {
-	    var triple = ts.triplesContext[j]
-	    triple.graph = g;
-	}
-    }
-
-    // a group without triple patterns keeps its graph, see the EMPTY_PATTERN case of QueryEngine.executeSelectUnit
-    if(onlyBinds) {
-	gg.graph = g;
-    }
-
-    gg.token = 'groupgraphpattern'
-    return gg;
+    // the AQT passes the graph down to the patterns inside, see AbstractQueryTree.prototype.build
+    return {token: 'graphgraphpattern',
+	graph: g,
+	value: gg};
   }
   function peg$f57(v, ts) {
     return {token: 'servicegraphpattern',
@@ -2740,28 +2737,22 @@ return fcall;
   }
 
   function peg$parsePrologue() {
-    let s0, s1, s2, s3, s4;
+    let s0, s1, s2;
 
     peg$silentFails++;
     s0 = peg$currPos;
-    s1 = peg$parseBaseDecl();
-    if (s1 === peg$FAILED) {
-      s1 = null;
-    }
-    s2 = [];
+    s1 = [];
     for (;;) {
-      s3 = peg$parseWS();
-      if (s3 === peg$FAILED) { break; }
-      s2.push(s3);
-    }
-    s3 = [];
-    for (;;) {
-      s4 = peg$parsePrefixDecl();
-      if (s4 === peg$FAILED) { break; }
-      s3.push(s4);
+      s2 = peg$parseBaseDecl();
+      if (s2 === peg$FAILED) {
+        s2 = peg$parsePrefixDecl();
+      }
+      if (s2 === peg$FAILED) { break; }
+      s1.push(s2);
     }
     peg$savedPos = s0;
-    s0 = peg$f1(s1, s3);
+    s1 = peg$f1(s1);
+    s0 = s1;
     peg$silentFails--;
 
     return s0;

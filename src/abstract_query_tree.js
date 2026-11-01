@@ -60,14 +60,37 @@ AbstractQueryTree.prototype.parseExecutableUnit = function(executableUnit) {
     }
 };
 
-AbstractQueryTree.prototype.parseSelect = function(syntaxTree){
+AbstractQueryTree.prototype.parseSelect = function(syntaxTree, graph){
 
     if(syntaxTree == null) {
         console.log("error parsing query");
         return null;
     } else {
-        var env = { freshCounter: 0 };
-        syntaxTree.pattern = this.build(syntaxTree.pattern, env);
+        var env = {};
+        syntaxTree.pattern = this.build(syntaxTree.pattern, env, graph);
+        // the variable of a GROUP BY or SELECT expression must not be in scope of the pattern or of the
+        // expressions before it (SPARQL 1.1 18.2.1)
+        var scope = AbstractQueryTree.inScopeVariables(syntaxTree.pattern, {});
+        var introduce = function(clause, variable) {
+            if(scope[variable.value] === true) {
+                throw new SparqlParserError(clause + ": variable ?" + variable.value + " is already in scope");
+            }
+            scope[variable.value] = true;
+        };
+        if(Array.isArray(syntaxTree.group)) {
+            for(var i=0; i<syntaxTree.group.length; i++) {
+                if(syntaxTree.group[i].token === 'aliased_expression') {
+                    introduce("GROUP BY", syntaxTree.group[i].alias);
+                }
+            }
+        }
+        if(syntaxTree.projection != null) {
+            for(var j=0; j<syntaxTree.projection.length; j++) {
+                if(syntaxTree.projection[j].kind === 'aliased') {
+                    introduce("SELECT", syntaxTree.projection[j].alias);
+                }
+            }
+        }
         return syntaxTree;
     }
 };
@@ -81,10 +104,24 @@ AbstractQueryTree.prototype.parseInsertData = function(syntaxTree){
     }
 };
 
-AbstractQueryTree.prototype.build = function(node, env) {
+// numbers the internal variables (fresh: of property path sequences, graph: of GRAPH ?g); module-wide, because
+// EXISTS builds its pattern per solution, and the outer solution it is bound with carries the outer ones
+var internalVariableCounter = 0;
+
+/**
+ * Builds the algebra expression of a pattern. graph is the active graph (SPARQL 1.1 18.6) the patterns inside
+ * GRAPH are matched against: an IRI, or for GRAPH ?g an internal variable that the GRAPH node maps to ?g
+ * after its patterns are evaluated, so that ?g itself is not bound inside (W3C graph-variable-scope).
+ */
+AbstractQueryTree.prototype.build = function(node, env, graph) {
     if(node.token === 'groupgraphpattern') {
-        return this._buildGroupGraphPattern(node, env);
+        return this._buildGroupGraphPattern(node, env, graph);
     } else if (node.token === 'basicgraphpattern') {
+        if(graph != null) {
+            for(var i=0; i<node.triplesContext.length; i++) {
+                node.triplesContext[i].graph = _.clone(graph, true);
+            }
+        }
         var bgp = {
             kind: 'BGP',
             value: node.triplesContext
@@ -92,19 +129,25 @@ AbstractQueryTree.prototype.build = function(node, env) {
         bgp = AbstractQueryTree.translatePathExpressionsInBGP(bgp, env);
         return bgp;
     } else if (node.token === 'graphunionpattern') {
-        var a = this.build(node.value[0],env);
-        var b = this.build(node.value[1],env);
+        var a = this.build(node.value[0], env, graph);
+        var b = this.build(node.value[1], env, graph);
 
         return {
             kind: 'UNION',
             value: [a,b]
         };
     } else if(node.token === 'graphgraphpattern') {
-        var c = this.build(node.value, env);
+        var internal = null;
+        if(node.graph.token === 'var') {
+            internal = {token: 'var', value: 'graph:' + internalVariableCounter++};
+        }
+        // an inner GRAPH sets its own active graph
+        var c = this.build(node.value, env, internal || node.graph);
         return {
             kind: 'GRAPH',
             value: c,
-            graph: node.graph
+            graph: node.graph,
+            internal: internal
         };
     } else {
         if(node.token != null) {
@@ -241,9 +284,8 @@ AbstractQueryTree.translatePathExpression  = function(pathExpression, env) {
             if(i!=pathExpression.predicate.value.length-1) {
                 nextObject = {
                     token: "var",
-                    value: "fresh:"+env.freshCounter
+                    value: "fresh:" + internalVariableCounter++
                 };
-                env.freshCounter++;
             } else {
                 nextObject = lastObject;
             }
@@ -275,12 +317,16 @@ AbstractQueryTree.translatePathExpression  = function(pathExpression, env) {
     }
 };
 
-AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env) {
+AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env, graph) {
     var f = (node.filters || []);
     var g = {kind: "EMPTY_PATTERN"};
-    if(node.graph != null) {
-        // GRAPH over a group without triple patterns
-        g.graph = node.graph;
+    if(graph != null) {
+        // inside GRAPH the group starts from the active graph(s), see the EMPTY_PATTERN case of
+        // QueryEngine.executeSelectUnit, so every solution binds the graph
+        g.graph = _.clone(graph, true);
+        for(var i=0; i<f.length; i++) {
+            AbstractQueryTree.setExistsGraph(f[i].value, graph);
+        }
     }
     // variables in scope of the patterns so far
     var scope = {};
@@ -302,7 +348,7 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env) {
                     binds: [pattern] };
             }
         } else if(pattern.token === 'optionalgraphpattern') {
-            var parsedPattern = this.build(pattern.value,env);
+            var parsedPattern = this.build(pattern.value, env, graph);
             AbstractQueryTree.inScopeVariables(parsedPattern, scope);
             if(parsedPattern.kind === 'FILTER') {
                 g =  { kind:'LEFT_JOIN',
@@ -316,9 +362,11 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env) {
                     filter: true };
             }
         } else {
-            var parsedPattern = this.build(pattern,env);
+            var parsedPattern = this.build(pattern, env, graph);
             AbstractQueryTree.inScopeVariables(parsedPattern, scope);
-            if(g.kind == "EMPTY_PATTERN") {
+            // the patterns inside GRAPH bind the active graph, except an inner GRAPH: it joins the start of the
+            // group (W3C graph-nested-2/3)
+            if(g.kind == "EMPTY_PATTERN" && (graph == null || parsedPattern.kind !== 'GRAPH')) {
                 g = parsedPattern;
             } else {
                 g = { kind: 'JOIN',
@@ -338,8 +386,27 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env) {
 };
 
 /**
- * Adds the variables in scope of an algebra expression to acum (SPARQL 1.1 18.2.1). Graph variables are
- * left out: the triple patterns inside GRAPH ?g carry ?g too, but there it is not in scope.
+ * Records the active graph on every EXISTS / NOT EXISTS in a filter expression of a group inside GRAPH.
+ * QueryFilters.preprocessExistentialFilters builds the EXISTS pattern per solution with that graph, an
+ * internal graph variable replaced by its value in the solution.
+ */
+AbstractQueryTree.setExistsGraph = function(expression, graph) {
+    if(expression == null || typeof(expression) !== 'object') {
+        return;
+    }
+    if(expression.expressionType === 'builtincall' &&
+        (expression.builtincall === 'exists' || expression.builtincall === 'notexists')) {
+        expression.graph = _.clone(graph, true);
+    } else {
+        for(var p in expression) {
+            AbstractQueryTree.setExistsGraph(expression[p], graph);
+        }
+    }
+};
+
+/**
+ * Adds the variables in scope of an algebra expression to acum (SPARQL 1.1 18.2.1). Inside GRAPH ?g the
+ * patterns match an internal graph variable, and ?g is in scope only after the GRAPH.
  */
 AbstractQueryTree.inScopeVariables = function(aqt, acum) {
     if(aqt.kind === 'BGP') {
@@ -363,7 +430,12 @@ AbstractQueryTree.inScopeVariables = function(aqt, acum) {
     } else if(aqt.kind === 'LEFT_JOIN' || aqt.kind === 'JOIN') {
         AbstractQueryTree.inScopeVariables(aqt.lvalue, acum);
         AbstractQueryTree.inScopeVariables(aqt.rvalue, acum);
-    } else if(aqt.kind === 'GRAPH' || aqt.kind === 'FILTER') {
+    } else if(aqt.kind === 'GRAPH') {
+        AbstractQueryTree.inScopeVariables(aqt.value, acum);
+        if(aqt.graph.token === 'var') {
+            acum[aqt.graph.value] = true;
+        }
+    } else if(aqt.kind === 'FILTER') {
         AbstractQueryTree.inScopeVariables(aqt.value, acum);
     } else if(aqt.kind === 'EXTEND') {
         AbstractQueryTree.inScopeVariables(aqt.value, acum);
@@ -443,7 +515,18 @@ AbstractQueryTree.prototype.bind = function(aqt, bindings) {
         aqt.value[0] = this.bind(aqt.value[0],bindings);
         aqt.value[1] = this.bind(aqt.value[1],bindings);
     } else if(aqt.kind === 'GRAPH') {
-        aqt.value = this.bind(aqt.value,bindings);
+        if(aqt.internal != null && aqt.graph.token !== 'var') {
+            // ?g was bound above: the patterns inside match that graph
+            var graphBindings = {};
+            for(var v in bindings) {
+                graphBindings[v] = bindings[v];
+            }
+            graphBindings[aqt.internal.value] = aqt.graph;
+            aqt.internal = null;
+            aqt.value = this.bind(aqt.value, graphBindings);
+        } else {
+            aqt.value = this.bind(aqt.value, bindings);
+        }
     } else if(aqt.kind === 'LEFT_JOIN' || aqt.kind === 'JOIN') {
         aqt.lvalue = this.bind(aqt.lvalue, bindings);
         aqt.rvalue = this.bind(aqt.rvalue, bindings);
@@ -466,11 +549,11 @@ AbstractQueryTree.prototype.bind = function(aqt, bindings) {
 
 AbstractQueryTree.prototype._bindTripleContext = function(triples, bindings) {
     for(var i=0; i<triples.length; i++) {
-        delete triples[i]['graph'];
+        // the graph stays: a bound graph variable is replaced like the other components
         delete triples[i]['variables'];
         for(var p in triples[i]) {
             var comp = triples[i][p];
-            if(comp.token === 'var' && bindings[comp.value] != null) {
+            if(comp != null && comp.token === 'var' && bindings[comp.value] != null) {
                 triples[i][p] = bindings[comp.value];
             }
         }
@@ -561,7 +644,7 @@ AbstractQueryTree.prototype.replace = function(aqt, from, to, ns) {
         aqt.value[0] = this.replace(aqt.value[0],from,to, ns);
         aqt.value[1] = this.replace(aqt.value[1],from,to, ns);
     } else if(aqt.kind === 'GRAPH') {
-        aqt.value = this.replace(aqt.value,from,to);
+        aqt.value = this.replace(aqt.value, from, to, ns);
     } else if(aqt.kind === 'LEFT_JOIN' || aqt.kind === 'JOIN') {
         aqt.lvalue = this.replace(aqt.lvalue, from, to, ns);
         aqt.rvalue = this.replace(aqt.rvalue, from, to, ns);

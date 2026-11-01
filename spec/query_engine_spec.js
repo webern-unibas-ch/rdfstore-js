@@ -2679,6 +2679,22 @@ describe("QueryEngine", function(){
             // EXISTS builds its pattern per solution, after a nextTick
             [prefixes + 'SELECT ?s { ?s :p ?o FILTER EXISTS { ?s :p ?z BIND(1 AS ?z) } }', "SparqlParserError"],
             [prefixes + 'INSERT { :n :p ?o } WHERE { ?s :p ?o BIND(1 AS ?o) }', "SparqlParserError"],
+            [prefixes + 'SELECT * { GRAPH ?g { ?s :p ?o } BIND(1 AS ?g) }', "SparqlParserError"],
+            [prefixes + 'SELECT * { GRAPH ?g { SELECT ?s { ?s :p ?o } } }', "NonSupportedSparqlFeatureError"],
+            // likewise the variable of a SELECT expression
+            [prefixes + 'SELECT (1 AS ?s) { ?s :p ?o }', "SparqlParserError"],
+            [prefixes + 'SELECT (1 AS ?x) (2 AS ?x) {}', "SparqlParserError"],
+            [prefixes + 'SELECT (?o AS ?g) { GRAPH ?g { ?s :p ?o } }', "SparqlParserError"],
+            [prefixes + 'SELECT (COUNT(?o) AS ?o) { ?s :p ?o }', "SparqlParserError"],
+            [prefixes + 'SELECT ?s (STR(?o) AS ?k) (?k AS ?m) { ?s :p ?o } LIMIT 1', null],
+            [prefixes + 'SELECT (COUNT(?o) AS ?k) { ?s :p ?o } GROUP BY (STR(?s) AS ?k)', "SparqlParserError"],
+            [prefixes + 'SELECT (COUNT(*) AS ?n) { ?s :p ?o } GROUP BY (STR(?o) AS ?o)', "SparqlParserError"],
+            [prefixes + 'SELECT ?k (COUNT(?o) AS ?n) { ?s :p ?o } GROUP BY (STR(?s) AS ?k) LIMIT 1', null],
+            // DELETE WHERE takes a QuadPattern (a nested group is accepted)
+            [prefixes + 'DELETE WHERE { ?s :p ?o FILTER(?o > 1) }', "SyntaxError"],
+            [prefixes + 'DELETE WHERE { ?s :p ?o OPTIONAL { ?s :q ?x } }', "SyntaxError"],
+            [prefixes + 'DELETE WHERE { { :s0 :p ?o } }', null],
+            [prefixes + 'ASK { :s0 :p ?o }', null, false],
             [prefixes + 'ASK { :n :p ?o }', null, false],
             [prefixes + 'SELECT * { ?s :p* ?o FILTER(true) }', "NonSupportedSparqlFeatureError"]];
         new Lexicon(function(lexicon){
@@ -2727,6 +2743,140 @@ describe("QueryEngine", function(){
             ['ASK { GRAPH :nothing {} }', null, false],
             ['SELECT ?g FROM NAMED <http://example/g1> { GRAPH ?g {} }', ["g"], ["g=g1"]],
             ['SELECT ?g { GRAPH ?g {} }', ["g"], []]
+        ], done);
+    });
+
+    it("Test GraphNestedPatterns", function(done) {
+        // every pattern inside GRAPH matches the active graph, and EXISTS inside GRAPH does too
+        var named = 'FROM NAMED <http://example/g1> FROM NAMED <http://example/g2> FROM NAMED <http://example/g3> ';
+        checkQueries('GRAPH :g1 { :a :p "a1" . :a :q "q1" . :x :p "x1" } GRAPH :g2 { :a :p "a2" . :b :p "b2" . :a :q "q2" } ' +
+            'GRAPH :g3 { :b :q "q3" } :d :p "d" . :d :q "dq"', [
+            ['SELECT ?g ?s ?q ' + named + '{ GRAPH ?g { ?s :p ?o OPTIONAL { ?s :q ?q } } } ORDER BY ?g ?s', ["g", "s", "q"],
+                ["g=g1 s=a q=q1", "g=g1 s=x q=-", "g=g2 s=a q=q2", "g=g2 s=b q=-"]],
+            ['SELECT ?g ?o ' + named + '{ GRAPH ?g { { :a :p ?o } UNION { :b :p ?o } } } ORDER BY ?g ?o', ["g", "o"],
+                ["g=g1 o=a1", "g=g2 o=a2", "g=g2 o=b2"]],
+            ['SELECT ?g ?o ' + named + '{ GRAPH ?g { { :a :p ?o } } } ORDER BY ?g', ["g", "o"], ["g=g1 o=a1", "g=g2 o=a2"]],
+            // a graph without a match keeps its solution
+            ['SELECT ?g ?q ' + named + '{ GRAPH ?g { OPTIONAL { :a :q ?q } } } ORDER BY ?g', ["g", "q"],
+                ["g=g1 q=q1", "g=g2 q=q2", "g=g3 q=-"]],
+            ['SELECT ?s ?q { GRAPH :g2 { ?s :p ?o OPTIONAL { ?s :q ?q } } } ORDER BY ?s', ["s", "q"], ["s=a q=q2", "s=b q=-"]],
+            // an inner GRAPH keeps its own graph
+            ['SELECT ?g ?o ' + named + '{ GRAPH ?g { :a :p ?x GRAPH :g3 { :b :q ?o } } } ORDER BY ?g', ["g", "o"],
+                ["g=g1 o=q3", "g=g2 o=q3"]],
+            ['SELECT ?g ?s ' + named + '{ GRAPH ?g { ?s :p ?o FILTER EXISTS { ?s :q ?q } } } ORDER BY ?g ?s', ["g", "s"],
+                ["g=g1 s=a", "g=g2 s=a"]],
+            ['SELECT ?g ?s ' + named + '{ GRAPH ?g { ?s :p ?o FILTER NOT EXISTS { ?s :q ?q } } } ORDER BY ?g ?s', ["g", "s"],
+                ["g=g1 s=x", "g=g2 s=b"]],
+            ['SELECT ?g ?s ' + named + '{ GRAPH ?g { ?s :q ?q FILTER EXISTS { ?s :p ?o FILTER EXISTS { :b :p ?y } } } }', ["g", "s"],
+                ["g=g2 s=a"]],
+            // GRAPH inside EXISTS, also without an outer GRAPH
+            ['SELECT ?o { :d :p ?o FILTER EXISTS { GRAPH :g2 { :b :p ?x } } }', ["o"], ["o=d"]],
+            ['SELECT ?o { :d :p ?o FILTER EXISTS { GRAPH :g2 { :d :q ?x } } }', ["o"], []],
+            // ?g is bound only after the patterns inside: a BIND to it there must give the same graph
+            ['SELECT ?g ?s ' + named + '{ GRAPH ?g { ?s :p ?o BIND(:g1 AS ?g) } } ORDER BY ?s', ["g", "s"], ["g=g1 s=a", "g=g1 s=x"]],
+            ['SELECT ?g ?s ' + named + '{ GRAPH ?g { ?s :p ?o BIND(1 AS ?g) } }', ["g", "s"], []]
+        ], done);
+    });
+
+    it("Test GraphW3C", function(done) {
+        // W3C rdf-tests sparql10/graph (graph-nested-1…4, graph-variable-scope, graph-variable-join, graph-optional)
+        // and sparql11/exists (exists03, exists-graph-variable), with graph names in http://example/
+        var nested = 'FROM NAMED <http://example/n1> FROM NAMED <http://example/n2> ';
+        checkQueries('GRAPH :n1 { :s :p :o . :s1 :p :o1 } GRAPH :n2 { :s :p :o . :s2 :p :o2 } GRAPH :opt { :s :p :o . :s2 :p :opt } ' +
+            'GRAPH :vj { :vj :p :o } GRAPH :w1 { :x :p 1 . :a :p 9 } GRAPH :e2 { :a :p :o1 . :b :p :o1, :o2 } ' +
+            ':a :p :o2 . :s1 :p :eg . :s2 :p :o2 . GRAPH :eg { :s1 :p :eg . :s2 :p :o2 }', [
+            ['SELECT ?g ?s ?o ' + nested + '{ GRAPH ?g { GRAPH ?g { ?s :p ?o } } } ORDER BY ?g ?s', ["g", "s", "o"],
+                ["g=n1 s=s o=o", "g=n1 s=s1 o=o1", "g=n2 s=s o=o", "g=n2 s=s2 o=o2"]],
+            ['SELECT ?g1 ?g0 ?s ' + nested + '{ GRAPH ?g1 { GRAPH ?g0 { ?s :p ?o } } } ORDER BY ?g1 ?g0 ?s', ["g1", "g0", "s"],
+                ["g1=n1 g0=n1 s=s", "g1=n1 g0=n1 s=s1", "g1=n1 g0=n2 s=s", "g1=n1 g0=n2 s=s2",
+                    "g1=n2 g0=n1 s=s", "g1=n2 g0=n1 s=s1", "g1=n2 g0=n2 s=s", "g1=n2 g0=n2 s=s2"]],
+            ['SELECT ?g ?s ' + nested + '{ GRAPH ?g { GRAPH :n1 { ?s :p ?o } } } ORDER BY ?g ?s', ["g", "s"],
+                ["g=n1 s=s", "g=n1 s=s1", "g=n2 s=s", "g=n2 s=s1"]],
+            ['SELECT ?g ?s ' + nested + '{ GRAPH :n1 { GRAPH ?g { ?s :p ?o } } } ORDER BY ?g ?s', ["g", "s"],
+                ["g=n1 s=s", "g=n1 s=s1", "g=n2 s=s", "g=n2 s=s2"]],
+            // ?g is not in scope inside the GRAPH
+            ['SELECT ?g FROM NAMED <http://example/w1> FROM NAMED <http://example/n1> { GRAPH ?g { FILTER(BOUND(?g)) } }', ["g"], []],
+            ['SELECT ?g FROM NAMED <http://example/vj> FROM NAMED <http://example/w1> { GRAPH ?g { ?g :p ?o } }', ["g"], ["g=vj"]],
+            ['SELECT ?g ?s FROM NAMED <http://example/opt> FROM NAMED <http://example/w1> { GRAPH ?g { ?s ?p ?o OPTIONAL { ?s ?p ?g } } }',
+                ["g", "s"], ["g=opt s=s2"]],
+            ['SELECT ?s { GRAPH :e2 { ?s ?p :o1 FILTER EXISTS { ?s ?p :o2 } } }', ["s"], ["s=b"]],
+            ['SELECT ?s { ?s :p ?g FILTER EXISTS { GRAPH ?g { ?s2 :p ?o2 } } }', ["s"], ["s=s1"]]
+        ], done);
+    });
+
+    it("Test PathsInExists", function(done) {
+        // the internal variables of a path sequence inside EXISTS don't take the values of the outer ones
+        checkQueries(':a :p :m . :m :q :b . :c :r :n . :n :s :d', [
+            ['SELECT ?a { ?a :p/:q ?b FILTER EXISTS { :c :r/:s :d } }', ["a"], ["a=a"]],
+            ['SELECT ?a ?c { ?a :p/:q ?b FILTER EXISTS { ?c :r/:s ?d } }', ["a", "c"], ["a=a c=-"]]
+        ], done);
+    });
+
+    it("Test GraphIriInDataset", function(done) {
+        // if the query names named graphs, GRAPH <iri> matches only one of them; without, any graph of the store
+        var g1 = 'FROM NAMED <http://example/g1> ', g2 = 'FROM NAMED <http://example/g2> ';
+        checkQueries('GRAPH :g1 { :a :p 1 } GRAPH :g2 { :a :p 2 }', [
+            ['SELECT ?o ' + g2 + '{ GRAPH :g1 { :a :p ?o } }', ["o"], []],
+            ['SELECT ?o ' + g1 + '{ GRAPH :g1 { :a :p ?o } }', ["o"], ["o=1^^integer"]],
+            ['SELECT ?o { GRAPH :g1 { :a :p ?o } }', ["o"], ["o=1^^integer"]],
+            ['SELECT ?o ' + g2 + '{ GRAPH :g1 { OPTIONAL { :a :p ?o } } }', ["o"], []],
+            ['ASK ' + g2 + '{ GRAPH :g1 {} }', null, false],
+            ['ASK ' + g1 + '{ GRAPH :g1 {} }', null, true],
+            ['SELECT ?o ' + g2 + '{ GRAPH :g2 { :a :p ?o FILTER EXISTS { GRAPH :g1 { :a :p 1 } } } }', ["o"], []],
+            ['DELETE { GRAPH :g1 { :a :p ?o } } USING NAMED <http://example/g2> WHERE { GRAPH :g1 { :a :p ?o } }'],
+            ['SELECT ?o { GRAPH :g1 { :a :p ?o } }', ["o"], ["o=1^^integer"]],
+            ['DELETE WHERE { GRAPH :g1 { :a :p ?o } }'],
+            ['SELECT ?o { GRAPH :g1 { :a :p ?o } }', ["o"], []]
+        ], done);
+    });
+
+    it("Test GraphIriInDatasetArguments", function(done) {
+        // the named graphs passed to execute restrict GRAPH <iri> like FROM NAMED
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend, lexicon: lexicon});
+                engine.execute('INSERT DATA { GRAPH <http://example/g1> { <http://example/a> <http://example/p> 1 } }', function(err){
+                    expect(err).toBeNull();
+                    var query = 'SELECT ?o { GRAPH <http://example/g1> { ?s ?p ?o } }';
+                    engine.execute(query, function(err, results){
+                        expect(err).toBeNull();
+                        expect(results.length).toBe(0);
+                        engine.execute(query, function(err, results){
+                            expect(err).toBeNull();
+                            expect(results.length).toBe(1);
+                            done();
+                        }, [], [{token: 'uri', value: 'http://example/g1'}]);
+                    }, [], [{token: 'uri', value: 'http://example/g2'}]);
+                });
+            });
+        });
+    });
+
+    it("Test QuadsWithSeveralGraphs", function(done) {
+        // every GRAPH block of INSERT DATA, DELETE DATA and update templates counts, and so do the triples between them
+        var named = 'FROM NAMED <http://example/g1> FROM NAMED <http://example/g2> FROM NAMED <http://example/g3> ';
+        checkQueries(':a :p 1 . GRAPH :g1 { :a :p 2 } :a :p 3 . GRAPH :g2 { :a :p 4 } GRAPH :g3 { :a :p 5 } :a :p 6', [
+            ['SELECT ?o { :a :p ?o } ORDER BY ?o', ["o"], ["o=1^^integer", "o=3^^integer", "o=6^^integer"]],
+            ['SELECT ?g ?o ' + named + '{ GRAPH ?g { :a :p ?o } } ORDER BY ?o', ["g", "o"],
+                ["g=g1 o=2^^integer", "g=g2 o=4^^integer", "g=g3 o=5^^integer"]],
+            ['DELETE DATA { GRAPH :g1 { :a :p 2 } GRAPH :g2 { :a :p 4 } :a :p 6 }'],
+            ['SELECT ?o { :a :p ?o } ORDER BY ?o', ["o"], ["o=1^^integer", "o=3^^integer"]],
+            ['SELECT ?g ?o ' + named + '{ GRAPH ?g { :a :p ?o } } ORDER BY ?o', ["g", "o"], ["g=g3 o=5^^integer"]],
+            ['INSERT { GRAPH :h1 { ?s :q ?o } GRAPH :h2 { ?s :q ?o } } WHERE { ?s :p ?o FILTER(?o = 1) }'],
+            ['SELECT ?g FROM NAMED <http://example/h1> FROM NAMED <http://example/h2> { GRAPH ?g { :a :q 1 } } ORDER BY ?g', ["g"],
+                ["g=h1", "g=h2"]],
+            ['DELETE WHERE { :a :p 1 . GRAPH :g3 { :a :p ?o } GRAPH :h1 { ?s :q ?x } }'],
+            ['SELECT ?o { :a :p ?o }', ["o"], ["o=3^^integer"]],
+            ['SELECT ?g ?o FROM NAMED <http://example/g3> FROM NAMED <http://example/h1> FROM NAMED <http://example/h2> { GRAPH ?g { ?s ?p ?o } }',
+                ["g", "o"], ["g=h2 o=1^^integer"]]
+        ], done);
+    });
+
+    it("Test PrologueOrder", function(done) {
+        // BASE and PREFIX in any order (checkQueries puts PREFIX declarations first); the last BASE applies
+        checkQueries(':a :p 1', [
+            ['BASE <http://example/> SELECT ?o { <a> :p ?o }', ["o"], ["o=1^^integer"]],
+            ['BASE <http://other/> PREFIX q: <http://example/> BASE <http://example/> SELECT ?o { <a> q:p ?o }', ["o"], ["o=1^^integer"]]
         ], done);
     });
 
