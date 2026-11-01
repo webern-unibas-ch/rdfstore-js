@@ -997,9 +997,13 @@ return query;
     query.with = null;
     query.using = null;
 
-    // the template: the triple patterns of the group and of its GRAPH blocks
+    // the template: the triple patterns of the group and of its GRAPH blocks (a QuadPattern); nested groups
+    // are accepted as before
     var quads = [];
     var collectQuads = function(group, graph) {
+	if(group.patterns == null || group.filters.length > 0) {
+	    error("DELETE WHERE takes only triple patterns and GRAPH blocks");
+	}
 	for(var i=0; i<group.patterns.length; i++) {
 	    var pattern = group.patterns[i];
 	    if(pattern.token === 'basicgraphpattern') {
@@ -1007,14 +1011,16 @@ return query;
 		    var triple = pattern.triplesContext[j];
 		    quads.push({subject: triple.subject, predicate: triple.predicate, object: triple.object, graph: graph});
 		}
-	    } else if(pattern.token === 'graphgraphpattern' && pattern.value.patterns != null) {
+	    } else if(pattern.token === 'graphgraphpattern') {
 		collectQuads(pattern.value, pattern.graph);
+	    } else if(pattern.token === 'groupgraphpattern') {
+		collectQuads(pattern, graph);
+	    } else {
+		error("DELETE WHERE takes only triple patterns and GRAPH blocks");
 	    }
 	}
     };
-    if(p.patterns != null) {
-	collectQuads(p, null);
-    }
+    collectQuads(p, null);
 
     query.delete = quads;
 

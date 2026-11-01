@@ -1188,7 +1188,10 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
                     var solution = results[i];
                     var graph = solution[internal];
                     delete solution[internal];
-                    if(solution[name] == null) {
+                    if(graph == null) {
+                        // not reached: every pattern inside GRAPH binds its graph
+                        solutions.push(solution);
+                    } else if(solution[name] == null) {
                         solution[name] = graph;
                         solutions.push(solution);
                     } else if(solution[name] === graph) {

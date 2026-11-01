@@ -2687,6 +2687,14 @@ describe("QueryEngine", function(){
             [prefixes + 'SELECT (?o AS ?g) { GRAPH ?g { ?s :p ?o } }', "SparqlParserError"],
             [prefixes + 'SELECT (COUNT(?o) AS ?o) { ?s :p ?o }', "SparqlParserError"],
             [prefixes + 'SELECT ?s (STR(?o) AS ?k) (?k AS ?m) { ?s :p ?o } LIMIT 1', null],
+            [prefixes + 'SELECT (COUNT(?o) AS ?k) { ?s :p ?o } GROUP BY (STR(?s) AS ?k)', "SparqlParserError"],
+            [prefixes + 'SELECT (COUNT(*) AS ?n) { ?s :p ?o } GROUP BY (STR(?o) AS ?o)', "SparqlParserError"],
+            [prefixes + 'SELECT ?k (COUNT(?o) AS ?n) { ?s :p ?o } GROUP BY (STR(?s) AS ?k) LIMIT 1', null],
+            // DELETE WHERE takes a QuadPattern (a nested group is accepted)
+            [prefixes + 'DELETE WHERE { ?s :p ?o FILTER(?o > 1) }', "SyntaxError"],
+            [prefixes + 'DELETE WHERE { ?s :p ?o OPTIONAL { ?s :q ?x } }', "SyntaxError"],
+            [prefixes + 'DELETE WHERE { { :s0 :p ?o } }', null],
+            [prefixes + 'ASK { :s0 :p ?o }', null, false],
             [prefixes + 'ASK { :n :p ?o }', null, false],
             [prefixes + 'SELECT * { ?s :p* ?o FILTER(true) }', "NonSupportedSparqlFeatureError"]];
         new Lexicon(function(lexicon){
@@ -2793,6 +2801,14 @@ describe("QueryEngine", function(){
                 ["g", "s"], ["g=opt s=s2"]],
             ['SELECT ?s { GRAPH :e2 { ?s ?p :o1 FILTER EXISTS { ?s ?p :o2 } } }', ["s"], ["s=b"]],
             ['SELECT ?s { ?s :p ?g FILTER EXISTS { GRAPH ?g { ?s2 :p ?o2 } } }', ["s"], ["s=s1"]]
+        ], done);
+    });
+
+    it("Test PathsInExists", function(done) {
+        // the internal variables of a path sequence inside EXISTS don't take the values of the outer ones
+        checkQueries(':a :p :m . :m :q :b . :c :r :n . :n :s :d', [
+            ['SELECT ?a { ?a :p/:q ?b FILTER EXISTS { :c :r/:s :d } }', ["a"], ["a=a"]],
+            ['SELECT ?a ?c { ?a :p/:q ?b FILTER EXISTS { ?c :r/:s ?d } }', ["a", "c"], ["a=a c=-"]]
         ], done);
     });
 

@@ -66,19 +66,28 @@ AbstractQueryTree.prototype.parseSelect = function(syntaxTree, graph){
         console.log("error parsing query");
         return null;
     } else {
-        var env = { freshCounter: 0 };
+        var env = {};
         syntaxTree.pattern = this.build(syntaxTree.pattern, env, graph);
+        // the variable of a GROUP BY or SELECT expression must not be in scope of the pattern or of the
+        // expressions before it (SPARQL 1.1 18.2.1)
+        var scope = AbstractQueryTree.inScopeVariables(syntaxTree.pattern, {});
+        var introduce = function(clause, variable) {
+            if(scope[variable.value] === true) {
+                throw new SparqlParserError(clause + ": variable ?" + variable.value + " is already in scope");
+            }
+            scope[variable.value] = true;
+        };
+        if(Array.isArray(syntaxTree.group)) {
+            for(var i=0; i<syntaxTree.group.length; i++) {
+                if(syntaxTree.group[i].token === 'aliased_expression') {
+                    introduce("GROUP BY", syntaxTree.group[i].alias);
+                }
+            }
+        }
         if(syntaxTree.projection != null) {
-            // the variable of a SELECT expression must not be in scope of the pattern or of the expressions
-            // before it (SPARQL 1.1 18.2.1)
-            var scope = AbstractQueryTree.inScopeVariables(syntaxTree.pattern, {});
-            for(var i=0; i<syntaxTree.projection.length; i++) {
-                if(syntaxTree.projection[i].kind === 'aliased') {
-                    var variable = syntaxTree.projection[i].alias.value;
-                    if(scope[variable] === true) {
-                        throw new SparqlParserError("SELECT: variable ?" + variable + " is already in scope");
-                    }
-                    scope[variable] = true;
+            for(var j=0; j<syntaxTree.projection.length; j++) {
+                if(syntaxTree.projection[j].kind === 'aliased') {
+                    introduce("SELECT", syntaxTree.projection[j].alias);
                 }
             }
         }
@@ -95,9 +104,9 @@ AbstractQueryTree.prototype.parseInsertData = function(syntaxTree){
     }
 };
 
-// names the internal graph variables of GRAPH ?g; module-wide, because EXISTS builds its pattern per solution
-// with an env of its own, and the outer solution it is bound with carries the outer internal variables
-var graphVariableCounter = 0;
+// numbers the internal variables (fresh: of property path sequences, graph: of GRAPH ?g); module-wide, because
+// EXISTS builds its pattern per solution, and the outer solution it is bound with carries the outer ones
+var internalVariableCounter = 0;
 
 /**
  * Builds the algebra expression of a pattern. graph is the active graph (SPARQL 1.1 18.6) the patterns inside
@@ -130,7 +139,7 @@ AbstractQueryTree.prototype.build = function(node, env, graph) {
     } else if(node.token === 'graphgraphpattern') {
         var internal = null;
         if(node.graph.token === 'var') {
-            internal = {token: 'var', value: 'graph:' + graphVariableCounter++};
+            internal = {token: 'var', value: 'graph:' + internalVariableCounter++};
         }
         // an inner GRAPH sets its own active graph
         var c = this.build(node.value, env, internal || node.graph);
@@ -275,9 +284,8 @@ AbstractQueryTree.translatePathExpression  = function(pathExpression, env) {
             if(i!=pathExpression.predicate.value.length-1) {
                 nextObject = {
                     token: "var",
-                    value: "fresh:"+env.freshCounter
+                    value: "fresh:" + internalVariableCounter++
                 };
-                env.freshCounter++;
             } else {
                 nextObject = lastObject;
             }
