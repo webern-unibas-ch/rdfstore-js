@@ -2790,6 +2790,46 @@ describe("QueryEngine", function(){
         ], done);
     });
 
+    it("Test GraphIriInDataset", function(done) {
+        // if the query names named graphs, GRAPH <iri> matches only one of them; without, any graph of the store
+        var g1 = 'FROM NAMED <http://example/g1> ', g2 = 'FROM NAMED <http://example/g2> ';
+        checkQueries('GRAPH :g1 { :a :p 1 } GRAPH :g2 { :a :p 2 }', [
+            ['SELECT ?o ' + g2 + '{ GRAPH :g1 { :a :p ?o } }', ["o"], []],
+            ['SELECT ?o ' + g1 + '{ GRAPH :g1 { :a :p ?o } }', ["o"], ["o=1^^integer"]],
+            ['SELECT ?o { GRAPH :g1 { :a :p ?o } }', ["o"], ["o=1^^integer"]],
+            ['SELECT ?o ' + g2 + '{ GRAPH :g1 { OPTIONAL { :a :p ?o } } }', ["o"], []],
+            ['ASK ' + g2 + '{ GRAPH :g1 {} }', null, false],
+            ['ASK ' + g1 + '{ GRAPH :g1 {} }', null, true],
+            ['SELECT ?o ' + g2 + '{ GRAPH :g2 { :a :p ?o FILTER EXISTS { GRAPH :g1 { :a :p 1 } } } }', ["o"], []],
+            ['DELETE { GRAPH :g1 { :a :p ?o } } USING NAMED <http://example/g2> WHERE { GRAPH :g1 { :a :p ?o } }'],
+            ['SELECT ?o { GRAPH :g1 { :a :p ?o } }', ["o"], ["o=1^^integer"]],
+            ['DELETE WHERE { GRAPH :g1 { :a :p ?o } }'],
+            ['SELECT ?o { GRAPH :g1 { :a :p ?o } }', ["o"], []]
+        ], done);
+    });
+
+    it("Test GraphIriInDatasetArguments", function(done) {
+        // the named graphs passed to execute restrict GRAPH <iri> like FROM NAMED
+        new Lexicon(function(lexicon){
+            new QuadBackend({treeOrder: 2}, function(backend){
+                var engine = new QueryEngine({backend: backend, lexicon: lexicon});
+                engine.execute('INSERT DATA { GRAPH <http://example/g1> { <http://example/a> <http://example/p> 1 } }', function(err){
+                    expect(err).toBeNull();
+                    var query = 'SELECT ?o { GRAPH <http://example/g1> { ?s ?p ?o } }';
+                    engine.execute(query, function(err, results){
+                        expect(err).toBeNull();
+                        expect(results.length).toBe(0);
+                        engine.execute(query, function(err, results){
+                            expect(err).toBeNull();
+                            expect(results.length).toBe(1);
+                            done();
+                        }, [], [{token: 'uri', value: 'http://example/g1'}]);
+                    }, [], [{token: 'uri', value: 'http://example/g2'}]);
+                });
+            });
+        });
+    });
+
     it("Test QuadsWithSeveralGraphs", function(done) {
         // every GRAPH block of INSERT DATA, DELETE DATA and update templates counts, and so do the triples between them
         var named = 'FROM NAMED <http://example/g1> FROM NAMED <http://example/g2> FROM NAMED <http://example/g3> ';

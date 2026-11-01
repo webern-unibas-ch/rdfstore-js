@@ -486,16 +486,28 @@ QueryPlanDPSize.executeBGPDatasets = function(bgp, dataset, queryEngine, queryEn
                 }
             });
     } else {
-        // graph already has an active value, just match.
-        // Filtering the results will still be necessary
-        queryEngine.rangeQuery(bgp, queryEnv, function(results){
-            if(results!=null) {
-                results = QueryPlanDPSize.buildBindingsFromRange(results, bgp);
-                callback(results);
-            } else {
-                callback(null);
-            }
-        });
+        // a graph IRI: match it, if the query names named graphs only one of them
+        var match = function() {
+            queryEngine.rangeQuery(bgp, queryEnv, function(results){
+                if(results!=null) {
+                    results = QueryPlanDPSize.buildBindingsFromRange(results, bgp);
+                    callback(results);
+                } else {
+                    callback(null);
+                }
+            });
+        };
+        if(dataset.named == null || dataset.named.length === 0) {
+            match();
+        } else {
+            queryEngine.isDatasetGraph(bgp.graph, dataset, queryEnv, function(inDataset){
+                if(inDataset) {
+                    match();
+                } else {
+                    callback([]);
+                }
+            });
+        }
     }
 };
 

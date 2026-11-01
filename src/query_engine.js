@@ -551,6 +551,29 @@ QueryEngine.prototype.normalizeDatasets = function(datasets, outerEnv, callback)
     });
 };
 
+/**
+ * Calls back with whether a graph IRI is a graph of the dataset: one of its named graphs if the query names
+ * some (FROM NAMED, USING NAMED, the named graphs passed to execute), else any graph of the store. The store's
+ * graphs are cached on the dataset, which belongs to one query or update operation.
+ */
+QueryEngine.prototype.isDatasetGraph = function(graph, dataset, env, callback) {
+    var that = this;
+    this.normalizeTerm(graph, env, false, function(oid){
+        if(oid == null || oid === -1) {
+            callback(false);
+        } else if(dataset.named != null && dataset.named.length > 0) {
+            callback(dataset.named.some(function(named) { return named.oid === oid; }));
+        } else if(dataset.registeredGraphs != null) {
+            callback(dataset.registeredGraphs.indexOf(oid) !== -1);
+        } else {
+            that.lexicon.registeredGraphs(false, function(graphs){
+                dataset.registeredGraphs = graphs;
+                callback(graphs.indexOf(oid) !== -1);
+            });
+        }
+    });
+};
+
 QueryEngine.prototype.normalizeQuad = function(quad, queryEnv, shouldIndex, callback) {
     var subject    = null;
     var predicate  = null;
@@ -1178,7 +1201,7 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
     } else if(pattern.kind === "EMPTY_PATTERN") {
         // the empty group has one solution without variables (its filters are a FILTER node around it, see
         // DAWG algebra/filter-nested-2). Under GRAPH, like for triple patterns (QueryPlanDPSize.executeBGPDatasets),
-        // a graph variable takes each named graph of the dataset, and an IRI must be a graph of the store.
+        // a graph variable takes each named graph of the dataset, and an IRI must be a graph of the dataset.
         if(pattern.graph == null) {
             callback(null, [{}]);
         } else if(pattern.graph.token === 'var') {
@@ -1194,11 +1217,8 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
             }
             callback(null, solutions);
         } else {
-            var that = this;
-            this.normalizeTerm(pattern.graph, env, false, function(oid){
-                that.lexicon.registeredGraphs(false, function(graphs){
-                    callback(null, graphs.indexOf(oid) !== -1 ? [{}] : []);
-                });
+            this.isDatasetGraph(pattern.graph, dataset, env, function(inDataset){
+                callback(null, inDataset ? [{}] : []);
             });
         }
     } else if(pattern.kind === "ZERO_OR_MORE_PATH" || pattern.kind === 'ONE_OR_MORE_PATH') {
