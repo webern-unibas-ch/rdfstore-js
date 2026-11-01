@@ -48,7 +48,8 @@ QueryPlanDPSize.variablesInBGP = function(bgp) {
     for(var comp in components) {
         if(components[comp] && components[comp].token === "var") {
             variables.push(components[comp].value);
-        } else if(components[comp] && components[comp].token === "blank") {
+        } else if(components[comp] && components[comp].token === "blank" && components[comp].oid == null) {
+            // a blank node with an OID is a bound blank node of the store (EXISTS), so a constant
             variables.push("blank:"+components[comp].value);
         }
     }
@@ -315,7 +316,7 @@ QueryPlanDPSize.executeAndBGPsDPSize = function(allBgps, dataset, queryEngine, e
                     if(comp != '_cost') {
                         if(bgps[i][comp].token === 'var') {
                             vars.push(bgps[i][comp].value);
-                        } else if(bgps[i][comp].token === 'blank') {
+                        } else if(bgps[i][comp].token === 'blank' && bgps[i][comp].oid == null) {
                             // named like the bindings (buildBindingsFromRange), so blank nodes join
                             vars.push("blank:"+bgps[i][comp].value);
                         }
@@ -519,7 +520,7 @@ QueryPlanDPSize.buildBindingsFromRange = function(results, bgp) {
     for(comp in components) {
         if(components[comp] && components[comp].token === "var") {
             bindings[comp] = components[comp].value;
-        } else if(components[comp] && components[comp].token === "blank") {
+        } else if(components[comp] && components[comp].token === "blank" && components[comp].oid == null) {
             bindings[comp] = "blank:"+components[comp].value;
         }
     }
