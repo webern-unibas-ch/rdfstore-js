@@ -2681,6 +2681,12 @@ describe("QueryEngine", function(){
             [prefixes + 'INSERT { :n :p ?o } WHERE { ?s :p ?o BIND(1 AS ?o) }', "SparqlParserError"],
             [prefixes + 'SELECT * { GRAPH ?g { ?s :p ?o } BIND(1 AS ?g) }', "SparqlParserError"],
             [prefixes + 'SELECT * { GRAPH ?g { SELECT ?s { ?s :p ?o } } }', "NonSupportedSparqlFeatureError"],
+            // likewise the variable of a SELECT expression
+            [prefixes + 'SELECT (1 AS ?s) { ?s :p ?o }', "SparqlParserError"],
+            [prefixes + 'SELECT (1 AS ?x) (2 AS ?x) {}', "SparqlParserError"],
+            [prefixes + 'SELECT (?o AS ?g) { GRAPH ?g { ?s :p ?o } }', "SparqlParserError"],
+            [prefixes + 'SELECT (COUNT(?o) AS ?o) { ?s :p ?o }', "SparqlParserError"],
+            [prefixes + 'SELECT ?s (STR(?o) AS ?k) (?k AS ?m) { ?s :p ?o } LIMIT 1', null],
             [prefixes + 'ASK { :n :p ?o }', null, false],
             [prefixes + 'SELECT * { ?s :p* ?o FILTER(true) }', "NonSupportedSparqlFeatureError"]];
         new Lexicon(function(lexicon){

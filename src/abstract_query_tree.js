@@ -68,6 +68,20 @@ AbstractQueryTree.prototype.parseSelect = function(syntaxTree, graph){
     } else {
         var env = { freshCounter: 0 };
         syntaxTree.pattern = this.build(syntaxTree.pattern, env, graph);
+        if(syntaxTree.projection != null) {
+            // the variable of a SELECT expression must not be in scope of the pattern or of the expressions
+            // before it (SPARQL 1.1 18.2.1)
+            var scope = AbstractQueryTree.inScopeVariables(syntaxTree.pattern, {});
+            for(var i=0; i<syntaxTree.projection.length; i++) {
+                if(syntaxTree.projection[i].kind === 'aliased') {
+                    var variable = syntaxTree.projection[i].alias.value;
+                    if(scope[variable] === true) {
+                        throw new SparqlParserError("SELECT: variable ?" + variable + " is already in scope");
+                    }
+                    scope[variable] = true;
+                }
+            }
+        }
         return syntaxTree;
     }
 };
