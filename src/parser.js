@@ -1228,26 +1228,10 @@ return {token:'triplespattern',
 	value: v }
   }
   function peg$f56(g, gg) {
-    var onlyBinds = true;
-    for(var i=0; i<gg.patterns.length; i++) {
-	var ts = gg.patterns[i];
-	if(ts.token === 'bind') {
-	    continue;
-	}
-	onlyBinds = false;
-	for(var j=0; j<ts.triplesContext.length; j++) {
-	    var triple = ts.triplesContext[j]
-	    triple.graph = g;
-	}
-    }
-
-    // a group without triple patterns keeps its graph, see the EMPTY_PATTERN case of QueryEngine.executeSelectUnit
-    if(onlyBinds) {
-	gg.graph = g;
-    }
-
-    gg.token = 'groupgraphpattern'
-    return gg;
+    // the AQT passes the graph down to the patterns inside, see AbstractQueryTree.prototype.build
+    return {token: 'graphgraphpattern',
+	graph: g,
+	value: gg};
   }
   function peg$f57(v, ts) {
     return {token: 'servicegraphpattern',

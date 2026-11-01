@@ -1151,6 +1151,30 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
                 callback(null, []);
             }
         });
+    } else if(pattern.kind === "GRAPH") {
+        // GRAPH ?g: the patterns inside matched an internal variable, which becomes ?g here, as the join with
+        // ?g -> graph of SPARQL 1.1 18.6 (a ?g bound inside to another value drops the solution)
+        this.executeSelectUnit(projection, dataset, pattern.value, env, function (err, results) {
+            if (err != null || results == null || pattern.internal == null) {
+                callback(err, results);
+            } else {
+                var name = pattern.graph.value;
+                var internal = pattern.internal.value;
+                var solutions = [];
+                for(var i=0; i<results.length; i++) {
+                    var solution = results[i];
+                    var graph = solution[internal];
+                    delete solution[internal];
+                    if(solution[name] == null) {
+                        solution[name] = graph;
+                        solutions.push(solution);
+                    } else if(solution[name] === graph) {
+                        solutions.push(solution);
+                    }
+                }
+                callback(null, solutions);
+            }
+        });
     } else if(pattern.kind === "EMPTY_PATTERN") {
         // the empty group has one solution without variables (its filters are a FILTER node around it, see
         // DAWG algebra/filter-nested-2). Under GRAPH, like for triple patterns (QueryPlanDPSize.executeBGPDatasets),

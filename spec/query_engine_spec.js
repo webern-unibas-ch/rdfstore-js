@@ -2679,6 +2679,8 @@ describe("QueryEngine", function(){
             // EXISTS builds its pattern per solution, after a nextTick
             [prefixes + 'SELECT ?s { ?s :p ?o FILTER EXISTS { ?s :p ?z BIND(1 AS ?z) } }', "SparqlParserError"],
             [prefixes + 'INSERT { :n :p ?o } WHERE { ?s :p ?o BIND(1 AS ?o) }', "SparqlParserError"],
+            [prefixes + 'SELECT * { GRAPH ?g { ?s :p ?o } BIND(1 AS ?g) }', "SparqlParserError"],
+            [prefixes + 'SELECT * { GRAPH ?g { SELECT ?s { ?s :p ?o } } }', "NonSupportedSparqlFeatureError"],
             [prefixes + 'ASK { :n :p ?o }', null, false],
             [prefixes + 'SELECT * { ?s :p* ?o FILTER(true) }', "NonSupportedSparqlFeatureError"]];
         new Lexicon(function(lexicon){
@@ -2727,6 +2729,64 @@ describe("QueryEngine", function(){
             ['ASK { GRAPH :nothing {} }', null, false],
             ['SELECT ?g FROM NAMED <http://example/g1> { GRAPH ?g {} }', ["g"], ["g=g1"]],
             ['SELECT ?g { GRAPH ?g {} }', ["g"], []]
+        ], done);
+    });
+
+    it("Test GraphNestedPatterns", function(done) {
+        // every pattern inside GRAPH matches the active graph, and EXISTS inside GRAPH does too
+        var named = 'FROM NAMED <http://example/g1> FROM NAMED <http://example/g2> FROM NAMED <http://example/g3> ';
+        checkQueries('GRAPH :g1 { :a :p "a1" . :a :q "q1" . :x :p "x1" } GRAPH :g2 { :a :p "a2" . :b :p "b2" . :a :q "q2" } ' +
+            'GRAPH :g3 { :b :q "q3" } :d :p "d" . :d :q "dq"', [
+            ['SELECT ?g ?s ?q ' + named + '{ GRAPH ?g { ?s :p ?o OPTIONAL { ?s :q ?q } } } ORDER BY ?g ?s', ["g", "s", "q"],
+                ["g=g1 s=a q=q1", "g=g1 s=x q=-", "g=g2 s=a q=q2", "g=g2 s=b q=-"]],
+            ['SELECT ?g ?o ' + named + '{ GRAPH ?g { { :a :p ?o } UNION { :b :p ?o } } } ORDER BY ?g ?o', ["g", "o"],
+                ["g=g1 o=a1", "g=g2 o=a2", "g=g2 o=b2"]],
+            ['SELECT ?g ?o ' + named + '{ GRAPH ?g { { :a :p ?o } } } ORDER BY ?g', ["g", "o"], ["g=g1 o=a1", "g=g2 o=a2"]],
+            // a graph without a match keeps its solution
+            ['SELECT ?g ?q ' + named + '{ GRAPH ?g { OPTIONAL { :a :q ?q } } } ORDER BY ?g', ["g", "q"],
+                ["g=g1 q=q1", "g=g2 q=q2", "g=g3 q=-"]],
+            ['SELECT ?s ?q { GRAPH :g2 { ?s :p ?o OPTIONAL { ?s :q ?q } } } ORDER BY ?s', ["s", "q"], ["s=a q=q2", "s=b q=-"]],
+            // an inner GRAPH keeps its own graph
+            ['SELECT ?g ?o ' + named + '{ GRAPH ?g { :a :p ?x GRAPH :g3 { :b :q ?o } } } ORDER BY ?g', ["g", "o"],
+                ["g=g1 o=q3", "g=g2 o=q3"]],
+            ['SELECT ?g ?s ' + named + '{ GRAPH ?g { ?s :p ?o FILTER EXISTS { ?s :q ?q } } } ORDER BY ?g ?s', ["g", "s"],
+                ["g=g1 s=a", "g=g2 s=a"]],
+            ['SELECT ?g ?s ' + named + '{ GRAPH ?g { ?s :p ?o FILTER NOT EXISTS { ?s :q ?q } } } ORDER BY ?g ?s', ["g", "s"],
+                ["g=g1 s=x", "g=g2 s=b"]],
+            ['SELECT ?g ?s ' + named + '{ GRAPH ?g { ?s :q ?q FILTER EXISTS { ?s :p ?o FILTER EXISTS { :b :p ?y } } } }', ["g", "s"],
+                ["g=g2 s=a"]],
+            // GRAPH inside EXISTS, also without an outer GRAPH
+            ['SELECT ?o { :d :p ?o FILTER EXISTS { GRAPH :g2 { :b :p ?x } } }', ["o"], ["o=d"]],
+            ['SELECT ?o { :d :p ?o FILTER EXISTS { GRAPH :g2 { :d :q ?x } } }', ["o"], []],
+            // ?g is bound only after the patterns inside: a BIND to it there must give the same graph
+            ['SELECT ?g ?s ' + named + '{ GRAPH ?g { ?s :p ?o BIND(:g1 AS ?g) } } ORDER BY ?s', ["g", "s"], ["g=g1 s=a", "g=g1 s=x"]],
+            ['SELECT ?g ?s ' + named + '{ GRAPH ?g { ?s :p ?o BIND(1 AS ?g) } }', ["g", "s"], []]
+        ], done);
+    });
+
+    it("Test GraphW3C", function(done) {
+        // W3C rdf-tests sparql10/graph (graph-nested-1…4, graph-variable-scope, graph-variable-join, graph-optional)
+        // and sparql11/exists (exists03, exists-graph-variable), with graph names in http://example/
+        var nested = 'FROM NAMED <http://example/n1> FROM NAMED <http://example/n2> ';
+        checkQueries('GRAPH :n1 { :s :p :o . :s1 :p :o1 } GRAPH :n2 { :s :p :o . :s2 :p :o2 } GRAPH :opt { :s :p :o . :s2 :p :opt } ' +
+            'GRAPH :vj { :vj :p :o } GRAPH :w1 { :x :p 1 . :a :p 9 } GRAPH :e2 { :a :p :o1 . :b :p :o1, :o2 } ' +
+            ':a :p :o2 . :s1 :p :eg . :s2 :p :o2 . GRAPH :eg { :s1 :p :eg . :s2 :p :o2 }', [
+            ['SELECT ?g ?s ?o ' + nested + '{ GRAPH ?g { GRAPH ?g { ?s :p ?o } } } ORDER BY ?g ?s', ["g", "s", "o"],
+                ["g=n1 s=s o=o", "g=n1 s=s1 o=o1", "g=n2 s=s o=o", "g=n2 s=s2 o=o2"]],
+            ['SELECT ?g1 ?g0 ?s ' + nested + '{ GRAPH ?g1 { GRAPH ?g0 { ?s :p ?o } } } ORDER BY ?g1 ?g0 ?s', ["g1", "g0", "s"],
+                ["g1=n1 g0=n1 s=s", "g1=n1 g0=n1 s=s1", "g1=n1 g0=n2 s=s", "g1=n1 g0=n2 s=s2",
+                    "g1=n2 g0=n1 s=s", "g1=n2 g0=n1 s=s1", "g1=n2 g0=n2 s=s", "g1=n2 g0=n2 s=s2"]],
+            ['SELECT ?g ?s ' + nested + '{ GRAPH ?g { GRAPH :n1 { ?s :p ?o } } } ORDER BY ?g ?s', ["g", "s"],
+                ["g=n1 s=s", "g=n1 s=s1", "g=n2 s=s", "g=n2 s=s1"]],
+            ['SELECT ?g ?s ' + nested + '{ GRAPH :n1 { GRAPH ?g { ?s :p ?o } } } ORDER BY ?g ?s', ["g", "s"],
+                ["g=n1 s=s", "g=n1 s=s1", "g=n2 s=s", "g=n2 s=s2"]],
+            // ?g is not in scope inside the GRAPH
+            ['SELECT ?g FROM NAMED <http://example/w1> FROM NAMED <http://example/n1> { GRAPH ?g { FILTER(BOUND(?g)) } }', ["g"], []],
+            ['SELECT ?g FROM NAMED <http://example/vj> FROM NAMED <http://example/w1> { GRAPH ?g { ?g :p ?o } }', ["g"], ["g=vj"]],
+            ['SELECT ?g ?s FROM NAMED <http://example/opt> FROM NAMED <http://example/w1> { GRAPH ?g { ?s ?p ?o OPTIONAL { ?s ?p ?g } } }',
+                ["g", "s"], ["g=opt s=s2"]],
+            ['SELECT ?s { GRAPH :e2 { ?s ?p :o1 FILTER EXISTS { ?s ?p :o2 } } }', ["s"], ["s=b"]],
+            ['SELECT ?s { ?s :p ?g FILTER EXISTS { GRAPH ?g { ?s2 :p ?o2 } } }', ["s"], ["s=s1"]]
         ], done);
     });
 
