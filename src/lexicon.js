@@ -218,9 +218,9 @@ Lexicon.prototype.resolveLiteral = function (literal,callback) {
  */
 Lexicon.prototype.parseLiteral = function(literalString) {
     var parts = literalString.lastIndexOf("@");
-    if(parts!=-1 && literalString[parts-1]==='"' && literalString.substring(parts, literalString.length).match(/^@[a-zA-Z\-]+$/g)!=null) {
+    if(parts!=-1 && literalString[parts-1]==='"' && literalString.substring(parts, literalString.length).match(/^@[a-zA-Z]+(-[a-zA-Z0-9]+)*$/)!=null) {
         var value = literalString.substring(1,parts-1);
-        var lang = literalString.substring(parts+1, literalString.length);
+        var lang = literalString.substring(parts+1, literalString.length).toLowerCase();
         return {token: "literal", value:value, lang:lang};
     }
 

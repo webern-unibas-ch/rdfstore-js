@@ -2411,12 +2411,8 @@ return fcall;
   function peg$f155(v) {    return v  }
   function peg$f156(v) {    return v  }
   function peg$f157(a, b) {
-
-    if(b.length===0) {
-    return ("@"+a.join('')).toLowerCase();
-    } else {
-    return ("@"+a.join('')+"-"+b[0][1].join('')).toLowerCase();
-    }
+    // language tags are case-insensitive: normalized to lower case, with every subtag
+    return ("@"+a.join('')+b.map(function(subtag) { return "-"+subtag[1].join(''); }).join('')).toLowerCase();
   }
   function peg$f158(d) {
     var lit = {};

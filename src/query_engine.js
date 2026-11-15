@@ -1656,11 +1656,11 @@ QueryEngine.prototype.batchLoad = function(quads, callback) {
                 }
             });
         } else if (quad[component]['literal'] || quad[component].token === 'literal') {
-            that.lexicon.registerLiteral(quad[component].literal || quad[component].value, function(oid){
-                if (quad[component].literal != null) {
-                    quad[component] = that.lexicon.parseLiteral(quad[component].literal);
-                    delete quad[component]['literal'];
-                }
+            if (quad[component].literal != null) {
+                quad[component] = that.lexicon.parseLiteral(quad[component].literal);
+            }
+            // the same key as for a literal in a query (lower-case language tag, hexBinary normalization)
+            that.lexicon.registerLiteral(Utils.lexicalFormLiteral(quad[component], {}), function(oid){
                 newQuad[component] = oid;
                 k();
             });

@@ -2783,12 +2783,8 @@ IRI_REF "[122] IRI_REF"
      */
     LANGTAG "[128] LANGTAG"
     = '@' a:[a-zA-Z]+ b:('-' [a-zA-Z0-9]+)*  {
-
-    if(b.length===0) {
-    return ("@"+a.join('')).toLowerCase();
-    } else {
-    return ("@"+a.join('')+"-"+b[0][1].join('')).toLowerCase();
-    }
+    // language tags are case-insensitive: normalized to lower case, with every subtag
+    return ("@"+a.join('')+b.map(function(subtag) { return "-"+subtag[1].join(''); }).join('')).toLowerCase();
     }
 
     /*

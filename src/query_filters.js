@@ -1244,7 +1244,10 @@ QueryFilters.runBuiltInCall = function(builtincall, args, bindings, queryEngine,
                 if(langRange.value === '*' && lang.value != '') {
                     return QueryFilters.ebvTrue();
                 } else {
-                    return QueryFilters.ebvBoolean(lang.value.toLowerCase().indexOf(langRange.value.toLowerCase()) === 0)
+                    // RFC 4647 basic filtering: the range equals the tag or is a prefix ending before a '-'
+                    var tag = lang.value.toLowerCase();
+                    var range = langRange.value.toLowerCase();
+                    return QueryFilters.ebvBoolean(tag === range || tag.indexOf(range + "-") === 0);
                 }
             } else {
                 return QueryFilters.ebvError();

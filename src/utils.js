@@ -157,7 +157,8 @@ var lexicalFormLiteral = function(term, env) {
         if(lang == null && type == null) {
             indexedValue = '"' + value + '"';
         } else if(type == null) {
-            indexedValue = '"' + value + '"' + "@" + lang;
+            // language tags are case-insensitive: one term per tag, in lower case like the query grammar
+            indexedValue = '"' + value + '"' + "@" + lang.toLowerCase();
         } else {
             // normalization
             if(type.indexOf('hexBinary') != -1) {
