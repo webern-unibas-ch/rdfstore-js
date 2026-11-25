@@ -184,15 +184,16 @@ describe("Property paths", function () {
                 // full IRIs: an observed query's patterns are registered without its PREFIX declarations
                 store.startObservingQuery("SELECT ?b { <http://example/x1> <http://example/p>+ ?b }", function (results) {
                     calls.push(rows(results));
-                    if (calls.length === 2) {
+                    if (calls.length === 1) {
+                        // the first call has the current results; insert only after it, or the two calls may swap
                         expect(calls[0]).toEqual(["b=x2", "b=x3", "b=x4"]);
+                        store.execute(prefixes + "INSERT DATA { :x4 :p :x5 }", function (err) {
+                            expect(err).toBeNull();
+                        });
+                    } else if (calls.length === 2) {
                         expect(calls[1]).toEqual(["b=x2", "b=x3", "b=x4", "b=x5"]);
                         done();
                     }
-                }, function () {
-                    store.execute(prefixes + "INSERT DATA { :x4 :p :x5 }", function (err) {
-                        expect(err).toBeNull();
-                    });
                 });
             });
         });
