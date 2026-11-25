@@ -34,6 +34,8 @@ describe("Relative IRIs", function () {
             expect(Utils.resolveIri("http://Example.org/dir/", "ä b")).toBe("http://Example.org/dir/ä b");
             expect(Utils.resolveIri("http://example.org/", "HTTP://Example.org/../x")).toBe("HTTP://Example.org/../x");
             expect(Utils.resolveIri("http://example.org", "x")).toBe("http://example.org/x");
+            // a colon in the first segment but no valid scheme: not a relative reference, kept
+            expect(Utils.resolveIri("http://x/dir/q", "a_b:c")).toBe("a_b:c");
             // without a base, or with a base without a scheme
             expect(Utils.resolveIri(null, "x")).toBe("x");
             expect(Utils.resolveIri("rel/", "x")).toBe("rel/x");
@@ -74,6 +76,24 @@ describe("Relative IRIs", function () {
         it("resolve in updates", async function () {
             await store.promises.execute("BASE <http://x/dir/q.rq> INSERT DATA { <s> <q> <../new> }");
             expect(await values("SELECT ?o { <http://x/dir/s> <http://x/dir/q> ?o }", "o")).toEqual(["http://x/new"]);
+            // the declarations of an operation also apply to the ones after it, not to those before
+            await store.promises.execute("INSERT DATA { <http://x/a> <http://x/b> <first> }; " +
+                "BASE <http://x/dir/> PREFIX ex: <http://ex/> INSERT DATA { <s> ex:p <o> }; INSERT DATA { <s> ex:p <o2> }");
+            expect(await values("SELECT ?o { <http://x/dir/s> <http://ex/p> ?o }", "o")).toEqual(["http://x/dir/o", "http://x/dir/o2"]);
+            expect(await values("SELECT ?o { <http://x/a> <http://x/b> ?o }", "o")).toEqual(["first"]);
+        });
+
+        it("keep an undeclared prefixed name as written", async function () {
+            await store.promises.execute("BASE <http://x/dir/> INSERT DATA { <s> my_ns:p <o> }");
+            expect(await values("SELECT ?p { <http://x/dir/s> ?p <http://x/dir/o> }", "p")).toEqual(["my_ns:p"]);
+        });
+
+        it("are not resolved again when a stored IRI is cast to xsd:string", async function () {
+            await store.promises.execute("INSERT DATA { <http://x/dir/s> <http://x/dir/r> <a/../c> }");
+            var results = await store.promises.execute("BASE <http://other/> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> " +
+                "SELECT (xsd:string(?o) AS ?v) (xsd:string(<rel>) AS ?k) { <http://x/dir/s> <http://x/dir/r> ?o }");
+            expect(results[0].v.value).toBe("a/../c");
+            expect(results[0].k.value).toBe("http://other/rel");
         });
     });
 });

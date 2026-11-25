@@ -564,13 +564,17 @@ query.token = 'query';
 query.kind = 'update'
 query.prologue = p;
 
+// the prologue of each operation: its declarations also apply to the operations after it
 var units = [u];
+var prologues = [p];
 
 if(us != null && us.length != null && us[3] != null && us[3].units != null) {
     units = units.concat(us[3].units);
+    prologues = prologues.concat(us[3].prologues);
 }
 
 query.units = units;
+query.prologues = prologues;
 return query;
 }
 

@@ -1557,8 +1557,9 @@ QueryFilters.runIriRefOrFunction = function(iriref, args, bindings,queryEngine, 
                     return QueryFilters.ebvError();
                 }
             } else if(from.token === 'uri') {
+                // an evaluated IRI: a constant of the query is resolved already (runIriRefOrFunction)
                 return {token: 'literal',
-                    value: Utils.lexicalFormBaseUri(from, env),
+                    value: from.value,
                     type: fun,
                     lang: null};
             } else {

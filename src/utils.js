@@ -78,7 +78,8 @@ var lexicalFormBaseUri = function(term, env) {
         if(resolvedPrefix != null) {
             uri = resolvedPrefix+suffix;
         } else {
-            uri = prefix+":"+suffix;
+            // an undeclared prefix stays as written
+            return prefix+":"+suffix;
         }
     } else {
         // URI is not prefixed
@@ -126,11 +127,13 @@ var removeDotSegments = function(input) {
 /**
  * Resolves an IRI reference against a base IRI (RFC 3986 section 5.2). Works on the strings, without the
  * normalization of WHATWG URL (case, percent-encoding), so IRIs stay as written. An IRI with a scheme is
- * returned unchanged, like N3.js does when loading data, and so is any IRI without a base. A base that has no
- * scheme itself is prepended.
+ * returned unchanged, like N3.js does when loading data, and so is any IRI without a base, or with a colon in
+ * its first segment but no valid scheme (a_b:c, no relative reference). A base that has no scheme itself is
+ * prepended.
  */
 var resolveIri = function(base, iri) {
-    if(SCHEME.test(iri) || base == null || base === "") {
+    // a colon in the first segment: a scheme, or no relative reference
+    if(/^[^/?#]*:/.test(iri) || base == null || base === "") {
         return iri;
     } else if(!SCHEME.test(base)) {
         return base + iri;
