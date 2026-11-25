@@ -127,6 +127,7 @@ This is a list of the different kind of queries currently implemented:
 - FILTER EXISTS / NOT EXISTS operators
 - BIND
 - FILTER IN / NOT IN operators
+- property paths: sequence `/`, inverse `^`, alternative `|`, and the modifiers `*`, `+`, `?`. Negated property sets (`!`) and `{n,m}` are not supported.
 
 
 ## Installation

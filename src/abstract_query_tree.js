@@ -158,163 +158,125 @@ AbstractQueryTree.prototype.build = function(node, env, graph) {
     }
 };
 
+/**
+ * Translates the property paths of a basic graph pattern. A path of IRIs, sequences and inverses (`:p/^:q`)
+ * becomes triple patterns joined by internal variables (fresh:), which the planner joins like the others. Any
+ * other path (with *, +, ?, |) becomes a PATH node, evaluated by PropertyPaths. A basic graph pattern with
+ * PATH nodes becomes a BGP_SCOPE around the join of its parts: blank nodes and internal variables are scoped to
+ * the whole basic graph pattern, so they are dropped only there (QueryEngine.executeSelectUnit).
+ */
 AbstractQueryTree.translatePathExpressionsInBGP = function(bgp, env) {
-    var pathExpression;
-    var before = [], rest, bottomJoin;
+    var triples = [];
+    var paths = [];
     for(var i=0; i<bgp.value.length; i++) {
-        if(bgp.value[i].predicate && bgp.value[i].predicate.token === 'path') {
-            //console.log("FOUND A PATH");
-            pathExpression = bgp.value[i];
-            rest = bgp.value.slice(i+1);
-            var bgpTransformed = AbstractQueryTree.translatePathExpression(pathExpression, env);
-            var optionalPattern = null;
-            //console.log("BACK FROM TRANSFORMED");
-            if(bgpTransformed.kind === 'BGP') {
-                before = before.concat(bgpTransformed.value);
-            } else if(bgpTransformed.kind === 'ZERO_OR_MORE_PATH' || bgpTransformed.kind === 'ONE_OR_MORE_PATH'){
-                //console.log("BEFORE");
-                //console.log(bgpTransformed);
-
-
-                if(before.length > 0) {
-                    bottomJoin =  {kind: 'JOIN',
-                        lvalue: {kind: 'BGP', value:before},
-                        rvalue: bgpTransformed};
-                } else {
-                    bottomJoin = bgpTransformed;
-                }
-
-
-                if(bgpTransformed.kind === 'ZERO_OR_MORE_PATH') {
-                    if(bgpTransformed.y.token === 'var' && bgpTransformed.y.value.indexOf("fresh:")===0 &&
-                        bgpTransformed.x.token === 'var' && bgpTransformed.x.value.indexOf("fresh:")===0) {
-                        //console.log("ADDING EXTRA PATTERN 1)");
-                        for(var j=0; j<bgp.value.length; j++) {
-                            //console.log(bgp.value[j]);
-                            if(bgp.value[j].object && bgp.value[j].object.token === 'var' && bgp.value[j].object.value === bgpTransformed.x.value) {
-                                //console.log(" YES 1)");
-                                optionalPattern = _.clone(bgp.value[j], true);
-                                optionalPattern.object = bgpTransformed.y;
-                            }
-                        }
-                    } else if(bgpTransformed.y.token === 'var' && bgpTransformed.y.value.indexOf("fresh:")===0) {
-                        //console.log("ADDING EXTRA PATTERN 2)");
-                        for(var j=0; j<bgp.value.length; j++) {
-                            //console.log(bgp.value[j]);
-                            if(bgp.value[j].subject && bgp.value[j].subject.token === 'var' && bgp.value[j].subject.value === bgpTransformed.y.value) {
-                                //console.log(" YES 2)");
-                                optionalPattern = _.clone(bgp.value[j],true);
-                                optionalPattern.subject = bgpTransformed.x;
-                            }
-                        }
-                    }
-                }
-
-                if(rest.length >0) {
-                    //console.log("(2a)")
-                    var rvalueJoin = AbstractQueryTree.translatePathExpressionsInBGP({kind: 'BGP', value: rest}, env);
-                    //console.log("got rvalue");
-                    if(optionalPattern != null) {
-                        var optionals = before.concat([optionalPattern]).concat(rest);
-                        return { kind: 'UNION',
-                            value: [{ kind: 'JOIN',
-                                lvalue: bottomJoin,
-                                rvalue: rvalueJoin },
-                                {kind: 'BGP',
-                                    value: optionals}] };
-                    } else {
-                        return { kind: 'JOIN',
-                            lvalue: bottomJoin,
-                            rvalue: rvalueJoin };
-                    }
-                } else {
-                    //console.log("(2b)")
-                    return bottomJoin;
-                }
-
+        var triple = bgp.value[i];
+        if(triple.predicate != null && triple.predicate.token === 'path') {
+            var path = AbstractQueryTree.normalizePath(triple.predicate);
+            if(isPlainPath(path)) {
+                expandPlainPath(triple.subject, path, triple.object, triple.graph, triples);
             } else {
-                // @todo ????
-                return bgpTransformed;
+                var pathPattern = {kind: 'PATH', subject: triple.subject, path: path, object: triple.object};
+                if(triple.graph != null) {
+                    pathPattern.graph = triple.graph;
+                }
+                paths.push(pathPattern);
             }
         } else {
-            before.push(bgp.value[i]);
+            triples.push(triple);
         }
     }
 
-    //console.log("returning");
-    bgp.value = before;
-    return bgp;
+    if(paths.length === 0) {
+        bgp.value = triples;
+        return bgp;
+    }
+    var joined = triples.length > 0 ? {kind: 'BGP', value: triples, scoped: true} : paths.shift();
+    for(var j=0; j<paths.length; j++) {
+        joined = {kind: 'JOIN', lvalue: joined, rvalue: paths[j]};
+    }
+    return {kind: 'BGP_SCOPE', value: joined};
 };
 
-
-AbstractQueryTree.translatePathExpression  = function(pathExpression, env) {
-    // * and + on a single predicate become ZERO_OR_MORE_PATH / ONE_OR_MORE_PATH (rejected when executed)
-    var modifier = pathExpression.predicate.modifier;
-    if(modifier != null && (pathExpression.predicate.kind !== 'element' || (modifier !== '*' && modifier !== '+'))) {
-        throw new NonSupportedSparqlFeatureError("property path modifier", "Property path modifiers (*, +, ?, {n,m}) are not supported");
+/**
+ * The path of the parser as a tree of {type: 'link', iri}, {type: 'inverse', path}, {type: 'seq', paths},
+ * {type: 'alt', paths} and {type: 'zeroOrMore' | 'oneOrMore' | 'zeroOrOne', path}.
+ */
+AbstractQueryTree.normalizePath = function(node) {
+    if(node.token !== 'path') {
+        return {type: 'link', iri: node};
     }
-    // add support for different path patterns
-    if(pathExpression.predicate.kind === 'element') {
-        // simple paths, maybe modified
-        if(pathExpression.predicate.modifier === '+') {
-            pathExpression.predicate.modifier = null;
-            var expandedPath = AbstractQueryTree.translatePathExpression(pathExpression, env);
-            return {kind: 'ONE_OR_MORE_PATH',
-                path: expandedPath,
-                x: pathExpression.subject,
-                y: pathExpression.object};
-        } else if(pathExpression.predicate.modifier === '*') {
-            pathExpression.predicate.modifier = null;
-            var expandedPath = AbstractQueryTree.translatePathExpression(pathExpression, env);
-            return {kind: 'ZERO_OR_MORE_PATH',
-                path: expandedPath,
-                x: pathExpression.subject,
-                y: pathExpression.object};
-        } else {
-            pathExpression.predicate = pathExpression.predicate.value;
-            return {kind: 'BGP', value: [pathExpression]};
-        }
-    } else if(pathExpression.predicate.kind === 'sequence') {
-        var currentSubject = pathExpression.subject;
-        var lastObject = pathExpression.object;
-        var currentGraph = pathExpression.graph;
-        var nextObject, chain;
-        var restTriples = [];
-        for(var i=0; i< pathExpression.predicate.value.length; i++) {
-            if(i!=pathExpression.predicate.value.length-1) {
-                nextObject = {
-                    token: "var",
-                    value: "fresh:" + internalVariableCounter++
-                };
-            } else {
-                nextObject = lastObject;
-            }
-
-            // @todo
-            // what if the predicate is a path with
-            // '*'? same fresh va in subject and object??
-            chain = {
-                subject: currentSubject,
-                predicate: pathExpression.predicate.value[i],
-                object: nextObject
-            };
-
-            if(currentGraph != null)
-                chain.graph =_.clone(currentGraph,true);
-
-            restTriples.push(chain);
-
-            if(i!=pathExpression.predicate.value.length-1)
-                currentSubject = _.clone(nextObject,true);
-        }
-        var bgp = {kind: 'BGP', value: restTriples};
-        //console.log("BEFORE (1):");
-        //console.log(bgp);
-        //console.log("--------------");
-        return AbstractQueryTree.translatePathExpressionsInBGP(bgp, env);
+    var path;
+    if(node.kind === 'element') {
+        path = AbstractQueryTree.normalizePath(node.value);
+    } else if(node.kind === 'sequence' || node.kind === 'alternative') {
+        path = {type: node.kind === 'sequence' ? 'seq' : 'alt', paths: node.value.map(AbstractQueryTree.normalizePath)};
+    } else if(node.kind === 'inversePath') {
+        path = {type: 'inverse', path: AbstractQueryTree.normalizePath(node.value)};
+    } else if(node.kind === 'negatedPropertySet') {
+        throw new NonSupportedSparqlFeatureError("negated property set", "Negated property sets (!) in property paths are not supported");
     } else {
-        throw new NonSupportedSparqlFeatureError("Non supported path expression "+pathExpression.predicate.kind);
+        throw new NonSupportedSparqlFeatureError("path expression " + node.kind);
     }
+
+    var modifier = node.modifier;
+    if(modifier == null) {
+        return path;
+    } else if(modifier === '*') {
+        return {type: 'zeroOrMore', path: path};
+    } else if(modifier === '+') {
+        return {type: 'oneOrMore', path: path};
+    } else if(modifier === '?') {
+        return {type: 'zeroOrOne', path: path};
+    } else {
+        throw new NonSupportedSparqlFeatureError("property path modifier", "Property path modifiers {n,m} are not supported");
+    }
+};
+
+var isPlainPath = function(path) {
+    if(path.type === 'link') {
+        return true;
+    } else if(path.type === 'inverse') {
+        return isPlainPath(path.path);
+    } else if(path.type === 'seq') {
+        return path.paths.every(isPlainPath);
+    } else {
+        return false;
+    }
+};
+
+var expandPlainPath = function(subject, path, object, graph, acum) {
+    if(path.type === 'link') {
+        var triple = {subject: _.clone(subject, true), predicate: path.iri, object: _.clone(object, true)};
+        if(graph != null) {
+            triple.graph = _.clone(graph, true);
+        }
+        acum.push(triple);
+    } else if(path.type === 'inverse') {
+        expandPlainPath(object, path.path, subject, graph, acum);
+    } else {
+        var current = subject;
+        for(var i=0; i<path.paths.length; i++) {
+            var next = i === path.paths.length - 1 ? object : {token: "var", value: "fresh:" + internalVariableCounter++};
+            expandPlainPath(current, path.paths[i], next, graph, acum);
+            current = next;
+        }
+    }
+};
+
+/**
+ * The IRIs of the links in a path
+ */
+AbstractQueryTree.pathLinks = function(path, acum) {
+    if(path.type === 'link') {
+        acum.push(path.iri);
+    } else if(path.type === 'seq' || path.type === 'alt') {
+        for(var i=0; i<path.paths.length; i++) {
+            AbstractQueryTree.pathLinks(path.paths[i], acum);
+        }
+    } else {
+        AbstractQueryTree.pathLinks(path.path, acum);
+    }
+    return acum;
 };
 
 AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env, graph) {
@@ -418,12 +380,14 @@ AbstractQueryTree.inScopeVariables = function(aqt, acum) {
                 }
             });
         }
-    } else if(aqt.kind === 'ZERO_OR_MORE_PATH' || aqt.kind === 'ONE_OR_MORE_PATH') {
-        [aqt.x, aqt.y].forEach(function(term) {
+    } else if(aqt.kind === 'PATH') {
+        [aqt.subject, aqt.object].forEach(function(term) {
             if(term != null && term.token === 'var') {
                 acum[term.value] = true;
             }
         });
+    } else if(aqt.kind === 'BGP_SCOPE') {
+        AbstractQueryTree.inScopeVariables(aqt.value, acum);
     } else if(aqt.kind === 'UNION') {
         AbstractQueryTree.inScopeVariables(aqt.value[0], acum);
         AbstractQueryTree.inScopeVariables(aqt.value[1], acum);
@@ -458,8 +422,18 @@ AbstractQueryTree.prototype.collectBasicTriples = function(aqt, acum) {
         acum = this.collectBasicTriples(aqt.pattern,acum);
     } else if(aqt.kind === 'BGP') {
         acum = acum.concat(aqt.value);
-    } else if(aqt.kind === 'ZERO_OR_MORE_PATH' || aqt.kind === 'ONE_OR_MORE_PATH') {
-        acum = this.collectBasicTriples(aqt.path);
+    } else if(aqt.kind === 'PATH') {
+        // a triple pattern for each IRI of the path, so that observers see changes to them
+        var links = AbstractQueryTree.pathLinks(aqt.path, []);
+        for(var i=0; i<links.length; i++) {
+            var triple = {subject: {token: 'var', value: 'path:s'}, predicate: links[i], object: {token: 'var', value: 'path:o'}};
+            if(aqt.graph != null) {
+                triple.graph = aqt.graph;
+            }
+            acum.push(triple);
+        }
+    } else if(aqt.kind === 'BGP_SCOPE') {
+        acum = this.collectBasicTriples(aqt.value, acum);
     } else if(aqt.kind === 'UNION') {
         acum = this.collectBasicTriples(aqt.value[0],acum);
         acum = this.collectBasicTriples(aqt.value[1],acum);
@@ -503,14 +477,15 @@ AbstractQueryTree.prototype.bind = function(aqt, bindings) {
     } else if(aqt.kind === 'BGP') {
         aqt.value = this._bindTripleContext(aqt.value, bindings);
         //acum = acum.concat(aqt.value);
-    } else if(aqt.kind === 'ZERO_OR_MORE_PATH' || aqt.kind === 'ONE_OR_MORE_PATH') {
-        aqt.path = this._bindTripleContext(aqt.path, bindings);
-        if(aqt.x && aqt.x.token === 'var' && bindings[aqt.x.value] != null) {
-            aqt.x = bindings[aqt.x.value];
+    } else if(aqt.kind === 'PATH') {
+        if(aqt.subject.token === 'var' && bindings[aqt.subject.value] != null) {
+            aqt.subject = bindings[aqt.subject.value];
         }
-        if(aqt.y && aqt.y.token === 'var' && bindings[aqt.y.value] != null) {
-            aqt.y = bindings[aqt.y.value];
+        if(aqt.object.token === 'var' && bindings[aqt.object.value] != null) {
+            aqt.object = bindings[aqt.object.value];
         }
+    } else if(aqt.kind === 'BGP_SCOPE') {
+        aqt.value = this.bind(aqt.value, bindings);
     } else if(aqt.kind === 'UNION') {
         aqt.value[0] = this.bind(aqt.value[0],bindings);
         aqt.value[1] = this.bind(aqt.value[1],bindings);
@@ -632,14 +607,12 @@ AbstractQueryTree.prototype.replace = function(aqt, from, to, ns) {
         aqt.pattern = this.replace(aqt.pattern, from, to, ns);
     } else if(aqt.kind === 'BGP') {
         aqt.value = this._replaceTripleContext(aqt.value, from, to, ns);
-    } else if(aqt.kind === 'ZERO_OR_MORE_PATH' || aqt.kind === 'ONE_OR_MORE_PATH') {
-        aqt.path = this._replaceTripleContext(aqt.path, from,to, ns);
-        if(aqt.x && aqt.x.token === from.token && aqt.value === from.value) {
-            aqt.x = _.clone(to,true);
-        }
-        if(aqt.y && aqt.y.token === from.token && aqt.value === from.value) {
-            aqt.y = _.clone(to,true);
-        }
+    } else if(aqt.kind === 'PATH') {
+        var endpoints = this._replaceTripleContext([{subject: aqt.subject, object: aqt.object}], from, to, ns)[0];
+        aqt.subject = endpoints.subject;
+        aqt.object = endpoints.object;
+    } else if(aqt.kind === 'BGP_SCOPE') {
+        aqt.value = this.replace(aqt.value, from, to, ns);
     } else if(aqt.kind === 'UNION') {
         aqt.value[0] = this.replace(aqt.value[0],from,to, ns);
         aqt.value[1] = this.replace(aqt.value[1],from,to, ns);

@@ -7,6 +7,7 @@ var Utils = require("./utils");
 var QuadIndex = require("./quad_index");
 var QueryPlan = require("./query_plan").QueryPlan;
 var QueryFilters = require("./query_filters").QueryFilters;
+var PropertyPaths = require("./property_paths").PropertyPaths;
 var RDFModel = require("./rdf_model");
 var RDFLoader = require("./rdf_loader").RDFLoader;
 var Callbacks = require("./graph_callbacks").CallbacksBackend;
@@ -520,7 +521,7 @@ QueryEngine.prototype.normalizeTerm = function(term, env, shouldIndex, callback)
             // a blank node of the store bound into an EXISTS pattern
             callback(term.oid);
         } else if(!shouldIndex) {
-            // in a query pattern a blank node matches like a variable (see QueryPlanDPSize.variablesInBGP, withoutBlankNodes),
+            // in a query pattern a blank node matches like a variable (see QueryPlanDPSize.variablesInBGP, withoutInternalVariables),
             // never a data blank node with the same label in env.blanks
             callback("blank:" + label);
         } else if(env.blanks[label] != null) {
@@ -1228,139 +1229,18 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
                 callback(null, inDataset ? [{}] : []);
             });
         }
-    } else if(pattern.kind === "ZERO_OR_MORE_PATH" || pattern.kind === 'ONE_OR_MORE_PATH') {
-        // the place to evaluate them; see the commented-out executeZeroOrMorePath below
-        callback(new NonSupportedSparqlFeatureError(pattern.kind, "Property path modifiers (*, +, ?, {n,m}) are not supported"));
+    } else if(pattern.kind === "PATH") {
+        PropertyPaths.execute(this, dataset, pattern, env, callback);
+    } else if(pattern.kind === "BGP_SCOPE") {
+        // a basic graph pattern split around property paths: its blank nodes and internal variables join its
+        // parts, and are dropped here
+        this.executeSelectUnit(projection, dataset, pattern.value, env, function (err, results) {
+            callback(err, err != null || results == null ? results : withoutInternalVariables(results));
+        });
     } else {
         callback(new NonSupportedSparqlFeatureError(pattern.kind));
     }
 };
-
-/*
-QueryEngine.prototype.executeZeroOrMorePath = function(pattern, dataset, env) {
-    //console.log("EXECUTING ZERO OR MORE PATH");
-    //console.log("X");
-    //console.log(pattern.x);
-    //console.log("Y");
-    //console.log(pattern.y);
-    var projection = [];
-    var starProjection = false;
-    if(pattern.x.token === 'var') {
-        projection.push({token: 'variable',
-            kind: 'var',
-            value: pattern.x.value});
-    }
-    if(pattern.y.token === 'var') {
-        projection.push({token: 'variable',
-            kind: 'var',
-            value: pattern.y.value});
-    }
-
-    if(projection.length === 0) {
-        projection.push({"token": "variable", "kind": "*"});
-        starProjection = true;
-    }
-
-    //console.log("COMPUTED PROJECTION");
-    //console.log(projection);
-
-
-    if(pattern.x.token === 'var' && pattern.y.token === 'var') {
-        var bindings = this.executeAndBGP(projection, dataset, pattern.path, env);
-        //console.log("BINDINGS "+bindings.length);
-        //console.log(bindings);
-        var acum = {};
-        var results = [];
-        var vx, intermediate, nextBinding, vxDenorm;
-        var origVXName = pattern.x.value;
-        var last = pattern.x;
-        var nextPath = pattern.path;
-        //console.log("VAR - VAR PATTERN");
-        //console.log(nextPath.value);
-        for(var i=0; i<bindings.length; i++) {
-            vx = bindings[i][origVXName];
-            if(acum[vx] == null) {
-                vxDenorm = this.lexicon.retrieve(vx);
-                pattern.x = vxDenorm;
-                //console.log("REPLACING");
-                //console.log(last);
-                //console.log("BY");
-                //console.log(vxDenorm);
-                //console.log(nextPath.value);
-                pattern.path = this.abstractQueryTree.replace(nextPath, last, vxDenorm, env);
-                nextPath = Utils.clone(pattern.path);
-                intermediate = this.executeZeroOrMorePath(pattern, dataset, env);
-                for(var j=0; j<intermediate.length; j++) {
-                    nextBinding = intermediate[j];
-                    nextBinding[origVXName] = vx;
-                    results.push(nextBinding)
-                }
-                last = vxDenorm;
-            }
-        }
-
-        //console.log("RETURNING VAR - VAR");
-        return results;
-    } else if(pattern.x.token !== 'var' && pattern.y.token === 'var') {
-        var finished;
-        var acum = {};
-        var initial = true;
-        var pending = [];
-        var bindings,nextBinding;
-        var collected = [];
-        var origVx = pattern.x;
-        var last;
-
-        while(initial == true || pending.length !== 0) {
-            //console.log("-- Iteration");
-            //console.log(pattern.path.value[0]);
-            if(initial === true) {
-                bindings = this.executeAndBGP(projection, dataset, pattern.path, env);
-                //console.log("SAVING LAST");
-                //console.log(pattern.x);
-                last = pattern.x;
-                initial = false;
-            } else {
-                var nextOid = pending.pop();
-                //console.log("POPPING:"+nextOid);
-                var value = this.lexicon.retrieve(nextOid);
-                var path = pattern.path; //Utils.clone(pattern.path);
-                //console.log(path.value[0]);
-                //console.log("REPLACING");
-                //console.log(last);
-                //console.log("BY");
-                //console.log(value);
-                path = this.abstractQueryTree.replace(path, last, value, env);
-                //console.log(path.value[0]);
-                bindings = this.executeAndBGP(projection, dataset, path, env);
-                last = value;
-            }
-
-
-            //console.log("BINDINGS!");
-            //console.log(bindings);
-
-            for(var i=0; i<bindings.length; i++) {
-                //console.log(bindings[i][pattern.y.value])
-                var value = bindings[i][pattern.y.value];
-                //console.log("VALUE:"+value);
-                if(acum[value] !== true) {
-                    nextBinding = {};
-                    nextBinding[pattern.y.value] = value;
-                    collected.push(nextBinding);
-                    acum[value] = true;
-                    pending.push(value);
-                }
-            }
-        }
-        //console.log("RETURNING TERM - VAR");
-        //console.log(collected);
-        return collected;
-    } else {
-        throw "Kind of path not supported!";
-    }
-};
-*/
 
 // Evaluates two sub-patterns one after the other; stops at the first error. With skipIfFirstEmpty
 // (joins), the second one is not evaluated when the first has no solutions.
@@ -1407,12 +1287,12 @@ QueryEngine.prototype.executeUNION = function(projection, dataset, patterns, env
 };
 
 // The blank nodes of a basic graph pattern match like variables (see normalizeTerm), but are scoped to it:
-// they are dropped from its solutions.
-var withoutBlankNodes = function(results) {
+// they are dropped from its solutions, like the internal variables of property path sequences (fresh:).
+var withoutInternalVariables = function(results) {
     return results.map(function(result) {
         var solution = {};
         for(var name in result) {
-            if(name.indexOf("blank:") !== 0) {
+            if(name.indexOf("blank:") !== 0 && name.indexOf("fresh:") !== 0) {
                 solution[name] = result[name];
             }
         }
@@ -1426,7 +1306,8 @@ QueryEngine.prototype.executeAndBGP = function(projection, dataset, pattern, env
         if(err != null) {
             callback(err);
         } else if(result!=null) {
-            QueryFilters.checkFilters(pattern, withoutBlankNodes(result), false, dataset, env, that, callback);
+            // a part of a BGP_SCOPE keeps them for the join with the other parts
+            QueryFilters.checkFilters(pattern, pattern.scoped === true ? result : withoutInternalVariables(result), false, dataset, env, that, callback);
         } else {
             callback(null, null);
         }

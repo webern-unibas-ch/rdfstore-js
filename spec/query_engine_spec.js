@@ -2422,11 +2422,10 @@ describe("QueryEngine", function(){
             new QuadBackend({treeOrder: 2}, function(backend){
                 var engine = new QueryEngine({backend: backend,
                     lexicon: lexicon});
-                var patterns = ['?s :p* ?o', '?s :p+ ?o', '?s :p? ?o', '?s :p{2} ?o', '?s !:p ?o', '?s ^:p ?o', '?s :p|:q ?o',
-                    // a modifier on a group
-                    '?s (:p/:p)* ?o', '?s (:p/:p)? ?o', '?s (:p|:q)+ ?o',
+                // the other paths are supported, see property_paths_spec.js
+                var patterns = ['?s :p{2} ?o', '?s !:p ?o', '?s (:p/:p){1,2} ?o',
                     // inside EXISTS
-                    '?s :p ?o FILTER EXISTS { ?o :p+ ?x }', '?s :p ?o FILTER NOT EXISTS { ?o :p* ?x }'];
+                    '?s :p ?o FILTER EXISTS { ?o :p{2} ?x }'];
 
                 engine.execute('PREFIX : <http://example/> INSERT DATA { :a :p :b . :b :p :c }', function(err, result){
                     expect(err).toBeNull();
@@ -2699,7 +2698,7 @@ describe("QueryEngine", function(){
             [prefixes + 'DELETE WHERE { { :s0 :p ?o } }', null],
             [prefixes + 'ASK { :s0 :p ?o }', null, false],
             [prefixes + 'ASK { :n :p ?o }', null, false],
-            [prefixes + 'SELECT * { ?s :p* ?o FILTER(true) }', "NonSupportedSparqlFeatureError"]];
+            [prefixes + 'SELECT * { ?s :p{2} ?o FILTER(true) }', "NonSupportedSparqlFeatureError"]];
         new Lexicon(function(lexicon){
             new QuadBackend({treeOrder: 2}, function(backend){
                 var engine = new QueryEngine({backend: backend, lexicon: lexicon});
