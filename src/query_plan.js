@@ -445,8 +445,8 @@ QueryPlanDPSize.executeBGPDatasets = function(bgp, dataset, queryEngine, queryEn
                     k();
                 }
             }, function(){
-                var acumBindings = QueryPlanDPSize.unionManyBindings(acum);
-                callback(acumBindings);
+                // the default graph is the RDF merge of these graphs: a triple in several of them counts once
+                callback(acum.length > 1 ? QueryPlanDPSize.distinctUnionBindings(acum) : QueryPlanDPSize.unionManyBindings(acum));
             });
     } else if(bgp.graph.token === 'var') {
         // union through all named datasets
@@ -807,6 +807,28 @@ QueryPlanDPSize.unionManyBindings = function(bindingLists) {
         acum = QueryPlanDPSize.unionBindings(acum, bindings);
     }
 
+    return acum;
+};
+
+/**
+ * The bindings of one triple pattern over several graphs without duplicates. The pattern's constants and the
+ * values of its variables (OIDs) fix the matched triple, so equal bindings mean the same triple.
+ */
+QueryPlanDPSize.distinctUnionBindings = function(bindingLists) {
+    var seen = new Set();
+    var acum = [];
+    for(var i=0; i<bindingLists.length; i++) {
+        for(var j=0; j<bindingLists[i].length; j++) {
+            var bindings = bindingLists[i][j];
+            var key = Object.keys(bindings).sort().map(function(name) {
+                return name + "=" + bindings[name];
+            }).join(" ");
+            if(!seen.has(key)) {
+                seen.add(key);
+                acum.push(bindings);
+            }
+        }
+    }
     return acum;
 };
 
