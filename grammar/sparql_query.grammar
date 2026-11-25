@@ -1637,13 +1637,13 @@ Path "[77] Path"
  [78]	PathAlternative	  ::=	PathSequence ( '|' PathSequence )*
  */
 PathAlternative "[78] PathAlternative"
-    = first:PathSequence rest:( '|' PathSequence)* {
+    = first:PathSequence rest:( WS* '|' WS* PathSequence)* {
     if(rest == null || rest.length === 0) {
 	return first;
     } else {
 	var acum = [first];
 	for(var i=0; i<rest.length; i++)
-	    acum.push(rest[i][1]);
+	    acum.push(rest[i][3]);
 
 	var path = {};
 	path.token = 'path';
@@ -1658,14 +1658,14 @@ PathAlternative "[78] PathAlternative"
  [79]	PathSequence	  ::=	PathEltOrInverse ( '/' PathEltOrInverse )*
  */
 PathSequence "[79] PathSequence"
-    = first:PathEltOrInverse rest:( '/' PathEltOrInverse)* {
+    = first:PathEltOrInverse rest:( WS* '/' WS* PathEltOrInverse)* {
     if(rest == null || rest.length === 0) {
 	return first;
     } else {
 	var acum = [first];
 
 	for(var i=0; i<rest.length; i++)
-	    acum.push(rest[i][1]);
+	    acum.push(rest[i][3]);
 
 	var path = {};
 	path.token = 'path';
@@ -1703,7 +1703,7 @@ PathElt "[88] PathElt"
 
 PathEltOrInverse "[81] PathEltOrInverse"
     = PathElt
-/ '^' elt:PathElt {
+/ '^' WS* elt:PathElt {
     var path = {};
     path.token = 'path';
     path.kind = 'inversePath';
@@ -1729,7 +1729,7 @@ PathPrimary "[83] PathPrimary"
 / '!' s:PathNegatedPropertySet {
     return {token: 'path', kind: 'negatedPropertySet', value: s};
 }
-/ '(' p:Path ')' {
+/ '(' WS* p:Path WS* ')' {
     return p;
 }
 
