@@ -1708,9 +1708,11 @@ return {token:'triplestemplate',
     path.value = p;
     path.modifier = mod;
     return path;
-} else {
-    p.modifier = mod;
+} else if(mod == null) {
     return p;
+} else {
+    // a modifier on a group wraps it, so a modifier inside the group stays: (:p+)*
+    return {token: 'path', kind: 'element', value: p, modifier: mod};
 }
   }
   function peg$f86(elt) {

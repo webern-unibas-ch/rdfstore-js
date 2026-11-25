@@ -144,18 +144,22 @@ var graphNodes = function(ctx, callback) {
     });
 };
 
-// the zero-length pairs: the bound end of the path (also if it is not in the graph), else every node of the graph
+// the zero-length pairs: the start (or end) nodes of the path (a constant also if it is not in the graph), else
+// every node of the graph. Inside |, / or a modifier the ends are not known, so the constant ends of the whole path
+// are added: they need not be in the graph either (<x> (:p?|:q) ?y gives ?y = <x>), and pair only with themselves.
 var zeroLength = function(ctx, ends, callback) {
-    var node = ends.start !== undefined ? ends.start : ends.end;
-    if(node !== undefined) {
-        callback(null, new Map(ctx.keys.map(function(key) { return [key, [[node, node]]]; })));
+    var nodes = ends.starts || ends.ends;
+    if(nodes !== undefined) {
+        callback(null, new Map(ctx.keys.map(function(key) {
+            return [key, nodes.map(function(n) { return [n, n]; })];
+        })));
     } else {
         graphNodes(ctx, function(err, nodes) {
             if(err != null) {
                 return callback(err);
             }
             callback(null, mapRelation(nodes, function(list) {
-                return list.map(function(n) { return [n, n]; });
+                return distinctPairs(list.concat(ctx.boundNodes).map(function(n) { return [n, n]; }));
             }));
         });
     }
@@ -182,9 +186,9 @@ var reachable = function(adjacency, start) {
     return visited;
 };
 
-// the transitive closure of a relation (path+), distinct pairs; only from the bound start or to the bound end
+// the transitive closure of a relation (path+), distinct pairs; only from the start nodes or to the end nodes
 var closure = function(pairs, ends) {
-    var backwards = ends.start === undefined && ends.end !== undefined;
+    var backwards = ends.starts === undefined && ends.ends !== undefined;
     var adjacency = new Map();
     for(var i=0; i<pairs.length; i++) {
         var from = backwards ? pairs[i][1] : pairs[i][0];
@@ -194,14 +198,7 @@ var closure = function(pairs, ends) {
         }
         adjacency.get(from).push(to);
     }
-    var starts;
-    if(ends.start !== undefined) {
-        starts = [ends.start];
-    } else if(backwards) {
-        starts = [ends.end];
-    } else {
-        starts = Array.from(adjacency.keys());
-    }
+    var starts = ends.starts || ends.ends || Array.from(adjacency.keys());
     var acum = [];
     for(var j=0; j<starts.length; j++) {
         reachable(adjacency, starts[j]).forEach(function(node) {
@@ -234,31 +231,56 @@ var compose = function(left, right) {
 };
 
 /**
- * Evaluates a path to a relation (Map graph -> pairs). ends holds the bound start and end of the whole path
- * (undefined if not bound); inner paths get {} and are evaluated over the whole graph.
+ * Evaluates a path to a relation (Map graph -> pairs). ends holds the nodes the whole path starts (starts) or ends
+ * (ends) at, undefined if any; inner paths get {} and are evaluated over the whole graph.
  */
 var evaluate = function(ctx, path, ends, callback) {
     if(path.type === 'link') {
         matchTriple(ctx, path.iri, callback);
     } else if(path.type === 'inverse') {
-        evaluate(ctx, path.path, {start: ends.end, end: ends.start}, function(err, relation) {
+        evaluate(ctx, path.path, {starts: ends.ends, ends: ends.starts}, function(err, relation) {
             callback(err, err != null ? null : mapRelation(relation, function(pairs) {
                 return pairs.map(function(pair) { return [pair[1], pair[0]]; });
             }));
         });
-    } else if(path.type === 'seq' || path.type === 'alt') {
-        var result = null;
+    } else if(path.type === 'alt') {
+        var union = null;
         async.eachSeries(path.paths, function(part, k) {
-            evaluate(ctx, part, {}, function(err, relation) {
+            evaluate(ctx, part, ends, function(err, relation) {
+                if(err == null) {
+                    union = union == null ? relation : mapRelation(union, function(pairs, graph) {
+                        return pairs.concat(relation.get(graph));
+                    });
+                }
+                k(err);
+            });
+        }, function(err) {
+            callback(err, err != null ? null : union);
+        });
+    } else if(path.type === 'seq') {
+        // step by step from the start nodes, or backwards from the end nodes: each part starts (ends) only at the
+        // nodes the parts before reached
+        var backwards = ends.starts === undefined && ends.ends !== undefined;
+        var parts = backwards ? path.paths.slice().reverse() : path.paths;
+        var result = null;
+        var reached = backwards ? ends.ends : ends.starts;
+        async.eachSeries(parts, function(part, k) {
+            evaluate(ctx, part, backwards ? {ends: reached} : {starts: reached}, function(err, relation) {
                 if(err != null) {
                     return k(err);
                 }
-                if(result == null) {
-                    result = relation;
-                } else {
-                    result = mapRelation(result, function(pairs, graph) {
-                        return path.type === 'seq' ? compose(pairs, relation.get(graph)) : pairs.concat(relation.get(graph));
+                result = result == null ? relation : mapRelation(result, function(pairs, graph) {
+                    return backwards ? compose(relation.get(graph), pairs) : compose(pairs, relation.get(graph));
+                });
+                if(reached !== undefined) {
+                    var nodes = new Map();
+                    result.forEach(function(pairs) {
+                        pairs.forEach(function(pair) {
+                            var node = backwards ? pair[0] : pair[1];
+                            nodes.set(nodeKey(node), node);
+                        });
                     });
+                    reached = Array.from(nodes.values());
                 }
                 k();
             });
@@ -266,7 +288,8 @@ var evaluate = function(ctx, path, ends, callback) {
             callback(err, err != null ? null : result);
         });
     } else if(path.type === 'oneOrMore' || path.type === 'zeroOrMore' || path.type === 'zeroOrOne') {
-        evaluate(ctx, path.path, {}, function(err, relation) {
+        // a closure needs the whole relation of its inner path
+        evaluate(ctx, path.path, path.type === 'zeroOrOne' ? ends : {}, function(err, relation) {
             if(err != null) {
                 return callback(err);
             }
@@ -295,9 +318,10 @@ var sameNode = function(a, b) {
 };
 
 /**
- * The solutions of a PATH node: bindings of its variables (and of the graph variable under GRAPH ?g)
+ * The solutions of a PATH node: bindings of its variables (and of the graph variable under GRAPH ?g). candidates
+ * may restrict a variable start or end to nodes, the values a join will keep: {starts: [...], ends: [...]}.
  */
-PropertyPaths.execute = function(engine, dataset, pattern, env, callback) {
+PropertyPaths.execute = function(engine, dataset, pattern, env, candidates, callback) {
     var ctx = {engine: engine, dataset: dataset, env: env, graph: pattern.graph};
     resolveEndpoint(ctx, pattern.subject, function(subject) {
         resolveEndpoint(ctx, pattern.object, function(object) {
@@ -306,7 +330,11 @@ PropertyPaths.execute = function(engine, dataset, pattern, env, callback) {
                 if(keys.length === 0) {
                     return callback(null, []);
                 }
-                var ends = {start: subject.node, end: object.node};
+                var ends = {
+                    starts: subject.node !== undefined ? [subject.node] : candidates.starts,
+                    ends: object.node !== undefined ? [object.node] : candidates.ends
+                };
+                ctx.boundNodes = [subject.node, object.node].filter(function(node) { return node !== undefined; });
                 evaluate(ctx, pattern.path, ends, function(err, relation) {
                     if(err != null) {
                         return callback(err);

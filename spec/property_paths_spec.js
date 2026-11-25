@@ -93,6 +93,13 @@ describe("Property paths", function () {
             expect(await select(store, "SELECT * { :x1 (:p/:p)+ ?b }")).toEqual(["b=x3", "b=x5"]);
             expect(await select(store, "SELECT * { :x3 (:p|^:p)+ ?b }")).toEqual(["b=x1", "b=x2", "b=x3", "b=x4", "b=x5"]);
         });
+
+        it("keeps a modifier inside brackets", async function () {
+            var store = await storeWith(chain + ":x4 :q :end .");
+            expect(await select(store, "SELECT * { :x2 (:p+) ?b }")).toEqual(["b=x3", "b=x4"]);
+            expect(await select(store, "SELECT * { :x2 (:p*)+ ?b }")).toEqual(["b=x2", "b=x3", "b=x4"]);
+            expect(await select(store, "SELECT * { :x2 (:p+)/:q ?b }")).toEqual(["b=end"]);
+        });
     });
 
     describe("zero or more (*) and zero or one (?)", function () {
@@ -120,6 +127,11 @@ describe("Property paths", function () {
             expect(results[0].b.token).toBe("uri");
             expect(await select(store, "SELECT * { :nowhere :p+ ?b }")).toEqual([]);
             expect(await select(store, "SELECT * { \"x\" :p* ?b }")).toEqual(["b=x"]);
+            // also through a zero-length step inside |, / or a modifier
+            expect(await select(store, "SELECT * { :nowhere (:p?|:q) ?b }")).toEqual(["b=nowhere"]);
+            expect(await select(store, "SELECT * { :nowhere :p?/:q* ?b }")).toEqual(["b=nowhere"]);
+            expect(await select(store, "SELECT * { ?a (:p?|:q) :nowhere }")).toEqual(["a=nowhere"]);
+            expect(await select(store, "SELECT * { :nowhere (:p?)+ ?b }")).toEqual(["b=nowhere"]);
         });
     });
 
@@ -224,16 +236,31 @@ describe("Property paths", function () {
             expect(await select(store, "SELECT * { GRAPH :g2 { ?a :p* :x3 } }")).toEqual(["a=x2", "a=x3"]);
             expect(await select(store, "SELECT * { GRAPH :g3 { :x1 :p* ?y } }")).toEqual([]);
         });
+
+        it("joins a path with the triple patterns of the same graph only", async function () {
+            var store = await namedChain();
+            await load(store, ":s :q :x1 .", "http://example/g1");
+            var named = "FROM NAMED :g1 FROM NAMED :g2 ";
+            expect(await select(store, "SELECT * " + named + "{ GRAPH ?g { ?s :q ?m . ?m :p* ?o } }")).toEqual(
+                ["g=g1 m=x1 o=x1 s=s", "g=g1 m=x1 o=x2 s=s"]);
+        });
     });
 
-    it("handles long chains without a stack overflow", async function () {
-        var triples = [];
+    it("handles long chains without a stack overflow, also joined with other patterns", async function () {
+        var triples = [":start :q :n0 .", ":i a :n0 ."];
         for (var i = 0; i < 20000; i++) {
             triples.push(":n" + i + " :p :n" + (i + 1) + " .");
         }
         var store = await storeWith(triples.join("\n"));
-        var counted = await store.promises.execute(prefixes + "SELECT (COUNT(?b) AS ?n) { :n0 :p+ ?b }");
-        expect(counted[0].n.value).toBe("20000");
+        var count = async function (query) {
+            var counted = await store.promises.execute(prefixes + "SELECT (COUNT(*) AS ?n) { " + query + " }");
+            return counted[0].n.value;
+        };
+        expect(await count(":n0 :p+ ?b")).toBe("20000");
         expect(await ask(store, "ASK { :n20000 ^:p+ :n0 }")).toBe(true);
+        // the path starts only at the values the triple pattern binds (else quadratic in the chain length)
+        expect(await count(":start :q ?s . ?s :p+ ?o")).toBe("20000");
+        expect(await count("?o ^:p+ ?s . ?s ^:q :start")).toBe("20000");
+        expect(await count(":i a/:p* ?o")).toBe("20001");
     }, 60000);
 });

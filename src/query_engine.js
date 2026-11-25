@@ -1230,13 +1230,9 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
             });
         }
     } else if(pattern.kind === "PATH") {
-        PropertyPaths.execute(this, dataset, pattern, env, callback);
+        PropertyPaths.execute(this, dataset, pattern, env, {}, callback);
     } else if(pattern.kind === "BGP_SCOPE") {
-        // a basic graph pattern split around property paths: its blank nodes and internal variables join its
-        // parts, and are dropped here
-        this.executeSelectUnit(projection, dataset, pattern.value, env, function (err, results) {
-            callback(err, err != null || results == null ? results : withoutInternalVariables(results));
-        });
+        this.executeBGPScope(projection, dataset, pattern.value, env, callback);
     } else {
         callback(new NonSupportedSparqlFeatureError(pattern.kind));
     }
@@ -1297,6 +1293,58 @@ var withoutInternalVariables = function(results) {
             }
         }
         return solution;
+    });
+};
+
+// the distinct values of a variable in the solutions, or undefined if it is not a variable or unbound in some
+var boundValues = function(term, solutions) {
+    var name = term.token === 'var' ? term.value : (term.token === 'blank' && term.oid == null ? "blank:" + term.value : null);
+    if(name == null) {
+        return undefined;
+    }
+    var values = new Map();
+    for(var i=0; i<solutions.length; i++) {
+        var value = solutions[i][name];
+        if(value == null) {
+            return undefined;
+        }
+        values.set(typeof(value) === 'number' ? value : JSON.stringify(value), value);
+    }
+    return Array.from(values.values());
+};
+
+/**
+ * A basic graph pattern split around property paths (see AbstractQueryTree.translatePathExpressionsInBGP): the
+ * parts are joined in order, and a path starts (or ends) only at the values the solutions so far bind its
+ * variable to, instead of at every node. Its blank nodes and internal variables join the parts, and are dropped
+ * at the end.
+ */
+QueryEngine.prototype.executeBGPScope = function(projection, dataset, parts, env, callback) {
+    var that = this;
+    var solutions = null;
+    async.eachSeries(parts, function(part, k) {
+        if(solutions != null && solutions.length === 0) {
+            return k();
+        }
+        var join = function(err, results) {
+            if(err == null) {
+                solutions = solutions == null ? results : QueryPlan.joinBindings(solutions, results);
+            }
+            k(err);
+        };
+        if(part.kind === 'PATH') {
+            var candidates = solutions == null ? {} :
+                {starts: boundValues(part.subject, solutions), ends: boundValues(part.object, solutions)};
+            PropertyPaths.execute(that, dataset, part, env, candidates, join);
+        } else {
+            that.executeSelectUnit(projection, dataset, part, env, join);
+        }
+    }, function(err) {
+        if(err != null) {
+            callback(err);
+        } else {
+            callback(null, withoutInternalVariables(solutions));
+        }
     });
 };
 

@@ -162,8 +162,8 @@ AbstractQueryTree.prototype.build = function(node, env, graph) {
  * Translates the property paths of a basic graph pattern. A path of IRIs, sequences and inverses (`:p/^:q`)
  * becomes triple patterns joined by internal variables (fresh:), which the planner joins like the others. Any
  * other path (with *, +, ?, |) becomes a PATH node, evaluated by PropertyPaths. A basic graph pattern with
- * PATH nodes becomes a BGP_SCOPE around the join of its parts: blank nodes and internal variables are scoped to
- * the whole basic graph pattern, so they are dropped only there (QueryEngine.executeSelectUnit).
+ * PATH nodes becomes a BGP_SCOPE with its parts, the triple patterns first: they are joined in order (see
+ * QueryEngine.executeBGPScope), and its blank nodes and internal variables are dropped only after the join.
  */
 AbstractQueryTree.translatePathExpressionsInBGP = function(bgp, env) {
     var triples = [];
@@ -190,11 +190,8 @@ AbstractQueryTree.translatePathExpressionsInBGP = function(bgp, env) {
         bgp.value = triples;
         return bgp;
     }
-    var joined = triples.length > 0 ? {kind: 'BGP', value: triples, scoped: true} : paths.shift();
-    for(var j=0; j<paths.length; j++) {
-        joined = {kind: 'JOIN', lvalue: joined, rvalue: paths[j]};
-    }
-    return {kind: 'BGP_SCOPE', value: joined};
+    var parts = triples.length > 0 ? [{kind: 'BGP', value: triples, scoped: true}].concat(paths) : paths;
+    return {kind: 'BGP_SCOPE', value: parts};
 };
 
 /**
@@ -387,7 +384,7 @@ AbstractQueryTree.inScopeVariables = function(aqt, acum) {
             }
         });
     } else if(aqt.kind === 'BGP_SCOPE') {
-        AbstractQueryTree.inScopeVariables(aqt.value, acum);
+        aqt.value.forEach(function(part) { AbstractQueryTree.inScopeVariables(part, acum); });
     } else if(aqt.kind === 'UNION') {
         AbstractQueryTree.inScopeVariables(aqt.value[0], acum);
         AbstractQueryTree.inScopeVariables(aqt.value[1], acum);
@@ -433,7 +430,9 @@ AbstractQueryTree.prototype.collectBasicTriples = function(aqt, acum) {
             acum.push(triple);
         }
     } else if(aqt.kind === 'BGP_SCOPE') {
-        acum = this.collectBasicTriples(aqt.value, acum);
+        for(var j=0; j<aqt.value.length; j++) {
+            acum = this.collectBasicTriples(aqt.value[j], acum);
+        }
     } else if(aqt.kind === 'UNION') {
         acum = this.collectBasicTriples(aqt.value[0],acum);
         acum = this.collectBasicTriples(aqt.value[1],acum);
@@ -485,7 +484,8 @@ AbstractQueryTree.prototype.bind = function(aqt, bindings) {
             aqt.object = bindings[aqt.object.value];
         }
     } else if(aqt.kind === 'BGP_SCOPE') {
-        aqt.value = this.bind(aqt.value, bindings);
+        var that = this;
+        aqt.value = aqt.value.map(function(part) { return that.bind(part, bindings); });
     } else if(aqt.kind === 'UNION') {
         aqt.value[0] = this.bind(aqt.value[0],bindings);
         aqt.value[1] = this.bind(aqt.value[1],bindings);
@@ -612,7 +612,8 @@ AbstractQueryTree.prototype.replace = function(aqt, from, to, ns) {
         aqt.subject = endpoints.subject;
         aqt.object = endpoints.object;
     } else if(aqt.kind === 'BGP_SCOPE') {
-        aqt.value = this.replace(aqt.value, from, to, ns);
+        var that = this;
+        aqt.value = aqt.value.map(function(part) { return that.replace(part, from, to, ns); });
     } else if(aqt.kind === 'UNION') {
         aqt.value[0] = this.replace(aqt.value[0],from,to, ns);
         aqt.value[1] = this.replace(aqt.value[1],from,to, ns);
