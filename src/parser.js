@@ -578,19 +578,9 @@ function peg$parse(input, options) {
     }
   }
   function peg$f1(decls) {
-    // the last BASE applies
-    var b = null;
-    var pfx = [];
-    for(var i=0; i<decls.length; i++) {
-	if(decls[i].token === 'base') {
-	    b = decls[i];
-	} else {
-	    pfx.push(decls[i]);
-	}
-    }
+    // in order: each BASE and PREFIX IRI resolves against the BASE before it (QueryEngine.registerNsInEnvironment)
     return { token: 'prologue',
-	base: b,
-	prefixes: pfx }
+	declarations: decls }
   }
   function peg$f2(i) {
     registerDefaultPrefix(i);

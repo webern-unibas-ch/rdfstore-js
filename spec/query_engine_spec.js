@@ -3038,7 +3038,7 @@ describe("QueryEngine", function(){
     });
 
     it("Test PrologueOrder", function(done) {
-        // BASE and PREFIX in any order (checkQueries puts PREFIX declarations first); the last BASE applies
+        // BASE and PREFIX in any order (checkQueries puts PREFIX declarations first); the IRIs after the last BASE resolve against it
         checkQueries(':a :p 1', [
             ['BASE <http://example/> SELECT ?o { <a> :p ?o }', ["o"], ["o=1^^integer"]],
             ['BASE <http://other/> PREFIX q: <http://example/> BASE <http://example/> SELECT ?o { <a> q:p ?o }', ["o"], ["o=1^^integer"]]

@@ -193,8 +193,7 @@ describe("Property paths", function () {
         it("notifies observers of changes to the path's predicates", function (done) {
             storeWith(chain).then(function (store) {
                 var calls = [];
-                // full IRIs: an observed query's patterns are registered without its PREFIX declarations
-                store.startObservingQuery("SELECT ?b { <http://example/x1> <http://example/p>+ ?b }", function (results) {
+                store.startObservingQuery(prefixes + "SELECT ?b { :x1 :p+ ?b }", function (results) {
                     calls.push(rows(results));
                     if (calls.length === 1) {
                         // the first call has the current results; insert only after it, or the two calls may swap

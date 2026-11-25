@@ -173,3 +173,26 @@ describe("Events API deleted events", function() {
         });
     });
 });
+
+describe("Events API observed queries", function() {
+
+    it("notifies a query with PREFIX and BASE declarations", function(done) {
+        withStore(function(store) {
+            var query = "BASE <http://a/dir/> PREFIX ex: <http://example/> SELECT ?o { <s> ex:p ?o }";
+            var calls = [];
+            store.startObservingQuery(query, function(results) {
+                calls.push(results.map(function(solution) { return solution.o.value; }));
+                if(calls.length === 1) {
+                    // insert only after the first call, or the two calls may swap
+                    expect(calls[0]).toEqual([]);
+                    store.execute("INSERT DATA { <http://a/dir/s> <http://example/p> <http://o1> }", function(err) {
+                        expect(err).toBe(null);
+                    });
+                } else {
+                    expect(calls[1]).toEqual(["http://o1"]);
+                    done();
+                }
+            });
+        });
+    });
+});

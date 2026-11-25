@@ -38,30 +38,25 @@ QueryEngine.prototype.setCustomFunctions = function(customFns) {
 
 // Utils
 QueryEngine.prototype.registerNsInEnvironment = function(prologue, env) {
-    var prefixes = [];
-    if(prologue != null && prologue.prefixes != null) {
-        prefixes =prologue.prefixes;
-    }
-    var toSave = {};
-
-    // adding default prefixes;
+    var namespaces = {};
     for(var p in this.defaultPrefixes) {
-        toSave[p] = this.defaultPrefixes[p];
+        namespaces[p] = this.defaultPrefixes[p];
     }
 
-    for(var i=0; i<prefixes.length; i++) {
-        var prefix = prefixes[i];
-        if(prefix.token === "prefix") {
-            toSave[prefix.prefix] = prefix.local;
+    // in order: a BASE resolves against the BASE before it, a PREFIX IRI against the BASE in effect there
+    var base = null;
+    var declarations = prologue != null && prologue.declarations != null ? prologue.declarations : [];
+    for(var i=0; i<declarations.length; i++) {
+        var declaration = declarations[i];
+        if(declaration.token === "base") {
+            base = Utils.resolveIri(base, declaration.value);
+        } else if(declaration.token === "prefix") {
+            namespaces[declaration.prefix] = Utils.resolveIri(base, declaration.local);
         }
     }
 
-    env.namespaces = toSave;
-    if(prologue!=null && prologue.base && typeof(prologue.base) === 'object') {
-        env.base = prologue.base.value;
-    } else {
-        env.base = null;
-    }
+    env.namespaces = namespaces;
+    env.base = base;
 };
 
 QueryEngine.prototype.applyModifier = function(modifier, projectedBindings) {

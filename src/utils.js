@@ -85,16 +85,75 @@ var lexicalFormBaseUri = function(term, env) {
         uri = term.value;
     }
 
-    if(uri===null) {
-        return null;
-    } else {
-        // Should we apply the base URI namespace?
-        if(uri.indexOf(":") == -1) {
-            uri = (env.base||"") + uri; // applyBaseUri
+    return uri === null ? null : resolveIri(env.base, uri);
+};
+
+var SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+
+// RFC 3986 appendix B
+var parseReference = function(iri) {
+    var m = /^(([^:/?#]+):)?(\/\/([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?$/.exec(iri);
+    return {scheme: m[2], authority: m[4], path: m[5], query: m[7], fragment: m[9]};
+};
+
+// RFC 3986 5.2.4
+var removeDotSegments = function(input) {
+    var output = "";
+    while(input.length > 0) {
+        if(input.indexOf("../") === 0) {
+            input = input.slice(3);
+        } else if(input.indexOf("./") === 0 || input.indexOf("/./") === 0) {
+            input = input.slice(2);
+        } else if(input === "/.") {
+            input = "/";
+        } else if(input.indexOf("/../") === 0 || input === "/..") {
+            input = "/" + input.slice(4);
+            output = output.slice(0, Math.max(output.lastIndexOf("/"), 0));
+        } else if(input === "." || input === "..") {
+            input = "";
+        } else {
+            var next = input.indexOf("/", 1);
+            if(next === -1) {
+                next = input.length;
+            }
+            output += input.slice(0, next);
+            input = input.slice(next);
         }
     }
+    return output;
+};
 
-    return uri;
+/**
+ * Resolves an IRI reference against a base IRI (RFC 3986 section 5.2). Works on the strings, without the
+ * normalization of WHATWG URL (case, percent-encoding), so IRIs stay as written. An IRI with a scheme is
+ * returned unchanged, like N3.js does when loading data, and so is any IRI without a base. A base that has no
+ * scheme itself is prepended.
+ */
+var resolveIri = function(base, iri) {
+    if(SCHEME.test(iri) || base == null || base === "") {
+        return iri;
+    } else if(!SCHEME.test(base)) {
+        return base + iri;
+    }
+    var b = parseReference(base);
+    var r = parseReference(iri);
+    var authority = b.authority;
+    var path, query = r.query;
+    if(r.authority !== undefined) {
+        authority = r.authority;
+        path = removeDotSegments(r.path);
+    } else if(r.path === "") {
+        path = b.path;
+        query = r.query !== undefined ? r.query : b.query;
+    } else if(r.path[0] === "/") {
+        path = removeDotSegments(r.path);
+    } else if(b.authority !== undefined && b.path === "") {
+        path = removeDotSegments("/" + r.path);
+    } else {
+        path = removeDotSegments(b.path.slice(0, b.path.lastIndexOf("/") + 1) + r.path);
+    }
+    return b.scheme + ":" + (authority !== undefined ? "//" + authority : "") + path +
+        (query !== undefined ? "?" + query : "") + (r.fragment !== undefined ? "#" + r.fragment : "");
 };
 
 
@@ -487,6 +546,7 @@ module.exports = {
     isWorker: isWorker,
     nextTick: nextTick,
     lexicalFormBaseUri: lexicalFormBaseUri,
+    resolveIri: resolveIri,
     parseISO8601: parseISO8601,
     iso8601: iso8601,
     normalizeUnicodeLiterals: normalizeUnicodeLiterals,

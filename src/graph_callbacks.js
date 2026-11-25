@@ -382,7 +382,8 @@ Callbacks.CallbacksBackend.prototype.observeQuery = function(query, callback, en
     var patterns = this.aqt.collectBasicTriples(parsedTree);
     var that = this;
     var queryEnv = {blanks:{}, outCache:{}};
-    this.engine.registerNsInEnvironment(null, queryEnv);
+    // the query's PREFIX and BASE, so that its patterns are registered under the IRIs that change
+    this.engine.registerNsInEnvironment(queryParsed.prologue, queryEnv);
     var counter = this.queryCounter;
     this.queryCounter++;
     this.queriesMap[counter] = query;
