@@ -26,6 +26,8 @@ var createStorePromises = require("./store_promises").createStorePromises;
  *  <li> name: when using persistence, the name for this store. In the MongoDB backed version, name of the DB used by the store. By default <code>'rdfstore_js'</code> is used</li>
  *  <li> overwrite: clears the persistent storage </li>
  *  <li> maxCacheSize: if using persistence, maximum size of the index cache </li>
+ *  <li> unionDefaultGraph: if true, a query that names no dataset reads the merge of all graphs as its default graph,
+ *       and GRAPH ?g ranges over all named graphs. Updates are not affected.</li>
  * </ul>
  */
 var Store = function(arg1, arg2) {

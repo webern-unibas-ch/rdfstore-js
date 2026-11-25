@@ -28,6 +28,7 @@ Please read this README file carefully to find the current set of features.
 - [API](#api)
 	- [Store creation](#store-creation)
 	- [Query execution](#query-execution)
+	- [Union default graph](#union-default-graph)
 	- [Error handling](#error-handling)
 	- [Promise API](#promise-api)
 	- [Construct queries RDF Interfaces API](#construct-queries-rdf-interfaces-api)
@@ -261,6 +262,30 @@ store.executeWithEnvironment("SELECT * { ?s ?p ?o }",defaultGraph,
   }
 });
 ```
+
+Several default graphs (several `FROM`, or the default graphs passed to `execute`) are merged: a triple in more than one of them comes back once. *Since v0.9.18-alpha.25; before, once per graph.*
+
+### Union default graph
+
+*Since v0.9.18-alpha.25.*
+
+With the option `unionDefaultGraph`, a query that names no dataset (no `FROM` or `FROM NAMED`, no graphs passed to `execute`) reads all graphs of the store. Data can be loaded into named graphs and still be queried without `GRAPH`:
+
+```javascript
+rdfstore.create({unionDefaultGraph: true}, function(err, store) {
+  store.load("text/turtle", curated, "http://example.org/curated", function() {
+    store.load("text/turtle", generated, "http://example.org/generated", function() {
+      // sees the triples of both graphs and of the default graph
+      store.execute("SELECT * { ?s ?p ?o }", function(err, results) { /* ... */ });
+    });
+  });
+});
+```
+
+- The default graph of such a query is the merge of the default graph and all named graphs; a triple in several graphs comes back once. Blank nodes are shared between the graphs of a store, so the same blank node in two graphs is one node.
+- `GRAPH ?g` ranges over all named graphs, without `FROM NAMED`. It does not bind the default graph.
+- A query that names a dataset reads exactly that dataset, as without the option.
+- The option changes queries only. Updates (`INSERT DATA`, `DELETE WHERE`, `INSERT`/`DELETE … WHERE`, `CLEAR DEFAULT`), `store.insert`, `store.delete`, `store.load`, `store.graph()` and `store.node()` without a graph use the store's own default graph, as before. So `SELECT * { ?s ?p ?o }` finds the triples of the named graphs, but `DELETE WHERE { ?s ?p ?o }` does not delete them: use `GRAPH <g>` or `DROP GRAPH <g>`.
 
 ### Error handling
 

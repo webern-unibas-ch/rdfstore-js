@@ -26,6 +26,8 @@ var QueryEngine = function(params) {
         this.rdfLoader = new RDFLoader(params['communication']);
         this.callbacksBackend = new Callbacks(this);
         this.customFns = params.customFns || {};
+        // queries without a dataset read all graphs (store option unionDefaultGraph)
+        this.unionDefaultGraph = params.unionDefaultGraph === true;
         // labels of the blank nodes BNODE() creates, unique for the engine; per solution, BNODE(str) -> label
         this.bnodeCounter = 0;
         this.bnodeLabels = new WeakMap();
@@ -252,41 +254,6 @@ QueryEngine.prototype.compareFilteredBindings = function(a, b, order, env) {
         }
     }
 };
-
-QueryEngine.prototype.removeDefaultGraphBindings = function(bindingsList, dataset) {
-    var onlyDefaultDatasets = [];
-    var namedDatasetsMap = {};
-    for(var i=0; i<dataset.named.length; i++) {
-        namedDatasetsMap[dataset.named[i].oid] = true;
-    }
-    for(i=0; i<dataset.implicit.length; i++) {
-        if(namedDatasetsMap[dataset.implicit[i].oid] == null) {
-            onlyDefaultDatasets.push(dataset.implicit[i].oid);
-        }
-    }
-    var acum = [];
-    for(i=0; i<bindingsList.length; i++) {
-        var bindings = bindingsList[i];
-        var foundDefaultGraph = false;
-        for(var p in bindings) {
-            for(var j=0; j<namedDatasetsMap.length; j++) {
-                if(bindings[p] === namedDatasetsMap[j]) {
-                    foundDefaultGraph = true;
-                    break;
-                }
-            }
-            if(foundDefaultGraph) {
-                break;
-            }
-        }
-        if(!foundDefaultGraph) {
-            acum.push(bindings);
-        }
-    }
-
-    return acum;
-};
-
 
 // true if an aggregate (COUNT, SUM, ...) occurs anywhere in the expression tree
 QueryEngine.containsAggregate = function(expression) {
@@ -566,7 +533,7 @@ QueryEngine.prototype.isDatasetGraph = function(graph, dataset, env, callback) {
     this.normalizeTerm(graph, env, false, function(oid){
         if(oid == null || oid === -1) {
             callback(false);
-        } else if(dataset.named != null && dataset.named.length > 0) {
+        } else if(dataset.named != null && dataset.named.length > 0 && dataset.union !== true) {
             callback(dataset.named.some(function(named) { return named.oid === oid; }));
         } else if(dataset.registeredGraphs != null) {
             callback(dataset.registeredGraphs.indexOf(oid) !== -1);
@@ -929,13 +896,29 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
             dataset.named   = namedDataset || [];
         }
 
-        if(dataset.implicit != null && dataset.implicit.length === 0 && dataset.named !=null && dataset.named.length === 0) {
-            // We add the default graph to the default merged graph
-            dataset.implicit.push(this.lexicon.defaultGraphUriTerm);
-        }
+        var completeDataset = function(next) {
+            if(dataset.implicit.length > 0 || dataset.named.length > 0) {
+                next();
+            } else if(that.unionDefaultGraph && unit.kind !== 'modify') {
+                // a query (not an update) without a dataset: the default graph is the merge of all graphs, and the
+                // named graphs are all graphs of the store. As without FROM NAMED, GRAPH <iri> stays unrestricted
+                // (store.graph() reads the default graph by its IRI).
+                that.lexicon.registeredGraphs(true, function(uris) {
+                    var graphs = uris.map(function(uri) {
+                        return {token: 'uri', prefix: null, suffix: null, value: uri};
+                    });
+                    dataset.implicit = [that.lexicon.defaultGraphUriTerm].concat(graphs);
+                    dataset.named = graphs;
+                    dataset.union = true;
+                    next();
+                });
+            } else {
+                dataset.implicit.push(that.lexicon.defaultGraphUriTerm);
+                next();
+            }
+        };
 
-
-        that.normalizeDatasets(dataset.implicit.concat(dataset.named), env, function(){
+        completeDataset(function() { that.normalizeDatasets(dataset.implicit.concat(dataset.named), env, function(){
             that.executeSelectUnit(projection, dataset, unit.pattern, env, function (err, result) {
                 if (err != null) {
                     callback(err);
@@ -1002,9 +985,7 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
                                 var projectedBindings = that.projectBindings(projection, orderedBindings);
                                 var modifiedBindings = that.applyModifier(modifier, projectedBindings);
                                 var limitedBindings = that.applyLimitOffset(offset, limit, modifiedBindings);
-                                var filteredBindings = that.removeDefaultGraphBindings(limitedBindings, dataset);
-
-                                callback(null, filteredBindings);
+                                callback(null, limitedBindings);
                             });
                         });
                     }
@@ -1013,7 +994,7 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
                     callback(new Error("Error executing SELECT query."));
                 }
             });
-        });
+        }); });
     } else {
         callback(new Error("Cannot execute " + unit.kind + " query as a select query"));
     }

@@ -392,9 +392,13 @@ Callbacks.CallbacksBackend.prototype.observeQuery = function(query, callback, en
     this.queriesList.push(counter);
     this.queriesCallbacksMap[counter] = callback;
 
+    // a query without a dataset in a store with a union default graph: its patterns match in every graph
+    var dataset = parsedTree.dataset;
+    var union = this.engine.unionDefaultGraph && dataset.implicit.length === 0 && dataset.named.length === 0;
+
     async.eachSeries(patterns, function(quad, k) {
 	if(quad.graph == null) {
-	    quad.graph = that.engine.lexicon.defaultGraphUriTerm;
+	    quad.graph = union ? {token: 'var', value: 'graph:union'} : that.engine.lexicon.defaultGraphUriTerm;
 	}
 
 	that.engine.normalizeQuad(quad, queryEnv, true, function(normalized) {

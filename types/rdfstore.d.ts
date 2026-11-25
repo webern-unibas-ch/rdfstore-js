@@ -142,6 +142,8 @@ export interface StoreOptions {
     name?: string;
     /** Clear the persistent storage when the store is created. */
     overwrite?: boolean;
+    /** A query that names no dataset reads the merge of all graphs as its default graph. Updates are not affected. */
+    unionDefaultGraph?: boolean;
     [key: string]: any;
 }
 

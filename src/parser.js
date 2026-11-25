@@ -615,13 +615,6 @@ function peg$parse(input, options) {
     }
 
 
-    if(dataset['named'].length === 0 && dataset['implicit'].length === 0) {
-	dataset['implicit'].push({token:'uri',
-	    prefix:null,
-	    suffix:null,
-	    value:'https://github.com/antoniogarrote/rdfstore-js#default_graph'});
-    }
-
     var query = {};
     query.kind = 'select';
     query.token = 'executableunit';
@@ -706,13 +699,6 @@ function peg$parse(input, options) {
     }
 
 
-    if(dataset['named'].length === 0 && dataset['implicit'].length === 0) {
-	dataset['implicit'].push({token:'uri',
-	    prefix:null,
-	    suffix:null,
-	    value:'https://github.com/antoniogarrote/rdfstore-js#default_graph'});
-    }
-
     var query = {};
     query.kind = 'construct';
     query.token = 'executableunit'
@@ -750,13 +736,6 @@ function peg$parse(input, options) {
     }
 
 
-    if(dataset['named'].length === 0 && dataset['implicit'].length === 0) {
-	dataset['implicit'].push({token:'uri',
-	    prefix:null,
-	    suffix:null,
-	    value:'https://github.com/antoniogarrote/rdfstore-js#default_graph'});
-    }
-
     var query = {};
     query.kind = 'construct';
     query.token = 'executableunit'
@@ -788,20 +767,13 @@ function peg$parse(input, options) {
     var dataset = {'named':[], 'implicit':[]};
     for(var i=0; i<gs.length; i++) {
 	var g = gs[i];
-	if(g.kind === 'implicit') {
+	if(g.kind === 'default') {
 	    dataset['implicit'].push(g.graph);
 	} else {
 	    dataset['named'].push(g.graph)
 	}
     }
 
-
-    if(dataset['named'].length === 0 && dataset['implicit'].length === 0) {
-	dataset['implicit'].push({token:'uri',
-	    prefix:null,
-	    suffix:null,
-	    value:'https://github.com/antoniogarrote/rdfstore-js#default_graph'});
-    }
 
     var query = {};
     query.kind = 'ask';

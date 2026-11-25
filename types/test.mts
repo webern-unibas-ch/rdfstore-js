@@ -48,7 +48,7 @@ function useCallbacks(): void {
         });
         store.close();
     });
-    rdfstore.create({ treeOrder: 4 }, function(err, store) { if (!err) store.close(); });
+    rdfstore.create({ treeOrder: 4, unionDefaultGraph: true }, function(err, store) { if (!err) store.close(); });
     new rdfstore.Store(function(err, store) { if (!err) console.log(Store.VERSION, store.rdf.resolve('rdf:type')); });
 }
 

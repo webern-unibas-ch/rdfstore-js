@@ -498,7 +498,7 @@ QueryPlanDPSize.executeBGPDatasets = function(bgp, dataset, queryEngine, queryEn
                 }
             });
         };
-        if(dataset.named == null || dataset.named.length === 0) {
+        if(dataset.named == null || dataset.named.length === 0 || dataset.union === true) {
             match();
         } else {
             queryEngine.isDatasetGraph(bgp.graph, dataset, queryEnv, function(inDataset){
