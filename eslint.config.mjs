@@ -1,9 +1,9 @@
 import globals from 'globals';
 
-// Guards against undeclared names: ES module builds run in strict mode,
-// where an implicit global throws instead of silently landing on `window`.
-// And against redeclared names and `var`: block-scoped `let` keeps loop
-// variables and branch locals from leaking into the whole function.
+// no-undef: ES module builds run in strict mode, where an implicit global
+// throws instead of silently landing on `window`. no-redeclare, no-var and
+// prefer-const keep each name declared once, block-scoped, and const unless
+// it is reassigned.
 export default [
   {
     ignores: ['src/parser.js', 'src/perftest/']

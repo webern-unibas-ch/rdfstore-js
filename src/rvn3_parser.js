@@ -58,7 +58,7 @@ function convertEntity(entity) {
     // Handle modern N3.js object format
     if (entity && typeof entity === 'object' && entity.termType) {
         switch (entity.termType) {
-            case 'BlankNode':
+            case 'BlankNode': {
                 const blankId = entity.id;
                 if (!blankNodeMap[blankId]) {
                     // Check if this is a user-defined named blank node (not N3.js internal)
@@ -86,7 +86,8 @@ function convertEntity(entity) {
                     }
                 }
                 return { blank: blankNodeMap[blankId] };
-                
+            }
+
             case 'NamedNode':
                 return { token: 'uri', value: entity.id, prefix: null, suffix: null };
                 

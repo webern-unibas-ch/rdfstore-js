@@ -139,13 +139,13 @@ Callbacks.CallbacksBackend.prototype.dispatchNotifications = function(notificati
 	if(deleted!=null) {
 	    try {
 		callback(Callbacks['deleted'],deleted);
-	    }catch(e){ /* swallowed on purpose: a failing handler must not stop the other notifications */ }
+	    }catch(e){ /* swallowed on purpose: a throwing handler must not break event dispatch */ }
 	}
 	for(const event in notificationsMap[callbackId]) {
 	    if(event!=Callbacks['deleted']) {
 		try{
 		    callback(event, notificationsMap[callbackId][event]);
-		}catch(e){ /* swallowed on purpose: a failing handler must not stop the other notifications */ }
+		}catch(e){ /* swallowed on purpose: a throwing handler must not break event dispatch */ }
 
 	    }
 	}
@@ -323,7 +323,7 @@ Callbacks.CallbacksBackend.prototype.observeNode = function() {
 		    mustFlush = false;
 		    try {
 			callback(node);
-		    }catch(e){ /* swallowed on purpose: a failing handler must not stop the other notifications */ }
+		    }catch(e){ /* swallowed on purpose: a throwing handler must not break event dispatch */ }
 		} else if(event !== 'eventsFlushed') {
 		    mustFlush = true;
 		    for(let i = 0; i<triples.length; i++) {
@@ -347,7 +347,7 @@ Callbacks.CallbacksBackend.prototype.observeNode = function() {
 	    that.subscribe(uri,null,null,null,observer,function(){
 		try {
 		    callback(node);
-		}catch(e){ /* swallowed on purpose: a failing handler must not stop the other notifications */ }
+		}catch(e){ /* swallowed on purpose: a throwing handler must not break event dispatch */ }
 
 		if(doneCallback)
 		    doneCallback(true)
@@ -503,7 +503,7 @@ Callbacks.CallbacksBackend.prototype.dispatchQueries = function(callback) {
 		    if(!err) {
 			try{
 			    queryCallback(results);
-			}catch(e){ /* swallowed on purpose: a failing handler must not stop the other notifications */ }
+			}catch(e){ /* swallowed on purpose: a throwing handler must not break event dispatch */ }
 		    }
 		    k();
 		});

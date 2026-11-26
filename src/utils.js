@@ -343,7 +343,12 @@ const size = function(xs) {
     if(xs.length) {
         return xs.length;
     } else {
-        return Object.keys(xs).length;
+        // for…in also counts inherited enumerable properties
+        let acc = 0;
+        // eslint-disable-next-line no-unused-vars
+        for(const p in xs)
+            acc++;
+        return acc;
     }
 };
 
