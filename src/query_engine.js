@@ -1547,7 +1547,7 @@ QueryEngine.prototype.batchLoad = function(quads, callback) {
 
     // subject
     var registerComponent = function(quad, component, newQuad, k) {
-        var maybeBlankOid, oid;
+        var maybeBlankOid;
 
         if (quad[component]['uri'] || quad[component].token === 'uri') {
             var uriValue = (quad[component].uri || quad[component].value);

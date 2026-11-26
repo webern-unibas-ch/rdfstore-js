@@ -1254,7 +1254,6 @@ QueryFilters.runBuiltInCall = function(builtincall, args, bindings, queryEngine,
             }
         } else if(builtincall === 'bound') {
             var boundVar = ops[0].value;
-            var acum = [];
             if(boundVar == null) {
                 return QueryFilters.ebvError();
             } else  if(bindings[boundVar] != null) {

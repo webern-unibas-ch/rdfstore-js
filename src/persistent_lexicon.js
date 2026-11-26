@@ -1,6 +1,5 @@
 "use strict";
 
-var Tree = require('./btree').Tree;
 var utils = require('./utils');
 var async = utils;
 var InMemoryLexicon = require('./lexicon').Lexicon;

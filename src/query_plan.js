@@ -4,27 +4,6 @@ var _ = require('./utils');
 var async = require('./utils');
 
 /**
- * A new query plan object
- * @param left
- * @param right
- * @param cost
- * @param identifier
- * @param allVars
- * @param joinVars
- * @constructor
- */
-var QueryPlan = function(left, right, cost, identifier, allVars, joinVars) {
-
-    this.left =  left;
-    this.right = right;
-    this.cost = cost;
-    this.i = identifier;
-    this.vars = allVars;
-    this.join = joinVars;
-
-};
-
-/**
  * Functions to build and execute query plans for a particular query
  * using a dynamic programming join algorithm.
  */
@@ -294,7 +273,6 @@ QueryPlanDPSize.executeAndBGPsDPSize = function(allBgps, dataset, queryEngine, e
         // this lambda function should be moved to its named function
 
         // Build bushy tree for this group
-        var costFactor = 1;
         queryEngine.computeCosts(bgps,env,function(bgps) {
             var bestPlans = {};
             var plans = {};

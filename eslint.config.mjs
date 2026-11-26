@@ -19,7 +19,10 @@ export default [
     },
     rules: {
       'no-undef': 'error',
-      'no-redeclare': 'error'
+      'no-redeclare': 'error',
+      // Unused parameters keep shared callback signatures readable; unused
+      // catch bindings belong to the question of swallowed exceptions.
+      'no-unused-vars': ['error', { args: 'none', caughtErrors: 'none' }]
     }
   }
 ];

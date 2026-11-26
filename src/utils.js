@@ -343,10 +343,7 @@ var size = function(xs) {
     if(xs.length) {
         return xs.length;
     } else {
-        var acc = 0;
-        for(var p in xs)
-            acc++;
-        return acc;
+        return Object.keys(xs).length;
     }
 };
 

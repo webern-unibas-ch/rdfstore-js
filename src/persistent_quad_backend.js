@@ -160,7 +160,6 @@ PersistentQuadBackend.prototype._genMinIndexKey = function(quad,index) {
 PersistentQuadBackend.prototype._genMaxIndexKey = function(quad,index) {
     var indexComponents = this.componentOrders[index];
     var acum = [];
-    var foundFirstMissing = false;
     for(var i=0; i<indexComponents.length; i++){
         var component = indexComponents[i];
         var componentValue = quad[component];
