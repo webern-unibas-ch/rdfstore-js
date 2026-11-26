@@ -50,7 +50,7 @@ var readManifest = function(manifestPath) {
         tests.push({
             file: file,
             isPositive: type.indexOf(MF_NS + "Positive") === 0,
-            queryText: fs.readFileSync(path.join(dir, file), 'utf8').trim()
+            queryText: fs.readFileSync(path.join(dir, file), 'utf8')
         });
     });
     return tests;

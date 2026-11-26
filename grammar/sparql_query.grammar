@@ -58,7 +58,7 @@ QueryUnit "[1] QueryUnit"
  [2]	Query	  ::=	Prologue ( SelectQuery | ConstructQuery | DescribeQuery | AskQuery )
  */
 Query "[2] Query"
-    = p:Prologue q:( SelectQuery / ConstructQuery / DescribeQuery / AskQuery ) v:ValuesClause {
+    = p:Prologue q:( SelectQuery / ConstructQuery / DescribeQuery / AskQuery ) v:ValuesClause WS* {
     return {
 	token: 'query',
 	kind: 'query',
@@ -529,7 +529,7 @@ UpdateUnit "[29] UpdateUnit"
  [30]	Update	  ::=	Prologue Update1 ( ';' Update? )?
  */
 Update "[30] Update"
-    = p:Prologue WS* u:Update1 us:(WS* ';' WS* Update? )? {
+    = p:Prologue WS* u:Update1 us:(WS* ';' WS* Update? )? WS* {
 
     var query = {};
 query.token = 'query';

@@ -2668,7 +2668,7 @@ return fcall;
   }
 
   function peg$parseQuery() {
-    let s0, s1, s2, s3;
+    let s0, s1, s2, s3, s4, s5;
 
     peg$silentFails++;
     s0 = peg$currPos;
@@ -2685,6 +2685,12 @@ return fcall;
     }
     if (s2 !== peg$FAILED) {
       s3 = peg$parseValuesClause();
+      s4 = [];
+      for (;;) {
+        s5 = peg$parseWS();
+        if (s5 === peg$FAILED) { break; }
+        s4.push(s5);
+      }
       peg$savedPos = s0;
       s0 = peg$f0(s1, s2, s3);
     } else {
@@ -4477,6 +4483,12 @@ return fcall;
       }
       if (s4 === peg$FAILED) {
         s4 = null;
+      }
+      s5 = [];
+      for (;;) {
+        s6 = peg$parseWS();
+        if (s6 === peg$FAILED) { break; }
+        s5.push(s6);
       }
       peg$savedPos = s0;
       s0 = peg$f29(s1, s3, s4);

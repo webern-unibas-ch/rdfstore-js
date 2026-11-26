@@ -1440,6 +1440,22 @@ describe("Store", function () {
         });
     });
 
+    it("executes requests that end in whitespace", async function () {
+        var store = await Store.promises.create();
+        var requests = [
+            'SELECT * { ?s ?p ?o } VALUES ?s { <http://example/s> }\n',
+            'INSERT DATA { <http://example/s> <http://example/p> <http://example/o> }\n',
+            'CREATE SILENT GRAPH <http://example/g> ;\n# comment\n',
+            'DELETE WHERE { ?s ?p ?o }\n',
+            'CLEAR DEFAULT\n',
+            'DROP SILENT GRAPH <http://example/g>\t\n',
+            'CREATE GRAPH <http://example/g2> ;\nCLEAR SILENT GRAPH <http://example/g2>\n\n'
+        ];
+        for (var i = 0; i < requests.length; i++) {
+            await expectAsync(store.promises.execute(requests[i])).withContext(JSON.stringify(requests[i])).toBeResolved();
+        }
+    });
+
 });
 
 /*
