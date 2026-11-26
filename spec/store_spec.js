@@ -1443,7 +1443,6 @@ describe("Store", function () {
     it("executes requests that end in whitespace", async function () {
         var store = await Store.promises.create();
         var requests = [
-            'SELECT * { ?s ?p ?o } VALUES ?s { <http://example/s> }\n',
             'INSERT DATA { <http://example/s> <http://example/p> <http://example/o> }\n',
             'CREATE SILENT GRAPH <http://example/g> ;\n# comment\n',
             'DELETE WHERE { ?s ?p ?o }\n',
@@ -1453,6 +1452,19 @@ describe("Store", function () {
         ];
         for (var i = 0; i < requests.length; i++) {
             await expectAsync(store.promises.execute(requests[i])).withContext(JSON.stringify(requests[i])).toBeResolved();
+        }
+    });
+
+    it("reports a VALUES block after the query as not supported, not as a syntax error", async function () {
+        var store = await Store.promises.create();
+        await store.promises.execute('INSERT DATA { <http://example/a> <http://example/p> 1 . <http://example/b> <http://example/p> 2 }');
+        var queries = [
+            'SELECT ?s { ?s ?p ?o } VALUES ?s { <http://example/a> }\n',
+            'SELECT ?s { ?s ?p ?o } VALUES (?s) { (<http://example/a>) }'
+        ];
+        for (var i = 0; i < queries.length; i++) {
+            await expectAsync(store.promises.execute(queries[i])).withContext(JSON.stringify(queries[i]))
+                .toBeRejectedWith(jasmine.objectContaining({name: "NonSupportedSparqlFeatureError"}));
         }
     });
 

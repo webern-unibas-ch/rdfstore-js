@@ -130,6 +130,8 @@ This is a list of the different kind of queries currently implemented:
 - FILTER IN / NOT IN operators
 - property paths: sequence `/`, inverse `^`, alternative `|`, and the modifiers `*`, `+`, `?`. Negated property sets (`!`) and `{n,m}` are not supported.
 
+Not supported: DESCRIBE, subqueries, MINUS and VALUES (since v0.9.18-alpha.26, VALUES fails with `NonSupportedSparqlFeatureError` instead of being ignored).
+
 
 ## Installation
 

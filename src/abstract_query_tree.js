@@ -31,7 +31,11 @@ var AbstractQueryTree = function() {
 };
 
 AbstractQueryTree.prototype.parseQueryString = function(query_string) {
-        return SparqlParser.parse(query_string);
+    var syntaxTree = SparqlParser.parse(query_string);
+    // the VALUES block after a query is parsed, but its bindings are not evaluated
+    if(syntaxTree.inlineData != null)
+        throw new NonSupportedSparqlFeatureError("VALUES", "VALUES is not supported");
+    return syntaxTree;
 };
 
 AbstractQueryTree.prototype.parseExecutableUnit = function(executableUnit) {
