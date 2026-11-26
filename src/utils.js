@@ -1,6 +1,6 @@
 "use strict";
 
-var slowNextTick = (function () {
+let slowNextTick = (function () {
 
     if(typeof(process) !== 'undefined' && process.nextTick) {
         return process.nextTick;
@@ -16,9 +16,9 @@ var slowNextTick = (function () {
 
 })();
 
-var spin = 0;
-var yieldFrequency = 100;
-var nextTick = function(f) {
+let spin = 0;
+let yieldFrequency = 100;
+let nextTick = function(f) {
     spin++;
     if(spin < yieldFrequency) {
         f();
@@ -33,7 +33,7 @@ var nextTick = function(f) {
  * @param term
  * @returns {*}
  */
-var hashTerm = function(term) {
+let hashTerm = function(term) {
     try {
         if(term == null) {
             return "";
@@ -42,7 +42,7 @@ var hashTerm = function(term) {
         } else if(term.token === 'blank') {
             return "b"+term.value;
         } else if(term.token === 'literal') {
-            var l = "l"+term.value;
+            let l = "l"+term.value;
             l = l + (term.type || "");
             l = l + (term.lang || "");
 
@@ -50,8 +50,8 @@ var hashTerm = function(term) {
         }
     } catch(e) {
         if(typeof(term) === 'object') {
-            var key = "";
-            for(var p in term) {
+            let key = "";
+            for(let p in term) {
                 key = key + p + term[p];
             }
 
@@ -67,14 +67,14 @@ var hashTerm = function(term) {
  * @param env Repository of the prefixes where th prefix of the URI will be resolved.
  * @returns the lexical representation of the URI term.
  */
-var lexicalFormBaseUri = function(term, env) {
-    var uri = null;
+let lexicalFormBaseUri = function(term, env) {
+    let uri = null;
     env = env || {};
     if(term.value == null) {
         // URI has prefix and suffix, we'll try to resolve it.
-        var prefix = term.prefix;
-        var suffix = term.suffix;
-        var resolvedPrefix = env.namespaces[prefix];
+        let prefix = term.prefix;
+        let suffix = term.suffix;
+        let resolvedPrefix = env.namespaces[prefix];
         if(resolvedPrefix != null) {
             uri = resolvedPrefix+suffix;
         } else {
@@ -89,17 +89,17 @@ var lexicalFormBaseUri = function(term, env) {
     return uri === null ? null : resolveIri(env.base, uri);
 };
 
-var SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+let SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 
 // RFC 3986 appendix B
-var parseReference = function(iri) {
-    var m = /^(([^:/?#]+):)?(\/\/([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?$/.exec(iri);
+let parseReference = function(iri) {
+    let m = /^(([^:/?#]+):)?(\/\/([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?$/.exec(iri);
     return {scheme: m[2], authority: m[4], path: m[5], query: m[7], fragment: m[9]};
 };
 
 // RFC 3986 5.2.4
-var removeDotSegments = function(input) {
-    var output = "";
+let removeDotSegments = function(input) {
+    let output = "";
     while(input.length > 0) {
         if(input.indexOf("../") === 0) {
             input = input.slice(3);
@@ -113,7 +113,7 @@ var removeDotSegments = function(input) {
         } else if(input === "." || input === "..") {
             input = "";
         } else {
-            var next = input.indexOf("/", 1);
+            let next = input.indexOf("/", 1);
             if(next === -1) {
                 next = input.length;
             }
@@ -138,10 +138,10 @@ var resolveIri = function(base, iri) {
     } else if(!SCHEME.test(base)) {
         return base + iri;
     }
-    var b = parseReference(base);
-    var r = parseReference(iri);
-    var authority = b.authority;
-    var path, query = r.query;
+    let b = parseReference(base);
+    let r = parseReference(iri);
+    let authority = b.authority;
+    let path, query = r.query;
     if(r.authority !== undefined) {
         authority = r.authority;
         path = removeDotSegments(r.path);
@@ -160,7 +160,7 @@ var resolveIri = function(base, iri) {
 };
 
 
-var parseISO8601 = function (str) {
+let parseISO8601 = function (str) {
     return Date.parse(str);
 };
 
@@ -188,24 +188,24 @@ if (!Date.prototype.toISOString) {
     }());
 }
 
-var iso8601 = function(date) {
+let iso8601 = function(date) {
     return date.toISOString();
 };
 
-var lexicalFormLiteral = function(term, env) {
-    var value = term.value;
-    var lang = term.lang;
-    var type = term.type;
+let lexicalFormLiteral = function(term, env) {
+    let value = term.value;
+    let lang = term.lang;
+    let type = term.type;
 
-    var indexedValue = null;
+    let indexedValue = null;
     if(value != null && type != null && typeof(type) != 'string') {
-        var typeValue = type.value;
+        let typeValue = type.value;
 
         if(typeValue == null) {
-            var typePrefix = type.prefix;
-            var typeSuffix = type.suffix;
+            let typePrefix = type.prefix;
+            let typeSuffix = type.suffix;
 
-            var resolvedPrefix = env.namespaces[typePrefix];
+            let resolvedPrefix = env.namespaces[typePrefix];
             term.type = resolvedPrefix+typeSuffix;
             typeValue = resolvedPrefix+typeSuffix;
         }
@@ -234,16 +234,16 @@ var lexicalFormLiteral = function(term, env) {
 };
 
 // Replaces \uXXXX escapes with their characters, without eval (which a CSP without 'unsafe-eval' blocks).
-var normalizeUnicodeLiterals = function (string) {
+let normalizeUnicodeLiterals = function (string) {
     return string.replace(/\\u([0-9a-fA-F]{4})/g, function (escape, hex) {
         return String.fromCharCode(parseInt(hex, 16));
     });
 };
 
 // Persistence relies on the native IndexedDB of the runtime (browser window or worker).
-var registerIndexedDB = function(that) {
+let registerIndexedDB = function(that) {
     // In the following line, you should include the prefixes of implementations you want to test.
-    var context = globalThis;
+    let context = globalThis;
 
     context.indexedDB = context.indexedDB || context.mozIndexedDB || context.webkitIndexedDB || context.msIndexedDB;
     context.IDBKeyRange = context.IDBKeyRange || context.webkitIDBKeyRange || context.msIDBKeyRange;
@@ -257,7 +257,7 @@ var registerIndexedDB = function(that) {
     }
 };
 
-var guid = function() {
+let guid = function() {
     function s4() {
         return Math.floor((1 + Math.random()) * 0x10000)
             .toString(16)
@@ -268,9 +268,9 @@ var guid = function() {
 };
 
 // Returns a new array without the elements matching p.
-var reject = function(xs,p) {
-    var acc = [];
-    for(var i=0; i<xs.length; i++) {
+let reject = function(xs,p) {
+    let acc = [];
+    for(let i=0; i<xs.length; i++) {
         if(!p(xs[i])) {
             acc.push(xs[i]);
         }
@@ -280,10 +280,10 @@ var reject = function(xs,p) {
 };
 
 // Removes the elements matching p from xs itself and returns them.
-var remove = function(xs,p) {
-    var removed = [];
-    var kept = 0;
-    for(var i=0; i<xs.length; i++) {
+let remove = function(xs,p) {
+    let removed = [];
+    let kept = 0;
+    for(let i=0; i<xs.length; i++) {
         if(p(xs[i])) {
             removed.push(xs[i]);
         } else {
@@ -295,8 +295,8 @@ var remove = function(xs,p) {
     return removed;
 };
 
-var include = function(xs,p) {
-    for(var i=0; i<xs.length; i++){
+let include = function(xs,p) {
+    for(let i=0; i<xs.length; i++){
         if(xs[i] === p)
             return true;
     }
@@ -304,42 +304,42 @@ var include = function(xs,p) {
     return false;
 };
 
-var each = function(xs,f) {
+let each = function(xs,f) {
     if(xs.forEach) {
         xs.forEach(f);
     } else {
-        for (var i = 0; i < xs.length; i++)
+        for (let i = 0; i < xs.length; i++)
             f(xs[i]);
     }
 };
 
-var map = function(xs,f) {
+let map = function(xs,f) {
     if(xs.map) {
         return xs.map(f);
     } else {
-        var acc = [];
-        for (var i = 0; i < xs.length; i++)
+        let acc = [];
+        for (let i = 0; i < xs.length; i++)
             acc[i] = f(xs[i]);
 
         return acc;
     }
 };
 
-var keys = function(xs) {
-    var acc = [];
-    for(var p in xs)
+let keys = function(xs) {
+    let acc = [];
+    for(let p in xs)
         acc.push(p);
     return acc;
 };
 
-var values = function(xs) {
-    var acc = [];
-    for(var p in xs)
+let values = function(xs) {
+    let acc = [];
+    for(let p in xs)
         acc.push(xs[p]);
     return acc;
 };
 
-var size = function(xs) {
+let size = function(xs) {
     if(xs.length) {
         return xs.length;
     } else {
@@ -347,19 +347,19 @@ var size = function(xs) {
     }
 };
 
-var clone = function(value) {
+let clone = function(value) {
     return JSON.parse(JSON.stringify(value));
 };
 
-var isObject = function(value) {
+let isObject = function(value) {
     // Avoid a V8 JIT bug in Chrome 19-20.
     // See https://code.google.com/p/v8/issues/detail?id=2291 for more details.
-    var type = typeof value;
+    let type = typeof value;
     return type == 'function' || (value && type == 'object') || false;
 };
 
 
-var create = (function() {
+let create = (function() {
     function Object() {}
     return function(prototype) {
         if (isObject(prototype)) {
@@ -371,7 +371,7 @@ var create = (function() {
     };
 }());
 
-var whilst = function (test, iterator, callback) {
+let whilst = function (test, iterator, callback) {
     if (test()) {
         iterator(function (err) {
             if (err) {
@@ -389,13 +389,13 @@ var whilst = function (test, iterator, callback) {
 };
 
 
-var eachSeries = function (arr, iterator, callback) {
+let eachSeries = function (arr, iterator, callback) {
     callback = callback || function () {};
     if (!arr.length) {
         return callback();
     }
-    var completed = 0;
-    var iterate = function () {
+    let completed = 0;
+    let iterate = function () {
         iterator(arr[completed], function (err) {
             if (err) {
                 callback(err);
@@ -415,15 +415,15 @@ var eachSeries = function (arr, iterator, callback) {
     iterate();
 };
 
-var eachParallel = function (arr, iterator, callback) {
+let eachParallel = function (arr, iterator, callback) {
     callback = callback || function () {};
     if (!arr.length) {
         return callback();
     }
-    var failed = false;
-    var completed = 0;
+    let failed = false;
+    let completed = 0;
 
-    var innerCallback = function(err) {
+    let innerCallback = function(err) {
         if(err) {
             failed = true;
             throw(new Error(err));
@@ -437,7 +437,7 @@ var eachParallel = function (arr, iterator, callback) {
     };
 
 
-    for(var i=0; i<arr.length; i++) {
+    for(let i=0; i<arr.length; i++) {
         (function(arr,i,callback,iterator) {
             nextTick(function(){
                 try {
@@ -453,7 +453,7 @@ var eachParallel = function (arr, iterator, callback) {
 };
 
 
-var reduce = function (arr, memo, iterator, callback) {
+let reduce = function (arr, memo, iterator, callback) {
     eachSeries(arr, function (x, callback) {
         iterator(memo, x, function (err, v) {
             memo = v;
@@ -464,16 +464,16 @@ var reduce = function (arr, memo, iterator, callback) {
     });
 };
 
-var seq = function (/* functions... */) {
-    var fns = arguments;
+let seq = function (/* functions... */) {
+    let fns = arguments;
     return function () {
-        var that = this;
-        var args = Array.prototype.slice.call(arguments);
-        var callback = args.pop();
+        let that = this;
+        let args = Array.prototype.slice.call(arguments);
+        let callback = args.pop();
         reduce(fns, args, function (newargs, fn, cb) {
                 fn.apply(that, newargs.concat([function () {
-                    var err = arguments[0];
-                    var nextargs = Array.prototype.slice.call(arguments, 1);
+                    let err = arguments[0];
+                    let nextargs = Array.prototype.slice.call(arguments, 1);
                     cb(err, nextargs);
                 }]));
             },
@@ -485,13 +485,13 @@ var seq = function (/* functions... */) {
 
 
 // Thrown values that are not Errors (some builtins throw strings) are wrapped, so callers always get an Error.
-var toError = function (e) {
+let toError = function (e) {
     return (e instanceof Error) ? e : new Error(String(e));
 };
 
 // Wraps a callback so that only its first invocation runs; `called` tells whether it already ran.
-var once = function (callback) {
-    var wrapped = function () {
+let once = function (callback) {
+    let wrapped = function () {
         if (wrapped.called) {
             return;
         }
@@ -505,9 +505,9 @@ var once = function (callback) {
 // Runs fn(callback) and settles a promise with its node-style result; a synchronous throw rejects too.
 // A throw after the callback already ran is rethrown, as at the callback entry points: the promise
 // is settled by then and would swallow it.
-var toPromise = function (fn) {
-    var settle;
-    var promise = new Promise(function (resolve, reject) {
+let toPromise = function (fn) {
+    let settle;
+    let promise = new Promise(function (resolve, reject) {
         settle = function (err, result) {
             if (err) {
                 reject(toError(err));
@@ -516,7 +516,7 @@ var toPromise = function (fn) {
             }
         };
     });
-    var done = once(settle);
+    let done = once(settle);
     try {
         fn(done);
     } catch (e) {
@@ -529,7 +529,7 @@ var toPromise = function (fn) {
 };
 
 
-var isWorker = function() {
+let isWorker = function() {
     if(typeof(process) === "undefined" || process.browser === true) {
         if (typeof(window) === "undefined") {
             return true;

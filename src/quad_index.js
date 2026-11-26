@@ -1,8 +1,8 @@
 "use strict";
 
-var BaseTree = require("./btree").Tree;
-var _ = require('./utils');
-var async = require('./utils');
+let BaseTree = require("./btree").Tree;
+let _ = require('./utils');
+let async = require('./utils');
 
 /**
  * NodeKey
@@ -12,7 +12,7 @@ var async = require('./utils');
  * A Tree node augmented with BPlusTree
  * node structures
  */
-var NodeKey = function(components, order) {
+let NodeKey = function(components, order) {
     this.subject = components.subject;
     this.predicate = components.predicate;
     this.object = components.object;
@@ -27,8 +27,8 @@ var NodeKey = function(components, order) {
  * @returns {number}
  */
 NodeKey.prototype.comparator = function(keyPattern) {
-    for(var i=0; i<this.order.length; i++) {
-        var component = this.order[i];
+    for(let i=0; i<this.order.length; i++) {
+        let component = this.order[i];
         if(keyPattern[component] == null) {
             return 0;
         } else {
@@ -48,7 +48,7 @@ NodeKey.prototype.comparator = function(keyPattern) {
  *
  * A pattern with some variable components
  */
-var Pattern = function (components) {
+let Pattern = function (components) {
     this.subject = components.subject;
     this.predicate = components.predicate;
     this.object = components.object;
@@ -57,9 +57,9 @@ var Pattern = function (components) {
 
     this.keyComponents = {};
 
-    var order = [];
-    var indiferent = [];
-    var that = this;
+    let order = [];
+    let indiferent = [];
+    let that = this;
 
     // components must have been already normalized and
     // inserted in the lexicon.
@@ -89,7 +89,7 @@ var Pattern = function (components) {
  * @param callback
  * @constructor
  */
-var QuadIndex = function (params, callback) {
+let QuadIndex = function (params, callback) {
     if (arguments != 0) {
         this.componentOrder = params.componentOrder;
 
@@ -97,11 +97,11 @@ var QuadIndex = function (params, callback) {
 
             // For exact matches. Used by search.
             tree.comparator = function (a, b) {
-                for (var i = 0; i < tree.componentOrder.length; i++) {
-                    var component = tree.componentOrder[i];
+                for (let i = 0; i < tree.componentOrder.length; i++) {
+                    let component = tree.componentOrder[i];
 
-                    var vala = a[component];
-                    var valb = b[component];
+                    let vala = a[component];
+                    let valb = b[component];
 
                     if (vala < valb) {
                         return -1;
@@ -115,8 +115,8 @@ var QuadIndex = function (params, callback) {
 
             // For range matches.
             tree.rangeComparator = function (a, b) {
-                for (var i = 0; i < tree.componentOrder.length; i++) {
-                    var component = tree.componentOrder[i];
+                for (let i = 0; i < tree.componentOrder.length; i++) {
+                    let component = tree.componentOrder[i];
                     if (b[component] == null || a[component] == null) {
                         return 0;
                     } else {
@@ -172,16 +172,16 @@ QuadIndex.prototype.range = function (pattern, callback) {
 };
 
 QuadIndex.prototype._rangeTraverse = function(tree,node, pattern, callback) {
-    var patternKey  = pattern.key;
-    var acum = [];
-    var pendingNodes = [node];
+    let patternKey  = pattern.key;
+    let acum = [];
+    let pendingNodes = [node];
 
     async.whilst(function(){
         return pendingNodes.length > 0;
     }, function(k){
         // next node to process
-        var node = pendingNodes.shift();
-        var idxMin = 0;
+        let node = pendingNodes.shift();
+        let idxMin = 0;
 
         // move forward in the lower keys not matching the pattern.
         while(idxMin < node.numberActives && tree.rangeComparator(node.keys[idxMin].key,patternKey) === -1) {
@@ -192,7 +192,7 @@ QuadIndex.prototype._rangeTraverse = function(tree,node, pattern, callback) {
 
         if(node.isLeaf === true) { // the node is a leaf node -> has no nodes to push, only keys to accumulate
 
-            var idxMax = idxMin;
+            let idxMax = idxMin;
 
             // we keep on accumulating matching keys in this leaf
             while(idxMax < node.numberActives && tree.rangeComparator(node.keys[idxMax].key,patternKey) === 0) {
@@ -208,7 +208,7 @@ QuadIndex.prototype._rangeTraverse = function(tree,node, pattern, callback) {
 
                 // pushing the found node
                 pendingNodes.push(childNode);
-                var idxMax = idxMin;
+                let idxMax = idxMin;
 
                 async.whilst(function(){
                     // keep pushing nodes while the key for that nod ematches the pattern

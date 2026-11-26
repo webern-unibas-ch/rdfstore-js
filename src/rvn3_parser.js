@@ -1,11 +1,11 @@
 "use strict";
 
-var N3Parser = require('n3').Parser;
-var Utils = require('./utils');
+let N3Parser = require('n3').Parser;
+let Utils = require('./utils');
 //var N3Parser = require('../node_modules/n3/lib/N3Parser');
 
 // Add a wrapper around the N3.js parser
-var RVN3Parser = {};
+let RVN3Parser = {};
 RVN3Parser.parser = {
     async: true,
     parse: function (data, graph, options, callback) {
@@ -24,8 +24,8 @@ RVN3Parser.parser = {
         }
 
         // Parse triples into array; after an error the parser must not report anything else
-        var triples = [];
-        var done = Utils.once(callback);
+        let triples = [];
+        let done = Utils.once(callback);
         new N3Parser(options).parse(data, function (error, triple) {
             if (error)
                 done(error);
@@ -63,15 +63,15 @@ function convertEntity(entity) {
                 if (!blankNodeMap[blankId]) {
                     // Check if this is a user-defined named blank node (not N3.js internal)
                     if (blankId.startsWith('_:') && blankId.length > 2) {
-                        var name = blankId.substring(2); // Remove '_:' prefix
+                        let name = blankId.substring(2); // Remove '_:' prefix
                         
                         // Check if this looks like an N3.js internal ID (e.g., "n3-0", "b1", etc.)
-                        var isInternalId = /^(n3-\d+|b\d+|\d+)$/.test(name);
+                        let isInternalId = /^(n3-\d+|b\d+|\d+)$/.test(name);
                         
                         if (!isInternalId) {
                             // This appears to be a user-defined name
                             // Remove any N3.js internal prefixes (pattern: prefix_userDefined)
-                            var lastUnderscore = name.lastIndexOf('_');
+                            let lastUnderscore = name.lastIndexOf('_');
                             if (lastUnderscore > 0 && lastUnderscore < name.length - 1) {
                                 name = name.substring(lastUnderscore + 1);
                             }

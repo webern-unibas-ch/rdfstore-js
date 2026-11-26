@@ -1,6 +1,6 @@
 "use strict";
 
-var Utils = require("./utils");
+let Utils = require("./utils");
 
 /**
  * Builds the promise versions of the asynchronous Store methods, available as <code>store.promises</code>.<br/>
@@ -13,11 +13,11 @@ var Utils = require("./utils");
  *
  * @param {Store} store the store whose methods are wrapped
  */
-var createStorePromises = function(store) {
+let createStorePromises = function(store) {
 
     // The store methods tell their forms apart by the number of arguments, so the optional
     // argument is passed only when it is set, followed by the callback.
-    var callStore = function(method, args, optional) {
+    let callStore = function(method, args, optional) {
         if(optional != null) {
             args = args.concat([optional]);
         }
@@ -26,7 +26,7 @@ var createStorePromises = function(store) {
         });
     };
 
-    var executeWithEnvironment = function(query, defaultGraphs, namedGraphs) {
+    let executeWithEnvironment = function(query, defaultGraphs, namedGraphs) {
         // e.g. queries.map(execute) passes an index and the array: reject instead of querying the wrong graphs
         if(!Array.isArray(defaultGraphs) || !Array.isArray(namedGraphs)) {
             return Promise.reject(new TypeError("defaultGraphs and namedGraphs must be arrays of graph URIs"));

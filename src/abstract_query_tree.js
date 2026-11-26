@@ -1,9 +1,9 @@
 "use strict";
 
 // imports
-var SparqlParser = require("./parser");
-var Utils = require("./utils");
-var _ = Utils;
+let SparqlParser = require("./parser");
+let Utils = require("./utils");
+let _ = Utils;
 
 function NonSupportedSparqlFeatureError(feature, message) {
     this.name = "NonSupportedSparqlFeatureError";
@@ -27,11 +27,11 @@ SparqlParserError.constructor = SparqlParserError;
  * Based on <http://www.w3.org/2001/sw/DataAccess/rq23/rq24-algebra.html>
  * W3C's note
  */
-var AbstractQueryTree = function() {
+let AbstractQueryTree = function() {
 };
 
 AbstractQueryTree.prototype.parseQueryString = function(query_string) {
-    var syntaxTree = SparqlParser.parse(query_string);
+    let syntaxTree = SparqlParser.parse(query_string);
     // the VALUES block after a query is parsed, but its bindings are not evaluated
     if(syntaxTree.inlineData != null)
         throw new NonSupportedSparqlFeatureError("VALUES", "VALUES is not supported");
@@ -70,26 +70,26 @@ AbstractQueryTree.prototype.parseSelect = function(syntaxTree, graph){
         console.log("error parsing query");
         return null;
     } else {
-        var env = {};
+        let env = {};
         syntaxTree.pattern = this.build(syntaxTree.pattern, env, graph);
         // the variable of a GROUP BY or SELECT expression must not be in scope of the pattern or of the
         // expressions before it (SPARQL 1.1 18.2.1)
-        var scope = AbstractQueryTree.inScopeVariables(syntaxTree.pattern, {});
-        var introduce = function(clause, variable) {
+        let scope = AbstractQueryTree.inScopeVariables(syntaxTree.pattern, {});
+        let introduce = function(clause, variable) {
             if(scope[variable.value] === true) {
                 throw new SparqlParserError(clause + ": variable ?" + variable.value + " is already in scope");
             }
             scope[variable.value] = true;
         };
         if(Array.isArray(syntaxTree.group)) {
-            for(var i=0; i<syntaxTree.group.length; i++) {
+            for(let i=0; i<syntaxTree.group.length; i++) {
                 if(syntaxTree.group[i].token === 'aliased_expression') {
                     introduce("GROUP BY", syntaxTree.group[i].alias);
                 }
             }
         }
         if(syntaxTree.projection != null) {
-            for(var j=0; j<syntaxTree.projection.length; j++) {
+            for(let j=0; j<syntaxTree.projection.length; j++) {
                 if(syntaxTree.projection[j].kind === 'aliased') {
                     introduce("SELECT", syntaxTree.projection[j].alias);
                 }
@@ -110,7 +110,7 @@ AbstractQueryTree.prototype.parseInsertData = function(syntaxTree){
 
 // numbers the internal variables (fresh: of property path sequences, graph: of GRAPH ?g); module-wide, because
 // EXISTS builds its pattern per solution, and the outer solution it is bound with carries the outer ones
-var internalVariableCounter = 0;
+let internalVariableCounter = 0;
 
 /**
  * Builds the algebra expression of a pattern. graph is the active graph (SPARQL 1.1 18.6) the patterns inside
@@ -122,31 +122,31 @@ AbstractQueryTree.prototype.build = function(node, env, graph) {
         return this._buildGroupGraphPattern(node, env, graph);
     } else if (node.token === 'basicgraphpattern') {
         if(graph != null) {
-            for(var i=0; i<node.triplesContext.length; i++) {
+            for(let i=0; i<node.triplesContext.length; i++) {
                 node.triplesContext[i].graph = _.clone(graph, true);
             }
         }
-        var bgp = {
+        let bgp = {
             kind: 'BGP',
             value: node.triplesContext
         };
         bgp = AbstractQueryTree.translatePathExpressionsInBGP(bgp, env);
         return bgp;
     } else if (node.token === 'graphunionpattern') {
-        var a = this.build(node.value[0], env, graph);
-        var b = this.build(node.value[1], env, graph);
+        let a = this.build(node.value[0], env, graph);
+        let b = this.build(node.value[1], env, graph);
 
         return {
             kind: 'UNION',
             value: [a,b]
         };
     } else if(node.token === 'graphgraphpattern') {
-        var internal = null;
+        let internal = null;
         if(node.graph.token === 'var') {
             internal = {token: 'var', value: 'graph:' + internalVariableCounter++};
         }
         // an inner GRAPH sets its own active graph
-        var c = this.build(node.value, env, internal || node.graph);
+        let c = this.build(node.value, env, internal || node.graph);
         return {
             kind: 'GRAPH',
             value: c,
@@ -170,16 +170,16 @@ AbstractQueryTree.prototype.build = function(node, env, graph) {
  * QueryEngine.executeBGPScope), and its blank nodes and internal variables are dropped only after the join.
  */
 AbstractQueryTree.translatePathExpressionsInBGP = function(bgp, env) {
-    var triples = [];
-    var paths = [];
-    for(var i=0; i<bgp.value.length; i++) {
-        var triple = bgp.value[i];
+    let triples = [];
+    let paths = [];
+    for(let i=0; i<bgp.value.length; i++) {
+        let triple = bgp.value[i];
         if(triple.predicate != null && triple.predicate.token === 'path') {
-            var path = AbstractQueryTree.normalizePath(triple.predicate);
+            let path = AbstractQueryTree.normalizePath(triple.predicate);
             if(isPlainPath(path)) {
                 expandPlainPath(triple.subject, path, triple.object, triple.graph, triples);
             } else {
-                var pathPattern = {kind: 'PATH', subject: triple.subject, path: path, object: triple.object};
+                let pathPattern = {kind: 'PATH', subject: triple.subject, path: path, object: triple.object};
                 if(triple.graph != null) {
                     pathPattern.graph = triple.graph;
                 }
@@ -194,7 +194,7 @@ AbstractQueryTree.translatePathExpressionsInBGP = function(bgp, env) {
         bgp.value = triples;
         return bgp;
     }
-    var parts = triples.length > 0 ? [{kind: 'BGP', value: triples, scoped: true}].concat(paths) : paths;
+    let parts = triples.length > 0 ? [{kind: 'BGP', value: triples, scoped: true}].concat(paths) : paths;
     return {kind: 'BGP_SCOPE', value: parts};
 };
 
@@ -206,7 +206,7 @@ AbstractQueryTree.normalizePath = function(node) {
     if(node.token !== 'path') {
         return {type: 'link', iri: node};
     }
-    var path;
+    let path;
     if(node.kind === 'element') {
         path = AbstractQueryTree.normalizePath(node.value);
     } else if(node.kind === 'sequence' || node.kind === 'alternative') {
@@ -219,7 +219,7 @@ AbstractQueryTree.normalizePath = function(node) {
         throw new NonSupportedSparqlFeatureError("path expression " + node.kind);
     }
 
-    var modifier = node.modifier;
+    let modifier = node.modifier;
     if(modifier == null) {
         return path;
     } else if(modifier === '*') {
@@ -247,7 +247,7 @@ var isPlainPath = function(path) {
 
 var expandPlainPath = function(subject, path, object, graph, acum) {
     if(path.type === 'link') {
-        var triple = {subject: _.clone(subject, true), predicate: path.iri, object: _.clone(object, true)};
+        let triple = {subject: _.clone(subject, true), predicate: path.iri, object: _.clone(object, true)};
         if(graph != null) {
             triple.graph = _.clone(graph, true);
         }
@@ -255,9 +255,9 @@ var expandPlainPath = function(subject, path, object, graph, acum) {
     } else if(path.type === 'inverse') {
         expandPlainPath(object, path.path, subject, graph, acum);
     } else {
-        var current = subject;
-        for(var i=0; i<path.paths.length; i++) {
-            var next = i === path.paths.length - 1 ? object : {token: "var", value: "fresh:" + internalVariableCounter++};
+        let current = subject;
+        for(let i=0; i<path.paths.length; i++) {
+            let next = i === path.paths.length - 1 ? object : {token: "var", value: "fresh:" + internalVariableCounter++};
             expandPlainPath(current, path.paths[i], next, graph, acum);
             current = next;
         }
@@ -271,7 +271,7 @@ AbstractQueryTree.pathLinks = function(path, acum) {
     if(path.type === 'link') {
         acum.push(path.iri);
     } else if(path.type === 'seq' || path.type === 'alt') {
-        for(var i=0; i<path.paths.length; i++) {
+        for(let i=0; i<path.paths.length; i++) {
             AbstractQueryTree.pathLinks(path.paths[i], acum);
         }
     } else {
@@ -281,8 +281,8 @@ AbstractQueryTree.pathLinks = function(path, acum) {
 };
 
 AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env, graph) {
-    var f = (node.filters || []);
-    var g = {kind: "EMPTY_PATTERN"};
+    let f = (node.filters || []);
+    let g = {kind: "EMPTY_PATTERN"};
     if(graph != null) {
         // inside GRAPH the group starts from the active graph(s), see the EMPTY_PATTERN case of
         // QueryEngine.executeSelectUnit, so every solution binds the graph
@@ -292,13 +292,13 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env, graph)
         }
     }
     // variables in scope of the patterns so far
-    var scope = {};
+    let scope = {};
 
     for(i=0; i<node.patterns.length; i++) {
-        var pattern = node.patterns[i];
+        let pattern = node.patterns[i];
         if(pattern.token === 'bind') {
             // Extend the patterns so far; the variable must not be in scope yet (SPARQL 1.1 18.2.1)
-            var variable = pattern.as.value;
+            let variable = pattern.as.value;
             if(scope[variable] === true) {
                 throw new SparqlParserError("BIND: variable ?" + variable + " is already in scope");
             }
@@ -361,7 +361,7 @@ AbstractQueryTree.setExistsGraph = function(expression, graph) {
         (expression.builtincall === 'exists' || expression.builtincall === 'notexists')) {
         expression.graph = _.clone(graph, true);
     } else {
-        for(var p in expression) {
+        for(let p in expression) {
             AbstractQueryTree.setExistsGraph(expression[p], graph);
         }
     }
@@ -373,7 +373,7 @@ AbstractQueryTree.setExistsGraph = function(expression, graph) {
  */
 AbstractQueryTree.inScopeVariables = function(aqt, acum) {
     if(aqt.kind === 'BGP') {
-        for(var i=0; i<aqt.value.length; i++) {
+        for(let i=0; i<aqt.value.length; i++) {
             var triple = aqt.value[i];
             ['subject', 'predicate', 'object'].forEach(function(component) {
                 if(triple[component] != null && triple[component].token === 'var') {
@@ -404,7 +404,7 @@ AbstractQueryTree.inScopeVariables = function(aqt, acum) {
         AbstractQueryTree.inScopeVariables(aqt.value, acum);
     } else if(aqt.kind === 'EXTEND') {
         AbstractQueryTree.inScopeVariables(aqt.value, acum);
-        for(var j=0; j<aqt.binds.length; j++) {
+        for(let j=0; j<aqt.binds.length; j++) {
             acum[aqt.binds[j].as.value] = true;
         }
     }
@@ -425,16 +425,16 @@ AbstractQueryTree.prototype.collectBasicTriples = function(aqt, acum) {
         acum = acum.concat(aqt.value);
     } else if(aqt.kind === 'PATH') {
         // a triple pattern for each IRI of the path, so that observers see changes to them
-        var links = AbstractQueryTree.pathLinks(aqt.path, []);
-        for(var i=0; i<links.length; i++) {
-            var triple = {subject: {token: 'var', value: 'path:s'}, predicate: links[i], object: {token: 'var', value: 'path:o'}};
+        let links = AbstractQueryTree.pathLinks(aqt.path, []);
+        for(let i=0; i<links.length; i++) {
+            let triple = {subject: {token: 'var', value: 'path:s'}, predicate: links[i], object: {token: 'var', value: 'path:o'}};
             if(aqt.graph != null) {
                 triple.graph = aqt.graph;
             }
             acum.push(triple);
         }
     } else if(aqt.kind === 'BGP_SCOPE') {
-        for(var j=0; j<aqt.value.length; j++) {
+        for(let j=0; j<aqt.value.length; j++) {
             acum = this.collectBasicTriples(aqt.value[j], acum);
         }
     } else if(aqt.kind === 'UNION') {
@@ -462,14 +462,14 @@ AbstractQueryTree.prototype.collectBasicTriples = function(aqt, acum) {
  * Replaces bindings in an AQT
  */
 AbstractQueryTree.prototype.bind = function(aqt, bindings) {
-    var that = this;
+    let that = this;
     if(aqt.graph != null && aqt.graph.token && aqt.graph.token === 'var' &&
         bindings[aqt.graph.value] != null) {
         aqt.graph = bindings[aqt.graph.value];
     }
     if(aqt.filter != null) {
-        var acum = [];
-        for(var i=0; i< aqt.filter.length; i++) {
+        let acum = [];
+        for(let i=0; i< aqt.filter.length; i++) {
             aqt.filter[i].value = this._bindFilter(aqt.filter[i].value, bindings);
             acum.push(aqt.filter[i]);
         }
@@ -496,8 +496,8 @@ AbstractQueryTree.prototype.bind = function(aqt, bindings) {
     } else if(aqt.kind === 'GRAPH') {
         if(aqt.internal != null && aqt.graph.token !== 'var') {
             // ?g was bound above: the patterns inside match that graph
-            var graphBindings = {};
-            for(var v in bindings) {
+            let graphBindings = {};
+            for(let v in bindings) {
                 graphBindings[v] = bindings[v];
             }
             graphBindings[aqt.internal.value] = aqt.graph;
@@ -525,11 +525,11 @@ AbstractQueryTree.prototype.bind = function(aqt, bindings) {
 };
 
 AbstractQueryTree.prototype._bindTripleContext = function(triples, bindings) {
-    for(var i=0; i<triples.length; i++) {
+    for(let i=0; i<triples.length; i++) {
         // the graph stays: a bound graph variable is replaced like the other components
         delete triples[i]['variables'];
-        for(var p in triples[i]) {
-            var comp = triples[i][p];
+        for(let p in triples[i]) {
+            let comp = triples[i][p];
             if(comp != null && comp.token === 'var' && bindings[comp.value] != null) {
                 triples[i][p] = bindings[comp.value];
             }
@@ -542,7 +542,7 @@ AbstractQueryTree.prototype._bindTripleContext = function(triples, bindings) {
 
 AbstractQueryTree.prototype._bindFilter = function(filterExpr, bindings) {
     if(filterExpr.expressionType != null) {
-        var expressionType = filterExpr.expressionType;
+        let expressionType = filterExpr.expressionType;
         if(expressionType == 'relationalexpression') {
             filterExpr.op1 = this._bindFilter(filterExpr.op1, bindings);
             filterExpr.op2 = this._bindFilter(filterExpr.op2, bindings);
@@ -574,7 +574,7 @@ AbstractQueryTree.prototype._bindFilter = function(filterExpr, bindings) {
             if(filterExpr.primaryexpression == 'var') {
                 // lookup the var in the bindings
                 if(bindings[filterExpr.value.value] != null) {
-                    var val = bindings[filterExpr.value.value];
+                    let val = bindings[filterExpr.value.value];
                     if(val.token === 'uri') {
                         filterExpr.primaryexpression = 'iri';
                     } else {
@@ -598,8 +598,8 @@ AbstractQueryTree.prototype.replace = function(aqt, from, to, ns) {
         aqt.graph = _.clone(to,true);
     }
     if(aqt.filter != null) {
-        var acum = [];
-        for(var i=0; i< aqt.filter.length; i++) {
+        let acum = [];
+        for(let i=0; i< aqt.filter.length; i++) {
             aqt.filter[i].value = this._replaceFilter(aqt.filter[i].value, from, to, ns);
             acum.push(aqt.filter[i]);
         }
@@ -610,11 +610,11 @@ AbstractQueryTree.prototype.replace = function(aqt, from, to, ns) {
     } else if(aqt.kind === 'BGP') {
         aqt.value = this._replaceTripleContext(aqt.value, from, to, ns);
     } else if(aqt.kind === 'PATH') {
-        var endpoints = this._replaceTripleContext([{subject: aqt.subject, object: aqt.object}], from, to, ns)[0];
+        let endpoints = this._replaceTripleContext([{subject: aqt.subject, object: aqt.object}], from, to, ns)[0];
         aqt.subject = endpoints.subject;
         aqt.object = endpoints.object;
     } else if(aqt.kind === 'BGP_SCOPE') {
-        var that = this;
+        let that = this;
         aqt.value = aqt.value.map(function(part) { return that.replace(part, from, to, ns); });
     } else if(aqt.kind === 'UNION') {
         aqt.value[0] = this.replace(aqt.value[0],from,to, ns);
@@ -638,9 +638,9 @@ AbstractQueryTree.prototype.replace = function(aqt, from, to, ns) {
 };
 
 AbstractQueryTree.prototype._replaceTripleContext = function(triples, from, to, ns) {
-    for(var i=0; i<triples.length; i++) {
-        for(var p in triples[i]) {
-            var comp = triples[i][p];
+    for(let i=0; i<triples.length; i++) {
+        for(let p in triples[i]) {
+            let comp = triples[i][p];
             if(comp.token === 'var' && from.token === 'var' && comp.value === from.value) {
                 triples[i][p] = to;
             } else if(comp.token === 'blank' && from.token === 'blank' && comp.value === from.value) {
@@ -661,7 +661,7 @@ AbstractQueryTree.prototype._replaceTripleContext = function(triples, from, to, 
 
 AbstractQueryTree.prototype._replaceFilter = function(filterExpr, from, to, ns) {
     if(filterExpr.expressionType != null) {
-        var expressionType = filterExpr.expressionType;
+        let expressionType = filterExpr.expressionType;
         if(expressionType == 'relationalexpression') {
             filterExpr.op1 = this._replaceFilter(filterExpr.op1, from, to, ns);
             filterExpr.op2 = this._replaceFilter(filterExpr.op2, from, to, ns);
@@ -690,7 +690,7 @@ AbstractQueryTree.prototype._replaceFilter = function(filterExpr, from, to, ns) 
                 filterExpr.args[i] = this._replaceFilter(filterExpr.args[i], from, to, ns);
             }
         } else if(expressionType == 'atomic') {
-            var val = null;
+            let val = null;
             if(filterExpr.primaryexpression == from.token && filterExpr.value == from.value) {
                 val = to.value;
             } else if(filterExpr.primaryexpression == 'iri' && from.token == 'uri' && filterExpr.value == from.value) {

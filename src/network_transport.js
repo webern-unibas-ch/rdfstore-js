@@ -1,22 +1,22 @@
 "use strict";
 
-var utils = require("./utils");
+let utils = require("./utils");
 if(!utils.isWorker()) {
-    var http = require("http");
-    var https = require("https");
+    let http = require("http");
+    let https = require("https");
 
     var NetworkTransport = {
 
         load: function (uri, accept, callback, redirect) {
-            var redirection = redirect == null ? 3 : redirect;
-            var parts;
+            let redirection = redirect == null ? 3 : redirect;
+            let parts;
             try {
                 parts = new URL(uri);
             } catch (e) {
                 return callback(new Error("Invalid URI: " + uri));
             }
 
-            var client;
+            let client;
             if (parts.protocol === 'http:') {
                 client = http;
             } else if (parts.protocol === 'https:') {
@@ -30,8 +30,8 @@ if(!utils.isWorker()) {
             }
 
             // URL keeps the brackets of an IPv6 hostname, http.request expects it without them
-            var hostname = parts.hostname.replace(/^\[(.*)\]$/, "$1");
-            var params = {
+            let hostname = parts.hostname.replace(/^\[(.*)\]$/, "$1");
+            let params = {
                 'hostname': hostname,
                 'port': parts.port || (client === http ? 80 : 443),
                 'method': 'GET',
@@ -40,10 +40,10 @@ if(!utils.isWorker()) {
             };
 
             // a dropped connection can report through the request, the response or both
-            var done = utils.once(callback);
-            var request = client.request(params, function (response) {
-                var headers = response.headers;
-                var data = "";
+            let done = utils.once(callback);
+            let request = client.request(params, function (response) {
+                let headers = response.headers;
+                let data = "";
 
                 if (("" + response.statusCode)[0] == '2') {
                     // decodes characters split across chunks
@@ -66,7 +66,7 @@ if(!utils.isWorker()) {
                     if (redirection == 0) {
                         done(new Error("Too many redirections"));
                     } else {
-                        var location = (headers["Location"] || headers["location"]);
+                        let location = (headers["Location"] || headers["location"]);
                         if (location != null) {
                             // a relative Location is resolved against the requested URI;
                             // an unresolvable one is passed on as is and reported as invalid

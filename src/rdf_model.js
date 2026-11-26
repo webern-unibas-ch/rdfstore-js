@@ -1,10 +1,10 @@
 "use strict";
 
 // imports
-var _ = require("./utils");
-var QueryFilters = require("./query_filters").QueryFilters;
+let _ = require("./utils");
+let QueryFilters = require("./query_filters").QueryFilters;
 
-var RDFModel = {};
+let RDFModel = {};
 
 /**
  * Implementation of <http://www.w3.org/TR/rdf-interfaces/>
@@ -39,8 +39,8 @@ RDFModel.UrisMap = function() {
 };
 
 RDFModel.UrisMap.prototype.values = function() {
-    var collected = {};
-    for(var p in this) {
+    let collected = {};
+    for(let p in this) {
 	if(!_.include(this.interfaceProperties,p) &&
 	    typeof(this[p])!=='function' &&
 	    p!=='defaultNs' &&
@@ -83,7 +83,7 @@ RDFModel.UrisMap.prototype.setDefault = function(iri) {
 };
 
 RDFModel.UrisMap.prototype.addAll = function(prefixMap, override) {
-    for(var prefix in prefixMap) {
+    for(let prefix in prefixMap) {
 	if(!_.include(this.interfaceProperties, prefix)) {
 	    if(this[prefix] != null) {
 		if(override === true) {
@@ -99,9 +99,9 @@ RDFModel.UrisMap.prototype.addAll = function(prefixMap, override) {
 };
 
 RDFModel.UrisMap.prototype.resolve = function(curie) {
-    var parts = curie.split(":");
-    var ns = parts[0];
-    var suffix = parts[1];
+    let parts = curie.split(":");
+    let ns = parts[0];
+    let suffix = parts[1];
     if(ns === '') {
 	if(this.defaultNs == null) {
 	    return null;
@@ -116,11 +116,11 @@ RDFModel.UrisMap.prototype.resolve = function(curie) {
 };
 
 RDFModel.UrisMap.prototype.shrink = function(iri) {
-    for(var ns in this) {
-	var prefix = this[ns];
+    for(let ns in this) {
+	let prefix = this[ns];
 	if(iri.indexOf(prefix) === 0) {
 	    if(prefix !== '' && ns != 'defaultNs') {
-		var suffix = iri.split(prefix)[1];
+		let suffix = iri.split(prefix)[1];
 		return ns + ":" + suffix;
 	    }
 	}
@@ -172,7 +172,7 @@ RDFModel.Profile.prototype.setTerm = function(term, iri) {
 RDFModel.RDFEnvironment = function () {
     RDFModel.Profile.call(this);
     this.blankNodeCounter = 0;
-    var that = this;
+    let that = this;
     this.filters = {
 	s:function (s) {
 	    return function (t) {
@@ -215,27 +215,27 @@ RDFModel.RDFEnvironment = function () {
 	    };
 	},
 	type:function (o) {
-	    var type = that.resolve("rdf:type");
+	    let type = that.resolve("rdf:type");
 	    return function (t) {
 		return t.predicate.equals(type) && t.object.equals(o);
 	    };
 	}
     };
 
-    for (var p in RDFModel.defaultContext) {
+    for (let p in RDFModel.defaultContext) {
 	this.prefixes.set(p, RDFModel.defaultContext[p]);
     }
 };
 RDFModel.RDFEnvironment.prototype = _.create(RDFModel.Profile.prototype,{'constructor': RDFModel.RDFEnvironment});
 
 RDFModel.RDFEnvironment.prototype.createBlankNode = function() {
-    var bnode =  new RDFModel.BlankNode(this.blankNodeCounter);
+    let bnode =  new RDFModel.BlankNode(this.blankNodeCounter);
     this.blankNodeCounter++;
     return bnode;
 };
 
 RDFModel.RDFEnvironment.prototype.createNamedNode = function(value) {
-    var resolvedValue = this.resolve(value);
+    let resolvedValue = this.resolve(value);
     if(resolvedValue != null) {
 	return new RDFModel.NamedNode(resolvedValue);
     } else {
@@ -256,9 +256,9 @@ RDFModel.RDFEnvironment.prototype.createTriple = function(subject, predicate, ob
 };
 
 RDFModel.RDFEnvironment.prototype.createGraph = function(triples) {
-    var graph = new RDFModel.Graph();
+    let graph = new RDFModel.Graph();
     if(triples != null) {
-	for(var i=0; i<triples.length; i++) {
+	for(let i=0; i<triples.length; i++) {
 	    graph.add(triples[i]);
 	}
     }
@@ -280,7 +280,7 @@ RDFModel.RDFEnvironment.prototype.createProfile = function(empty) {
     if(empty === true) {
 	return new RDFModel.RDFEnvironment.Profile();
     } else {
-	var profile = new RDFModel.RDFEnvironment.Profile();
+	let profile = new RDFModel.RDFEnvironment.Profile();
 	profile.importProfile(this);
 
 	return profile;
@@ -291,10 +291,10 @@ RDFModel.RDFEnvironment.prototype.createTermMap = function(empty) {
     if(empty === true) {
 	return new RDFModel.UrisMap();
     } else {
-	var cloned = this.terms.values();
-	var termMap = new RDFModel.UrisMap();
+	let cloned = this.terms.values();
+	let termMap = new RDFModel.UrisMap();
 
-	for(var p in cloned) {
+	for(let p in cloned) {
 	    termMap[p] = cloned[p];
 	}
 
@@ -306,10 +306,10 @@ RDFModel.RDFEnvironment.prototype.createPrefixMap = function(empty) {
     if(empty === true) {
 	return new RDFModel.UrisMap();
     } else {
-	var cloned = this.prefixes.values();
-	var prefixMap = new RDFModel.UrisMap();
+	let cloned = this.prefixes.values();
+	let prefixMap = new RDFModel.UrisMap();
 
-	for(var p in cloned) {
+	for(let p in cloned) {
 	    prefixMap[p] = cloned[p];
 	}
 
@@ -329,8 +329,8 @@ RDFModel.RDFNode.prototype.equals = function(otherNode) {
 	return this.valueOf() == otherNode;
 
     } else {
-	for(var i in this.attributes) {
-	    var attribute = this.attributes[i];
+	for(let i in this.attributes) {
+	    let attribute = this.attributes[i];
 	    if(this[attribute] != otherNode[attribute]) {
 		return false;
 	    }
@@ -378,7 +378,7 @@ RDFModel.Literal = function(value, language, datatype) {
 RDFModel.Literal.prototype = _.create(RDFModel.RDFNode.prototype,{'constructor':RDFModel.Literal});
 
 RDFModel.Literal.prototype.toString = function(){
-    var tmp = '"'+this.nominalValue+'"';
+    let tmp = '"'+this.nominalValue+'"';
     if(this.language != null) {
 	tmp = tmp + "@" + this.language;
     } else if(this.datatype != null || this.type) {
@@ -453,11 +453,11 @@ RDFModel.Graph = function() {
 };
 
 RDFModel.Graph.prototype.add = function(triple) {
-    for(var i=0; i<this.actions.length; i++) {
+    for(let i=0; i<this.actions.length; i++) {
 	triple = this.actions[i](triple);
     }
 
-    var id = triple.subject.toString()+triple.predicate.toString()+triple.object.toString();
+    let id = triple.subject.toString()+triple.predicate.toString()+triple.object.toString();
     if(!this.duplicates[id]) {
 	this.duplicates[id] = true;
 	this.triples.push(triple);
@@ -470,7 +470,7 @@ RDFModel.Graph.prototype.add = function(triple) {
 RDFModel.Graph.prototype.addAction = function (tripleAction, run) {
     this.actions.push(tripleAction);
     if (run == true) {
-	for (var i = 0; i < this.triples.length; i++) {
+	for (let i = 0; i < this.triples.length; i++) {
 	    this.triples[i] = tripleAction(this.triples[i]);
 	}
     }
@@ -479,8 +479,8 @@ RDFModel.Graph.prototype.addAction = function (tripleAction, run) {
 };
 
 RDFModel.Graph.prototype.addAll = function (graph) {
-    var newTriples = graph.toArray();
-    for (var i = 0; i < newTriples.length; i++) {
+    let newTriples = graph.toArray();
+    for (let i = 0; i < newTriples.length; i++) {
 	this.add(newTriples[i]);
     }
 
@@ -489,10 +489,10 @@ RDFModel.Graph.prototype.addAll = function (graph) {
 };
 
 RDFModel.Graph.prototype.remove = function(triple) {
-    var toRemove = null;
-    for(var i=0; i<this.triples.length; i++) {
+    let toRemove = null;
+    for(let i=0; i<this.triples.length; i++) {
 	if(this.triples[i].equals(triple)) {
-	    var id = triple.subject.toString()+triple.predicate.toString()+triple.object.toString();
+	    let id = triple.subject.toString()+triple.predicate.toString()+triple.object.toString();
 	    delete this.duplicates[id];
 	    toRemove = i;
 	    break;
@@ -512,7 +512,7 @@ RDFModel.Graph.prototype.toArray = function() {
 };
 
 RDFModel.Graph.prototype.some = function(p) {
-    for(var i=0; i<this.triples.length; i++) {
+    for(let i=0; i<this.triples.length; i++) {
 	if(p(this.triples[i],this) === true) {
 	    return true;
 	}
@@ -522,7 +522,7 @@ RDFModel.Graph.prototype.some = function(p) {
 };
 
 RDFModel.Graph.prototype.every = function(p) {
-    for(var i=0; i<this.triples.length; i++) {
+    for(let i=0; i<this.triples.length; i++) {
 	if(p(this.triples[i],this) === false) {
 	    return false;
 	}
@@ -532,9 +532,9 @@ RDFModel.Graph.prototype.every = function(p) {
 };
 
 RDFModel.Graph.prototype.filter = function(f) {
-    var tmp = new RDFModel.Graph();
+    let tmp = new RDFModel.Graph();
 
-    for(var i=0; i<this.triples.length; i++) {
+    for(let i=0; i<this.triples.length; i++) {
 	if(f(this.triples[i],this) === true) {
 	    tmp.add(this.triples[i]);
 	}
@@ -544,25 +544,25 @@ RDFModel.Graph.prototype.filter = function(f) {
 };
 
 RDFModel.Graph.prototype.forEach = function(f) {
-    for(var i=0; i<this.triples.length; i++) {
+    for(let i=0; i<this.triples.length; i++) {
 	f(this.triples[i],this);
     }
 };
 
 RDFModel.Graph.prototype.merge = function(g) {
-    var newGraph = new RDFModel.Graph();
-    for(var i=0; i<this.triples.length; i++)
+    let newGraph = new RDFModel.Graph();
+    for(let i=0; i<this.triples.length; i++)
 	newGraph.add(this.triples[i]);
 
     return newGraph;
 };
 
 RDFModel.Graph.prototype.match = function(subject, predicate, object, limit) {
-    var graph = new RDFModel.Graph();
+    let graph = new RDFModel.Graph();
 
-    var matched = 0;
-    for(var i=0; i<this.triples.length; i++) {
-	var triple = this.triples[i];
+    let matched = 0;
+    for(let i=0; i<this.triples.length; i++) {
+	let triple = this.triples[i];
 	if(subject == null || (triple.subject.equals(subject))) {
 	    if(predicate == null || (triple.predicate.equals(predicate))) {
 		if(object == null || (triple.object.equals(object))) {
@@ -581,9 +581,9 @@ RDFModel.Graph.prototype.match = function(subject, predicate, object, limit) {
 };
 
 RDFModel.Graph.prototype.removeMatches = function(subject, predicate, object) {
-    var toRemove = [];
+    let toRemove = [];
     for(var i=0; i<this.triples.length; i++) {
-	var triple = this.triples[i];
+	let triple = this.triples[i];
 	if(subject == null || (triple.subject.equals(subject))) {
 	    if(predicate == null || (triple.predicate.equals(predicate))) {
 		if(object == null || (triple.object.equals(object))) {
@@ -601,7 +601,7 @@ RDFModel.Graph.prototype.removeMatches = function(subject, predicate, object) {
 };
 
 RDFModel.Graph.prototype.toNT = function() {
-    var n3 = "";
+    let n3 = "";
 
     this.forEach(function(triple) {
 	n3 = n3 + triple.toString();
@@ -620,7 +620,7 @@ RDFModel.buildRDFResource = function(value, bindings, engine, env) {
     } else if(value.token === 'uri') {
 	return RDFModel.buildNamedNode(value, bindings, engine, env);
     } else if(value.token === 'var') {
-	var result = bindings[value.value];
+	let result = bindings[value.value];
 	if(result != null) {
 	    return RDFModel.buildRDFResource(result, bindings, engine, env);
 	} else {
@@ -650,7 +650,7 @@ RDFModel.buildNamedNode = function(value, bindings, engine, env) {
 	return new RDFModel.NamedNode(value);
     } else {
 	if(value.prefix != null) {
-	    var prefix = engine.resolveNsInEnvironment(value.prefix, env);
+	    let prefix = engine.resolveNsInEnvironment(value.prefix, env);
 	    value.value = prefix+value.suffix;
 	    return new RDFModel.NamedNode(value);
 	} else {
