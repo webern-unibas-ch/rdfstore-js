@@ -131,7 +131,7 @@ let removeDotSegments = function(input) {
  * its first segment but no valid scheme (a_b:c, no relative reference). A base that has no scheme itself is
  * prepended.
  */
-var resolveIri = function(base, iri) {
+let resolveIri = function(base, iri) {
     // a colon in the first segment: a scheme, or no relative reference
     if(/^[^/?#]*:/.test(iri) || base == null || base === "") {
         return iri;
@@ -362,9 +362,10 @@ let isObject = function(value) {
 let create = (function() {
     function Object() {}
     return function(prototype) {
+        let result;
         if (isObject(prototype)) {
             Object.prototype = prototype;
-            var result = new Object;
+            result = new Object;
             Object.prototype = null;
         }
         return result || Object();

@@ -20,14 +20,14 @@ let Utils = require("./utils");
     }
 
     if (params != null) {
-        for (var mime in params["parsers"]) {
+        for (let mime in params["parsers"]) {
             this.parsers[mime] = params["parsers"][mime];
         }
     }
 
     if (params && params["precedences"] != null) {
         this.precedences = params["precedences"];
-        for (mime in params["parsers"]) {
+        for (let mime in params["parsers"]) {
             if (!Utils.include(this.precedences, mime)) {
                 this.precedences.push(mime);
             }

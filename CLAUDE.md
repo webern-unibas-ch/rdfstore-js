@@ -16,7 +16,7 @@ yarn e2e                     # all e2e scripts in e2e/ (basic, comprehensive, re
 yarn test                    # parse-grammar + specs + e2e
 yarn build                   # parse-grammar + esbuild bundles -> dist/rdfstore{,_min}.js (IIFE) + dist/rdfstore{,_min}.mjs (ESM)
 yarn parse-grammar           # regenerate src/parser.js from grammar/sparql_query.grammar
-yarn lint                    # ESLint (no-undef, no-redeclare, no-unused-vars, no-empty) over src/, without parser.js and perftest/
+yarn lint                    # ESLint (no-undef, no-redeclare, no-var, no-unused-vars, no-empty) over src/, without parser.js and perftest/
 yarn types                   # tsc check of types/rdfstore.d.ts against types/test.{mts,cts}
 ```
 
@@ -47,7 +47,7 @@ Every error reaches the caller's callback exactly once, as `callback(err)` ([spe
 
 `store.promises` and `rdfstore.promises.create` ([src/store_promises.js](src/store_promises.js)) wrap the callback API with `Utils.toPromise`. Each wrapper calls the store method with the exact argument count of the intended form, because the methods dispatch on `arguments.length`. The core stays callback-based.
 
-**Every `src/` module is strict mode** (`"use strict";` at the top), so the CommonJS entry behaves like the ES module bundle. Declare every name with `var`: an implicit global throws in strict mode. [eslint.config.mjs](eslint.config.mjs) enables `no-undef` to catch this statically, including on paths the specs never run, and `no-redeclare`: declare each name once per function, because a second `var` is the same variable. `no-unused-vars` skips parameters and `catch` bindings. `no-empty`: an intentionally empty block gets a comment. It cannot see `this` inside plain callbacks, which is `undefined` in strict mode: capture `var that = this;` in the method instead.
+**Every `src/` module is strict mode** (`"use strict";` at the top), so the CommonJS entry behaves like the ES module bundle. Declare every name with `let` (`var` is not allowed): an implicit global throws in strict mode. [eslint.config.mjs](eslint.config.mjs) enables `no-undef` to catch this statically, including on paths the specs never run, plus `no-redeclare`, `no-var`, `no-unused-vars` (skips parameters and `catch` bindings) and `no-empty` (an intentionally empty block gets a comment). ESLint cannot see `this` inside plain callbacks, which is `undefined` in strict mode: capture `let that = this;` in the method instead.
 
 **Layering** (from the public API down to storage):
 
@@ -63,7 +63,7 @@ Every error reaches the caller's callback exactly once, as `callback(err)` ([spe
 - [src/rdf_loader.js](src/rdf_loader.js), [src/network_transport.js](src/network_transport.js), [src/rvn3_parser.js](src/rvn3_parser.js) (N3.js) and [src/jsonld_parser.js](src/jsonld_parser.js) (jsonld): load data by media type, either from a string, a remote URL or a local file.
 - [src/rdf_model.js](src/rdf_model.js): the RDF Interfaces API (`store.rdf`, graphs, nodes).
 
-**[src/utils.js](src/utils.js) is the core's own async/collection library.** Source files import it under the names `_` and `async` (`var async = require('./utils')`), not the real `lodash`/`async` packages. Those two packages are devDependencies used only by the specs. `eachSeries` and `whilst` iterate through a throttled `nextTick` that yields only every `yieldFrequency` calls (default 100), to avoid stack overflows. B-tree traversals in [src/quad_index.js](src/quad_index.js) and [src/btree.js](src/btree.js) depend on this. Without it, a full scan over ~100k triples threw `RangeError: Maximum call stack size exceeded` ([spec/large_dataset_spec.js](spec/large_dataset_spec.js) guards against that). New loops over large data should use these helpers, not direct synchronous recursion.
+**[src/utils.js](src/utils.js) is the core's own async/collection library.** Source files import it under the names `_` and `async` (`let async = require('./utils')`), not the real `lodash`/`async` packages. Those two packages are devDependencies used only by the specs. `eachSeries` and `whilst` iterate through a throttled `nextTick` that yields only every `yieldFrequency` calls (default 100), to avoid stack overflows. B-tree traversals in [src/quad_index.js](src/quad_index.js) and [src/btree.js](src/btree.js) depend on this. Without it, a full scan over ~100k triples threw `RangeError: Maximum call stack size exceeded` ([spec/large_dataset_spec.js](spec/large_dataset_spec.js) guards against that). New loops over large data should use these helpers, not direct synchronous recursion.
 
 ## Tests
 

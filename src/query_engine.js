@@ -179,7 +179,7 @@ QueryEngine.prototype.compareFilteredBindings = function(a, b, order, env) {
             return 0;
         }
         let direction = order[i].direction;
-        var filterResult;
+        let filterResult;
 
         // unbound first
         if(a.value[i] == null && b.value[i] == null) {
@@ -334,7 +334,7 @@ QueryEngine.groupVariables = function(group) {
 QueryEngine.planGroups = function(group, projection, having, order) {
     let plan = {groupVars: QueryEngine.groupVariables(group), aggregates: [], projection: [], having: [], order: []};
     let expressions = [];
-    for(var i=0; i<projection.length; i++) {
+    for(let i=0; i<projection.length; i++) {
         let expression = projection[i].expression;
         // a single aggregate is computed over the group, any other expression evaluated on the group's scope
         let evaluated = expression != null && expression.expressionType !== 'aggregate';
@@ -347,11 +347,11 @@ QueryEngine.planGroups = function(group, projection, having, order) {
             expressions.push(plan.projection[i].expression);
         }
     }
-    for(i=0; having != null && i<having.length; i++) {
+    for(let i=0; having != null && i<having.length; i++) {
         plan.having.push(QueryEngine.extractAggregates(having[i], plan.aggregates));
         expressions.push(plan.having[i]);
     }
-    for(i=0; order != null && i<order.length; i++) {
+    for(let i=0; order != null && i<order.length; i++) {
         plan.order.push({direction: order[i].direction, expression: QueryEngine.extractAggregates(order[i].expression, plan.aggregates)});
         expressions.push(plan.order[i].expression);
     }
@@ -359,11 +359,11 @@ QueryEngine.planGroups = function(group, projection, having, order) {
     let inScope = {};
     let names = plan.groupVars.concat(plan.projection.map(function(projected) { return projected.name; }),
         plan.aggregates.map(function(aggregate) { return aggregate.name; }));
-    for(i=0; i<names.length; i++) {
+    for(let i=0; i<names.length; i++) {
         inScope[names[i]] = true;
     }
     let used = QueryEngine.expressionVariables(expressions, []);
-    for(i=0; i<used.length && plan.ungroupedVariable == null; i++) {
+    for(let i=0; i<used.length && plan.ungroupedVariable == null; i++) {
         if(inScope[used[i]] !== true) {
             plan.ungroupedVariable = used[i];
         }
@@ -375,18 +375,18 @@ QueryEngine.planGroups = function(group, projection, having, order) {
 // aggregates of the plan and the projected values.
 QueryEngine.prototype.groupScope = function(plan, denormGroup, dataset, env) {
     let scope = {};
-    for(var i=0; i<plan.groupVars.length; i++) {
+    for(let i=0; i<plan.groupVars.length; i++) {
         scope[plan.groupVars[i]] = denormGroup.length > 0 ? denormGroup[0][plan.groupVars[i]] : null;
     }
-    for(i=0; i<plan.aggregates.length; i++) {
-        var value = QueryFilters.runAggregator({token: 'variable', kind: 'aliased', expression: plan.aggregates[i].expression}, denormGroup, this, dataset, env);
+    for(let i=0; i<plan.aggregates.length; i++) {
+        let value = QueryFilters.runAggregator({token: 'variable', kind: 'aliased', expression: plan.aggregates[i].expression}, denormGroup, this, dataset, env);
         if(!QueryFilters.isEbvError(value)) {
             scope[plan.aggregates[i].name] = value;
         }
     }
-    for(i=0; i<plan.projection.length; i++) {
+    for(let i=0; i<plan.projection.length; i++) {
         let projected = plan.projection[i];
-        value = projected.expression == null ?
+        let value = projected.expression == null ?
             QueryFilters.runAggregator(projected.item, denormGroup, this, dataset, env) :
             QueryFilters.runFilter(projected.expression, scope, this, dataset, env);
         // an error leaves the variable unbound
@@ -827,10 +827,10 @@ QueryEngine.prototype.executeQuery = function(syntaxTree, callback, defaultDatas
                         let toClear = [];
                         for(let i=0; i<result.length; i++) {
                             let bindings = result[i];
-                            for(var j=0; j<toClear.length; j++)
+                            for(let j=0; j<toClear.length; j++)
                                 delete toClear[j].valuetmp;
 
-                            for(j=0; j<aqt.template.triplesContext.length; j++) {
+                            for(let j=0; j<aqt.template.triplesContext.length; j++) {
                                 // fresh IDs for blank nodes in the construct template
                                 let components = ['subject', 'predicate', 'object'];
                                 let tripleTemplate = aqt.template.triplesContext[j];
@@ -926,12 +926,12 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
                     // (no group clause leaves `group` unset)
                     if (unit.group == null || unit.group === "") {
                         let foundUniqueGroup = unit.having != null;
-                        for (var i = 0; i < unit.projection.length; i++) {
+                        for (let i = 0; i < unit.projection.length; i++) {
                             if (QueryEngine.containsAggregate(unit.projection[i].expression)) {
                                 foundUniqueGroup = true;
                             }
                         }
-                        for (i = 0; order != null && i < order.length; i++) {
+                        for (let i = 0; order != null && i < order.length; i++) {
                             if (QueryEngine.containsAggregate(order[i].expression)) {
                                 foundUniqueGroup = true;
                             }
@@ -1347,7 +1347,7 @@ let restoreFailedLeftSolutions = function(bindings, leftSolutions, set2) {
     let failed = [];
     // left solutions already represented in acum
     let kept = new Set();
-    for(var i=0; i<bindings.length; i++) {
+    for(let i=0; i<bindings.length; i++) {
         if(bindings[i]["__nullify__"] === true) {
             failed.push(bindings[i]["bindings"]);
         } else {
@@ -1357,12 +1357,12 @@ let restoreFailedLeftSolutions = function(bindings, leftSolutions, set2) {
     }
 
     let rightVars = {};
-    for(i=0; i<set2.length; i++) {
-        for(var p in set2[i]) {
+    for(let i=0; i<set2.length; i++) {
+        for(let p in set2[i]) {
             rightVars[p] = true;
         }
     }
-    for(i=0; i<failed.length; i++) {
+    for(let i=0; i<failed.length; i++) {
         let merged = failed[i];
         // an unmatched left solution was not merged
         let left = leftSolutions.get(merged) || merged;
@@ -1371,7 +1371,7 @@ let restoreFailedLeftSolutions = function(bindings, leftSolutions, set2) {
         }
         kept.add(left);
         let solution = {};
-        for(p in left) {
+        for(let p in left) {
             solution[p] = left[p];
         }
         QueryPlan.augmentMissingBindings(solution, rightVars);
@@ -2033,11 +2033,11 @@ QueryEngine.prototype.checkGroupSemantics = function(groupVars, projectionVars) 
     // aggregates without GROUP BY ('singleGroup') have no group variables: nothing may be projected without being aggregated
     let projection = {};
     let names = QueryEngine.groupVariables(groupVars);
-    for(var i=0; i<names.length; i++) {
+    for(let i=0; i<names.length; i++) {
         projection[names[i]] = true;
     }
 
-    for(i=0; i<projectionVars.length; i++) {
+    for(let i=0; i<projectionVars.length; i++) {
         let projectionVar = projectionVars[i];
         if(projectionVar.kind === 'var') {
             if(projection[projectionVar.value.value] == null) {

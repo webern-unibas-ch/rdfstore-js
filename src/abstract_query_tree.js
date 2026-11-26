@@ -233,7 +233,7 @@ AbstractQueryTree.normalizePath = function(node) {
     }
 };
 
-var isPlainPath = function(path) {
+let isPlainPath = function(path) {
     if(path.type === 'link') {
         return true;
     } else if(path.type === 'inverse') {
@@ -245,7 +245,7 @@ var isPlainPath = function(path) {
     }
 };
 
-var expandPlainPath = function(subject, path, object, graph, acum) {
+let expandPlainPath = function(subject, path, object, graph, acum) {
     if(path.type === 'link') {
         let triple = {subject: _.clone(subject, true), predicate: path.iri, object: _.clone(object, true)};
         if(graph != null) {
@@ -287,14 +287,14 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env, graph)
         // inside GRAPH the group starts from the active graph(s), see the EMPTY_PATTERN case of
         // QueryEngine.executeSelectUnit, so every solution binds the graph
         g.graph = _.clone(graph, true);
-        for(var i=0; i<f.length; i++) {
+        for(let i=0; i<f.length; i++) {
             AbstractQueryTree.setExistsGraph(f[i].value, graph);
         }
     }
     // variables in scope of the patterns so far
     let scope = {};
 
-    for(i=0; i<node.patterns.length; i++) {
+    for(let i=0; i<node.patterns.length; i++) {
         let pattern = node.patterns[i];
         if(pattern.token === 'bind') {
             // Extend the patterns so far; the variable must not be in scope yet (SPARQL 1.1 18.2.1)
@@ -311,7 +311,7 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env, graph)
                     binds: [pattern] };
             }
         } else if(pattern.token === 'optionalgraphpattern') {
-            var parsedPattern = this.build(pattern.value, env, graph);
+            let parsedPattern = this.build(pattern.value, env, graph);
             AbstractQueryTree.inScopeVariables(parsedPattern, scope);
             if(parsedPattern.kind === 'FILTER') {
                 g =  { kind:'LEFT_JOIN',
@@ -325,7 +325,7 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env, graph)
                     filter: true };
             }
         } else {
-            parsedPattern = this.build(pattern, env, graph);
+            let parsedPattern = this.build(pattern, env, graph);
             AbstractQueryTree.inScopeVariables(parsedPattern, scope);
             // the patterns inside GRAPH bind the active graph, except an inner GRAPH: it joins the start of the
             // group (W3C graph-nested-2/3)
@@ -374,7 +374,7 @@ AbstractQueryTree.setExistsGraph = function(expression, graph) {
 AbstractQueryTree.inScopeVariables = function(aqt, acum) {
     if(aqt.kind === 'BGP') {
         for(let i=0; i<aqt.value.length; i++) {
-            var triple = aqt.value[i];
+            let triple = aqt.value[i];
             ['subject', 'predicate', 'object'].forEach(function(component) {
                 if(triple[component] != null && triple[component].token === 'var') {
                     acum[triple[component].value] = true;
@@ -547,27 +547,27 @@ AbstractQueryTree.prototype._bindFilter = function(filterExpr, bindings) {
             filterExpr.op1 = this._bindFilter(filterExpr.op1, bindings);
             filterExpr.op2 = this._bindFilter(filterExpr.op2, bindings);
         } else if(expressionType == 'conditionalor' || expressionType == 'conditionaland') {
-            for(var i=0; i< filterExpr.operands.length; i++) {
+            for(let i=0; i< filterExpr.operands.length; i++) {
                 filterExpr.operands[i] = this._bindFilter(filterExpr.operands[i], bindings);
             }
         } else if(expressionType == 'additiveexpression') {
             filterExpr.summand = this._bindFilter(filterExpr.summand, bindings);
-            for(i=0; i<filterExpr.summands.length; i++) {
+            for(let i=0; i<filterExpr.summands.length; i++) {
                 filterExpr.summands[i].expression = this._bindFilter(filterExpr.summands[i].expression, bindings);
             }
         } else if(expressionType == 'builtincall') {
-            for(i=0; i<filterExpr.args.length; i++) {
+            for(let i=0; i<filterExpr.args.length; i++) {
                 filterExpr.args[i] = this._bindFilter(filterExpr.args[i], bindings);
             }
         } else if(expressionType == 'multiplicativeexpression') {
             filterExpr.factor = this._bindFilter(filterExpr.factor, bindings);
-            for(i=0; i<filterExpr.factors.length; i++) {
+            for(let i=0; i<filterExpr.factors.length; i++) {
                 filterExpr.factors[i].expression = this._bindFilter(filterExpr.factors[i].expression, bindings);
             }
         } else if(expressionType == 'unaryexpression') {
             filterExpr.expression = this._bindFilter(filterExpr.expression, bindings);
         } else if(expressionType == 'irireforfunction') {
-            for(i=0; filterExpr.args != null && i<filterExpr.args.length; i++) {
+            for(let i=0; filterExpr.args != null && i<filterExpr.args.length; i++) {
                 filterExpr.args[i] = this._bindFilter(filterExpr.args[i], bindings);
             }
         } else if(expressionType == 'atomic') {
@@ -666,27 +666,27 @@ AbstractQueryTree.prototype._replaceFilter = function(filterExpr, from, to, ns) 
             filterExpr.op1 = this._replaceFilter(filterExpr.op1, from, to, ns);
             filterExpr.op2 = this._replaceFilter(filterExpr.op2, from, to, ns);
         } else if(expressionType == 'conditionalor' || expressionType == 'conditionaland') {
-            for(var i=0; i< filterExpr.operands.length; i++) {
+            for(let i=0; i< filterExpr.operands.length; i++) {
                 filterExpr.operands[i] = this._replaceFilter(filterExpr.operands[i], from, to, ns);
             }
         } else if(expressionType == 'additiveexpression') {
             filterExpr.summand = this._replaceFilter(filterExpr.summand, from, to, ns);
-            for(i=0; i<filterExpr.summands.length; i++) {
+            for(let i=0; i<filterExpr.summands.length; i++) {
                 filterExpr.summands[i].expression = this._replaceFilter(filterExpr.summands[i].expression, from, to, ns);
             }
         } else if(expressionType == 'builtincall') {
-            for(i=0; i<filterExpr.args.length; i++) {
+            for(let i=0; i<filterExpr.args.length; i++) {
                 filterExpr.args[i] = this._replaceFilter(filterExpr.args[i], from, to, ns);
             }
         } else if(expressionType == 'multiplicativeexpression') {
             filterExpr.factor = this._replaceFilter(filterExpr.factor, from, to, ns);
-            for(i=0; i<filterExpr.factors.length; i++) {
+            for(let i=0; i<filterExpr.factors.length; i++) {
                 filterExpr.factors[i].expression = this._replaceFilter(filterExpr.factors[i].expression, from, to, ns);
             }
         } else if(expressionType == 'unaryexpression') {
             filterExpr.expression = this._replaceFilter(filterExpr.expression, from, to, ns);
         } else if(expressionType == 'irireforfunction') {
-            for(i=0; filterExpr.args != null && i<filterExpr.args.length; i++) {
+            for(let i=0; filterExpr.args != null && i<filterExpr.args.length; i++) {
                 filterExpr.args[i] = this._replaceFilter(filterExpr.args[i], from, to, ns);
             }
         } else if(expressionType == 'atomic') {

@@ -465,7 +465,7 @@ Callbacks.CallbacksBackend.prototype._searchQueriesInIndex = function(index, ord
 
 	let filteredIds = [];
 	for(let j=0; j<matched.length; j++) {
-	    var queryId = matched[j];
+	    let queryId = matched[j];
 	    if(_.include(this.pendingQueries,queryId)) {
 		_.remove(this.pendingQueries,function(pendingQueryId){ return pendingQueryId === queryId });
 		this.matchedQueries.push(queryId);

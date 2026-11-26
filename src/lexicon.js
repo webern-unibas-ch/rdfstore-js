@@ -100,7 +100,7 @@ Lexicon.prototype.registerUri = function(uri, callback) {
     } else{
         this.uris.search(uri, function(oidData){
             if(oidData == null){
-                var oid = that.oidCounter;
+                let oid = that.oidCounter;
                 let oidStr = 'u'+oid;
                 that.oidCounter++;
 
@@ -117,7 +117,7 @@ Lexicon.prototype.registerUri = function(uri, callback) {
                 });
 
             } else {
-                oid = oidData[0];
+                let oid = oidData[0];
                 oidData[1] = oidData[1] + 1;
                 callback(oid);
             }
@@ -171,7 +171,7 @@ Lexicon.prototype.registerLiteral = function(literal, callback) {
 
         this.literals.search(literal, function(oidData){
             if(oidData == null){
-                var oid = that.oidCounter;
+                let oid = that.oidCounter;
                 let oidStr = 'l'+oid;
                 that.oidCounter++;
 
@@ -188,7 +188,7 @@ Lexicon.prototype.registerLiteral = function(literal, callback) {
                 });
 
             } else {
-                oid = oidData[0];
+                let oid = oidData[0];
                 oidData[1] = oidData[1] + 1;
                 callback(oid);
             }
@@ -219,20 +219,20 @@ Lexicon.prototype.resolveLiteral = function (literal,callback) {
 Lexicon.prototype.parseLiteral = function(literalString) {
     let parts = literalString.lastIndexOf("@");
     if(parts!=-1 && literalString[parts-1]==='"' && literalString.substring(parts, literalString.length).match(/^@[a-zA-Z]+(-[a-zA-Z0-9]+)*$/)!=null) {
-        var value = literalString.substring(1,parts-1);
+        let value = literalString.substring(1,parts-1);
         let lang = literalString.substring(parts+1, literalString.length).toLowerCase();
         return {token: "literal", value:value, lang:lang};
     }
 
     parts = literalString.lastIndexOf("^^");
     if(parts!=-1 && literalString[parts-1]==='"' && literalString[parts+2] === '<' && literalString[literalString.length-1] === '>') {
-        value = literalString.substring(1,parts-1);
+        let value = literalString.substring(1,parts-1);
         let type = literalString.substring(parts+3, literalString.length-1);
 
         return {token: "literal", value:value, type:type};
     }
 
-    value = literalString.substring(1,literalString.length-1);
+    let value = literalString.substring(1,literalString.length-1);
     return {token:"literal", value:value};
 };
 
@@ -402,7 +402,7 @@ Lexicon.prototype._unregisterTerm = function (kind, oid, callback) {
     let that = this;
     if (kind === 'uri') {
         if (oid != this.defaultGraphOid) {
-            var oidStr = 'u' + oid;
+            let oidStr = 'u' + oid;
             that.oidUris.search(oidStr, function(uri) {
                 that.uris.search(uri, function(oidData){
                     let counter = oidData[1];
@@ -441,7 +441,7 @@ Lexicon.prototype._unregisterTerm = function (kind, oid, callback) {
         }
     } else if (kind === 'literal') {
         this.oidCounter++;
-        oidStr = 'l' + oid;
+        let oidStr = 'l' + oid;
 
         that.oidLiterals.search(oidStr, function(literal) {
             that.literals.search(literal, function(oidData){

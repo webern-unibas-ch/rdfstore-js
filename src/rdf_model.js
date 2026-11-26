@@ -582,7 +582,7 @@ RDFModel.Graph.prototype.match = function(subject, predicate, object, limit) {
 
 RDFModel.Graph.prototype.removeMatches = function(subject, predicate, object) {
     let toRemove = [];
-    for(var i=0; i<this.triples.length; i++) {
+    for(let i=0; i<this.triples.length; i++) {
 	let triple = this.triples[i];
 	if(subject == null || (triple.subject.equals(subject))) {
 	    if(predicate == null || (triple.predicate.equals(predicate))) {
@@ -593,7 +593,7 @@ RDFModel.Graph.prototype.removeMatches = function(subject, predicate, object) {
 	}
     }
 
-    for(i=0; i<toRemove.length; i++) {
+    for(let i=0; i<toRemove.length; i++) {
 	this.remove(toRemove[i]);
     }
 

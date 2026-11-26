@@ -56,10 +56,10 @@ QueryPlanDPSize.connected = function(leftPlan, rightPlan) {
 
 let intersection = function(arr1,arr2) {
     let acc = {};
-    for(var i=0; i<arr1.lenght; i++) {
+    for(let i=0; i<arr1.lenght; i++) {
         acc[arr1[i]] = 1;
     }
-    for(i=0; i<arr2.length; i++) {
+    for(let i=0; i<arr2.length; i++) {
         let val = acc[arr2[i]] || 0;
         val++;
         acc[arr2[i]] = val;
@@ -93,6 +93,7 @@ QueryPlanDPSize.executeAndBGPsGroups = function(bgps) {
     let groups = {};
     let groupVars = {};
     let groupId = 0;
+    let vars;
 
 
     // Returns true if the any of the passed vars are in the vars
@@ -132,7 +133,7 @@ QueryPlanDPSize.executeAndBGPsGroups = function(bgps) {
         let newGroups = {};
         let newGroupVars = {};
 
-        var vars = QueryPlanDPSize.variablesInBGP(bgp);
+        vars = QueryPlanDPSize.variablesInBGP(bgp);
         let toJoin = {};
 
         for(let nextGroupId in groupVars) {
@@ -196,7 +197,7 @@ QueryPlanDPSize.createJoinTree = function(leftPlan, rightPlan) {
 
     // Search for the join vars trying to find shared vars between
     // the left plan and the right plan.
-    for(var i=0; i<rightPlan.vars.length; i++) {
+    for(let i=0; i<rightPlan.vars.length; i++) {
         if(varsLeft.indexOf("/"+rightPlan.vars[i]+"/") != -1) {
             join.push(rightPlan.vars[i]);
         } else {
@@ -209,12 +210,12 @@ QueryPlanDPSize.createJoinTree = function(leftPlan, rightPlan) {
     let rightIds = rightPlan.i.split("_");
     let leftIds = leftPlan.i.split("_");
     let distinct = {};
-    for(i=0; i<rightIds.length; i++) {
+    for(let i=0; i<rightIds.length; i++) {
         if(rightIds[i] != "") {
             distinct[rightIds[i]] = true;
         }
     }
-    for(i=0; i<leftIds.length; i++) {
+    for(let i=0; i<leftIds.length; i++) {
         if(leftIds[i] != "") {
             distinct[leftIds[i]] = true;
         }
@@ -286,7 +287,7 @@ QueryPlanDPSize.executeAndBGPsDPSize = function(allBgps, dataset, queryEngine, e
             sizes['1'] = [];
 
             // Building plans of size 1
-            for(var i=0; i<bgps.length; i++) {
+            for(let i=0; i<bgps.length; i++) {
                 let vars = [];
 
                 delete bgps[i]['variables'];
@@ -318,7 +319,7 @@ QueryPlanDPSize.executeAndBGPsDPSize = function(allBgps, dataset, queryEngine, e
                     let sr = s - sl; // size right plan
                     let leftPlans = sizes[''+sl] || [];
                     let rightPlans = sizes[''+sr] || [];
-                    for(i=0; i<leftPlans.length; i++) {
+                    for(let i=0; i<leftPlans.length; i++) {
                         for(let j=0; j<rightPlans.length; j++) {
                             if(leftPlans[i]===rightPlans[j])
                                 continue;
@@ -408,7 +409,7 @@ QueryPlanDPSize.executeBGPDatasets = function(bgp, dataset, queryEngine, queryEn
 
     if(bgp.graph == null) {
         //union through all default graph(s)
-        var acum = [];
+        let acum = [];
         async.eachSeries(dataset.implicit,
             function(implicitGraph, k){
                 if(duplicates[implicitGraph.oid] == null) {
@@ -429,7 +430,7 @@ QueryPlanDPSize.executeBGPDatasets = function(bgp, dataset, queryEngine, queryEn
     } else if(bgp.graph.token === 'var') {
         // union through all named datasets
         let graphVar = bgp.graph.value;
-        acum = [];
+        let acum = [];
 
         async.eachSeries(dataset.named,
             function(graph, k){
@@ -495,7 +496,7 @@ QueryPlanDPSize.buildBindingsFromRange = function(results, bgp) {
 
     let components =  bgp.value||bgp;
     let bindings = {};
-    for(comp in components) {
+    for(let comp in components) {
         if(components[comp] && components[comp].token === "var") {
             bindings[comp] = components[comp].value;
         } else if(components[comp] && components[comp].token === "blank" && components[comp].oid == null) {
@@ -510,7 +511,7 @@ QueryPlanDPSize.buildBindingsFromRange = function(results, bgp) {
             let binding = {};
             let result  = results[i];
             let duplicated = false;
-            for(var comp in bindings) {
+            for(let comp in bindings) {
                 let value = result[comp];
                 if(binding[bindings[comp]] == null || binding[bindings[comp]] === value) {
                     binding[bindings[comp]] = value;
@@ -565,12 +566,12 @@ QueryPlanDPSize.areCompatibleBindings = function(bindingsA, bindingsB) {
 
 QueryPlanDPSize.mergeBindings = function(bindingsA, bindingsB) {
     let merged = {};
-    for(var variable in bindingsA) {
+    for(let variable in bindingsA) {
         merged[variable] = bindingsA[variable];
     }
 
     // an unbound value on the right doesn't replace a bound one on the left
-    for(variable in bindingsB) {
+    for(let variable in bindingsB) {
         if(bindingsB[variable] != null || !(variable in merged)) {
             merged[variable] = bindingsB[variable];
         }
@@ -584,10 +585,10 @@ QueryPlanDPSize.joinBindings2 = function(bindingVars, bindingsA, bindingsB) {
     let bindings, variable, variableValue, values, tmp;
     let joined = [];
 
-    for(var i=0; i<bindingsA.length; i++) {
+    for(let i=0; i<bindingsA.length; i++) {
         bindings = bindingsA[i];
         tmp = acum;
-        for(var j=0; j<bindingVars.length; j++) {
+        for(let j=0; j<bindingVars.length; j++) {
             variable = bindingVars[j];
             variableValue = bindings[variable];
             if(j == bindingVars.length-1) {
@@ -602,10 +603,10 @@ QueryPlanDPSize.joinBindings2 = function(bindingVars, bindingsA, bindingsB) {
         }
     }
 
-    for(i=0; i<bindingsB.length; i++) {
+    for(let i=0; i<bindingsB.length; i++) {
         bindings = bindingsB[i];
         tmp = acum;
-        for(j=0; j<bindingVars.length; j++) {
+        for(let j=0; j<bindingVars.length; j++) {
             variable = bindingVars[j];
             variableValue = bindings[variable];
 
@@ -797,7 +798,7 @@ QueryPlanDPSize.distinctUnionBindings = function(bindingLists) {
     let acum = [];
     for(let i=0; i<bindingLists.length; i++) {
         for(let j=0; j<bindingLists[i].length; j++) {
-            var bindings = bindingLists[i][j];
+            let bindings = bindingLists[i][j];
             let key = Object.keys(bindings).sort().map(function(name) {
                 return name + "=" + bindings[name];
             }).join(" ");

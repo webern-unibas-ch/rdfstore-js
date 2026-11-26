@@ -2,7 +2,8 @@ import globals from 'globals';
 
 // Guards against undeclared names: ES module builds run in strict mode,
 // where an implicit global throws instead of silently landing on `window`.
-// And against redeclared `var`s, which share one function-scoped variable.
+// And against redeclared names and `var`: block-scoped `let` keeps loop
+// variables and branch locals from leaking into the whole function.
 export default [
   {
     ignores: ['src/parser.js', 'src/perftest/']
@@ -20,6 +21,7 @@ export default [
     rules: {
       'no-undef': 'error',
       'no-redeclare': 'error',
+      'no-var': 'error',
       // Unused parameters keep shared callback signatures readable; unused
       // catch bindings belong to the question of swallowed exceptions.
       'no-unused-vars': ['error', { args: 'none', caughtErrors: 'none' }],

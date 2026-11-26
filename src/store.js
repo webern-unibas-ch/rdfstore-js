@@ -212,12 +212,11 @@ Store.prototype.execute = function() {
  * @param {Function} [callback]
  */
 Store.prototype.executeWithEnvironment = function() {
-    let queryString, defaultGraphs, namedGraphs;
+    let queryString, defaultGraphs, namedGraphs, callback;
 
     if(arguments.length === 3) {
 	queryString   = arguments[0];
-	// JSDoc fails if this is pushed outside
-	var callback  = function(){};
+	callback      = function(){};
 	defaultGraphs = arguments[1];
 	namedGraphs   = arguments[2];
     } else if(arguments.length === 4) {

@@ -197,7 +197,8 @@ Tree.prototype._splitChild = function(parent, index, child, callback) {
     let newParentChild = child.keys[this.order-1];
     child.keys[this.order-1] = null;
 
-    for(var i=0; i< this.order-1; i++) {
+    let i;
+    for(i=0; i< this.order-1; i++) {
         newChild.keys[i]=child.keys[i+this.order];
         child.keys[i+this.order] = null;
         if(!child.isLeaf) {
@@ -476,7 +477,8 @@ Tree.prototype.__deleteNodeFound = function (tree, idx, key, node, callback) {
                             node.children[idx] = combNode;
 
                             idx++;
-                            for (var i = idx; i < node.numberActives; i++) {
+                            let i;
+                            for (i = idx; i < node.numberActives; i++) {
                                 node.children[i] = node.children[i + 1];
                                 node.keys[i - 1] = node.keys[i];
                             }
@@ -541,7 +543,7 @@ Tree.prototype._moveKey = function (parent, i, position, callback) {
 
                 parent.keys[i] = rchild.keys[0];
 
-                for (var _i = 1; _i < rchild.numberActives; _i++) {
+                for (let _i = 1; _i < rchild.numberActives; _i++) {
                     rchild.keys[_i - 1] = rchild.keys[_i];
                     rchild.children[_i - 1] = rchild.children[_i];
                 }
@@ -549,7 +551,7 @@ Tree.prototype._moveKey = function (parent, i, position, callback) {
                 rchild.numberActives--;
             } else {
                 rchild.children[rchild.numberActives + 1] = rchild.children[rchild.numberActives];
-                for (_i = rchild.numberActives; _i > 0; _i--) {
+                for (let _i = rchild.numberActives; _i > 0; _i--) {
                     rchild.children[_i] = rchild.children[_i - 1];
                     rchild.keys[_i] = rchild.keys[_i - 1];
                 }
@@ -796,7 +798,7 @@ Tree.prototype._getMinKeyPos = function (tree, node, callback) {
  * A Tree node augmented with BTree
  * node structures
  */
-var Node = function() {
+let Node = function() {
     this.numberActives = 0;
     this.isLeaf = null;
     this.keys = [];

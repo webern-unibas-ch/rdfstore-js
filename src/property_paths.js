@@ -200,7 +200,7 @@ let closure = function(pairs, ends) {
     }
     let starts = ends.starts || ends.ends || Array.from(adjacency.keys());
     let acum = [];
-    for(var j=0; j<starts.length; j++) {
+    for(let j=0; j<starts.length; j++) {
         reachable(adjacency, starts[j]).forEach(function(node) {
             acum.push(backwards ? [node, starts[j]] : [starts[j], node]);
         });

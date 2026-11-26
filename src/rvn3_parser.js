@@ -50,8 +50,8 @@ RVN3Parser.parser = {
 };
 
 // Add a blank node ID mapping system for backward compatibility
-var blankNodeMap = {};
-var blankNodeCounter = 0;
+let blankNodeMap = {};
+let blankNodeCounter = 0;
 
 // Converts an entity in N3.js representation to this library's representation
 function convertEntity(entity) {
@@ -59,7 +59,7 @@ function convertEntity(entity) {
     if (entity && typeof entity === 'object' && entity.termType) {
         switch (entity.termType) {
             case 'BlankNode':
-                var blankId = entity.id;
+                let blankId = entity.id;
                 if (!blankNodeMap[blankId]) {
                     // Check if this is a user-defined named blank node (not N3.js internal)
                     if (blankId.startsWith('_:') && blankId.length > 2) {
