@@ -72,7 +72,7 @@ if(!utils.isWorker()) {
                             // an unresolvable one is passed on as is and reported as invalid
                             try {
                                 location = new URL(location, uri).href;
-                            } catch (e) {}
+                            } catch (e) { /* keep the raw Location; load() reports it as invalid */ }
                             NetworkTransport.load(location, accept, done, (redirection - 1));
                         } else {
                             done(new Error("Redirection without location header"));

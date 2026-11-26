@@ -22,7 +22,9 @@ export default [
       'no-redeclare': 'error',
       // Unused parameters keep shared callback signatures readable; unused
       // catch bindings belong to the question of swallowed exceptions.
-      'no-unused-vars': ['error', { args: 'none', caughtErrors: 'none' }]
+      'no-unused-vars': ['error', { args: 'none', caughtErrors: 'none' }],
+      // An intentionally empty block (a swallowed exception) says so in a comment.
+      'no-empty': 'error'
     }
   }
 ];

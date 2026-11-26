@@ -837,8 +837,7 @@ QueryEngine.prototype.executeQuery = function(syntaxTree, callback, defaultDatas
                                 for(var p=0; p<components.length; p++) {
                                     var component = components[p];
                                     if(tripleTemplate[component].token === 'blank') {
-                                        if(tripleTemplate[component].valuetmp && tripleTemplate[component].valuetmp != null) {
-                                        } else {
+                                        if(!tripleTemplate[component].valuetmp) {
                                             var blankId = "_:b"+blankIdCounter;
                                             blankIdCounter++;
                                             tripleTemplate[component].valuetmp = blankId;

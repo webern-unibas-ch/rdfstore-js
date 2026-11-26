@@ -16,7 +16,7 @@ yarn e2e                     # all e2e scripts in e2e/ (basic, comprehensive, re
 yarn test                    # parse-grammar + specs + e2e
 yarn build                   # parse-grammar + esbuild bundles -> dist/rdfstore{,_min}.js (IIFE) + dist/rdfstore{,_min}.mjs (ESM)
 yarn parse-grammar           # regenerate src/parser.js from grammar/sparql_query.grammar
-yarn lint                    # ESLint (no-undef, no-redeclare, no-unused-vars) over src/, without parser.js and perftest/
+yarn lint                    # ESLint (no-undef, no-redeclare, no-unused-vars, no-empty) over src/, without parser.js and perftest/
 yarn types                   # tsc check of types/rdfstore.d.ts against types/test.{mts,cts}
 ```
 
@@ -47,7 +47,7 @@ Every error reaches the caller's callback exactly once, as `callback(err)` ([spe
 
 `store.promises` and `rdfstore.promises.create` ([src/store_promises.js](src/store_promises.js)) wrap the callback API with `Utils.toPromise`. Each wrapper calls the store method with the exact argument count of the intended form, because the methods dispatch on `arguments.length`. The core stays callback-based.
 
-**Every `src/` module is strict mode** (`"use strict";` at the top), so the CommonJS entry behaves like the ES module bundle. Declare every name with `var`: an implicit global throws in strict mode. [eslint.config.mjs](eslint.config.mjs) enables `no-undef` to catch this statically, including on paths the specs never run, and `no-redeclare`: declare each name once per function, because a second `var` is the same variable. `no-unused-vars` skips parameters and `catch` bindings. It cannot see `this` inside plain callbacks, which is `undefined` in strict mode: capture `var that = this;` in the method instead.
+**Every `src/` module is strict mode** (`"use strict";` at the top), so the CommonJS entry behaves like the ES module bundle. Declare every name with `var`: an implicit global throws in strict mode. [eslint.config.mjs](eslint.config.mjs) enables `no-undef` to catch this statically, including on paths the specs never run, and `no-redeclare`: declare each name once per function, because a second `var` is the same variable. `no-unused-vars` skips parameters and `catch` bindings. `no-empty`: an intentionally empty block gets a comment. It cannot see `this` inside plain callbacks, which is `undefined` in strict mode: capture `var that = this;` in the method instead.
 
 **Layering** (from the public API down to storage):
 

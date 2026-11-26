@@ -139,13 +139,13 @@ Callbacks.CallbacksBackend.prototype.dispatchNotifications = function(notificati
 	if(deleted!=null) {
 	    try {
 		callback(Callbacks['deleted'],deleted);
-	    }catch(e){}
+	    }catch(e){ /* swallowed on purpose: a failing handler must not stop the other notifications */ }
 	}
 	for(var event in notificationsMap[callbackId]) {
 	    if(event!=Callbacks['deleted']) {
 		try{
 		    callback(event, notificationsMap[callbackId][event]);
-		}catch(e){}
+		}catch(e){ /* swallowed on purpose: a failing handler must not stop the other notifications */ }
 
 	    }
 	}
@@ -323,7 +323,7 @@ Callbacks.CallbacksBackend.prototype.observeNode = function() {
 		    mustFlush = false;
 		    try {
 			callback(node);
-		    }catch(e){}
+		    }catch(e){ /* swallowed on purpose: a failing handler must not stop the other notifications */ }
 		} else if(event !== 'eventsFlushed') {
 		    mustFlush = true;
 		    for(var i = 0; i<triples.length; i++) {
@@ -347,7 +347,7 @@ Callbacks.CallbacksBackend.prototype.observeNode = function() {
 	    that.subscribe(uri,null,null,null,observer,function(){
 		try {
 		    callback(node);
-		}catch(e){}
+		}catch(e){ /* swallowed on purpose: a failing handler must not stop the other notifications */ }
 
 		if(doneCallback)
 		    doneCallback(true)
@@ -503,7 +503,7 @@ Callbacks.CallbacksBackend.prototype.dispatchQueries = function(callback) {
 		    if(!err) {
 			try{
 			    queryCallback(results);
-			}catch(e){}
+			}catch(e){ /* swallowed on purpose: a failing handler must not stop the other notifications */ }
 		    }
 		    k();
 		});
