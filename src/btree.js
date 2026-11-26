@@ -549,7 +549,7 @@ Tree.prototype._moveKey = function (parent, i, position, callback) {
                 rchild.numberActives--;
             } else {
                 rchild.children[rchild.numberActives + 1] = rchild.children[rchild.numberActives];
-                for (var _i = rchild.numberActives; _i > 0; _i--) {
+                for (_i = rchild.numberActives; _i > 0; _i--) {
                     rchild.children[_i] = rchild.children[_i - 1];
                     rchild.keys[_i] = rchild.keys[_i - 1];
                 }

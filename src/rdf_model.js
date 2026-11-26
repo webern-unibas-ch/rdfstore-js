@@ -593,7 +593,7 @@ RDFModel.Graph.prototype.removeMatches = function(subject, predicate, object) {
 	}
     }
 
-    for(var i=0; i<toRemove.length; i++) {
+    for(i=0; i<toRemove.length; i++) {
 	this.remove(toRemove[i]);
     }
 

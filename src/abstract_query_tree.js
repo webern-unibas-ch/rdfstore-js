@@ -294,7 +294,7 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env, graph)
     // variables in scope of the patterns so far
     var scope = {};
 
-    for(var i=0; i<node.patterns.length; i++) {
+    for(i=0; i<node.patterns.length; i++) {
         var pattern = node.patterns[i];
         if(pattern.token === 'bind') {
             // Extend the patterns so far; the variable must not be in scope yet (SPARQL 1.1 18.2.1)
@@ -325,7 +325,7 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env, graph)
                     filter: true };
             }
         } else {
-            var parsedPattern = this.build(pattern, env, graph);
+            parsedPattern = this.build(pattern, env, graph);
             AbstractQueryTree.inScopeVariables(parsedPattern, scope);
             // the patterns inside GRAPH bind the active graph, except an inner GRAPH: it joins the start of the
             // group (W3C graph-nested-2/3)
@@ -462,6 +462,7 @@ AbstractQueryTree.prototype.collectBasicTriples = function(aqt, acum) {
  * Replaces bindings in an AQT
  */
 AbstractQueryTree.prototype.bind = function(aqt, bindings) {
+    var that = this;
     if(aqt.graph != null && aqt.graph.token && aqt.graph.token === 'var' &&
         bindings[aqt.graph.value] != null) {
         aqt.graph = bindings[aqt.graph.value];
@@ -488,7 +489,6 @@ AbstractQueryTree.prototype.bind = function(aqt, bindings) {
             aqt.object = bindings[aqt.object.value];
         }
     } else if(aqt.kind === 'BGP_SCOPE') {
-        var that = this;
         aqt.value = aqt.value.map(function(part) { return that.bind(part, bindings); });
     } else if(aqt.kind === 'UNION') {
         aqt.value[0] = this.bind(aqt.value[0],bindings);
@@ -510,11 +510,9 @@ AbstractQueryTree.prototype.bind = function(aqt, bindings) {
         aqt.lvalue = this.bind(aqt.lvalue, bindings);
         aqt.rvalue = this.bind(aqt.rvalue, bindings);
     } else if(aqt.kind === 'FILTER') {
-        var that = this;
         aqt.value = this.bind(aqt.value, bindings);
         aqt.filter = aqt.filter.map(function(f) { return { token: 'filter', value: that._bindFilter(f.value, bindings) }; });
     } else if(aqt.kind === 'EXTEND') {
-        var that = this;
         aqt.value = this.bind(aqt.value, bindings);
         aqt.binds = aqt.binds.map(function(b) { return { token: 'bind', expression: that._bindFilter(b.expression, bindings), as: b.as }; });
     } else if(aqt.kind === 'EMPTY_PATTERN') {
@@ -554,22 +552,22 @@ AbstractQueryTree.prototype._bindFilter = function(filterExpr, bindings) {
             }
         } else if(expressionType == 'additiveexpression') {
             filterExpr.summand = this._bindFilter(filterExpr.summand, bindings);
-            for(var i=0; i<filterExpr.summands.length; i++) {
+            for(i=0; i<filterExpr.summands.length; i++) {
                 filterExpr.summands[i].expression = this._bindFilter(filterExpr.summands[i].expression, bindings);
             }
         } else if(expressionType == 'builtincall') {
-            for(var i=0; i<filterExpr.args.length; i++) {
+            for(i=0; i<filterExpr.args.length; i++) {
                 filterExpr.args[i] = this._bindFilter(filterExpr.args[i], bindings);
             }
         } else if(expressionType == 'multiplicativeexpression') {
             filterExpr.factor = this._bindFilter(filterExpr.factor, bindings);
-            for(var i=0; i<filterExpr.factors.length; i++) {
+            for(i=0; i<filterExpr.factors.length; i++) {
                 filterExpr.factors[i].expression = this._bindFilter(filterExpr.factors[i].expression, bindings);
             }
         } else if(expressionType == 'unaryexpression') {
             filterExpr.expression = this._bindFilter(filterExpr.expression, bindings);
         } else if(expressionType == 'irireforfunction') {
-            for(var i=0; filterExpr.args != null && i<filterExpr.args.length; i++) {
+            for(i=0; filterExpr.args != null && i<filterExpr.args.length; i++) {
                 filterExpr.args[i] = this._bindFilter(filterExpr.args[i], bindings);
             }
         } else if(expressionType == 'atomic') {
@@ -673,22 +671,22 @@ AbstractQueryTree.prototype._replaceFilter = function(filterExpr, from, to, ns) 
             }
         } else if(expressionType == 'additiveexpression') {
             filterExpr.summand = this._replaceFilter(filterExpr.summand, from, to, ns);
-            for(var i=0; i<filterExpr.summands.length; i++) {
+            for(i=0; i<filterExpr.summands.length; i++) {
                 filterExpr.summands[i].expression = this._replaceFilter(filterExpr.summands[i].expression, from, to, ns);
             }
         } else if(expressionType == 'builtincall') {
-            for(var i=0; i<filterExpr.args.length; i++) {
+            for(i=0; i<filterExpr.args.length; i++) {
                 filterExpr.args[i] = this._replaceFilter(filterExpr.args[i], from, to, ns);
             }
         } else if(expressionType == 'multiplicativeexpression') {
             filterExpr.factor = this._replaceFilter(filterExpr.factor, from, to, ns);
-            for(var i=0; i<filterExpr.factors.length; i++) {
+            for(i=0; i<filterExpr.factors.length; i++) {
                 filterExpr.factors[i].expression = this._replaceFilter(filterExpr.factors[i].expression, from, to, ns);
             }
         } else if(expressionType == 'unaryexpression') {
             filterExpr.expression = this._replaceFilter(filterExpr.expression, from, to, ns);
         } else if(expressionType == 'irireforfunction') {
-            for(var i=0; filterExpr.args != null && i<filterExpr.args.length; i++) {
+            for(i=0; filterExpr.args != null && i<filterExpr.args.length; i++) {
                 filterExpr.args[i] = this._replaceFilter(filterExpr.args[i], from, to, ns);
             }
         } else if(expressionType == 'atomic') {

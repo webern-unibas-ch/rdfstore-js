@@ -188,7 +188,7 @@ Lexicon.prototype.registerLiteral = function(literal, callback) {
                 });
 
             } else {
-                var oid = oidData[0];
+                oid = oidData[0];
                 oidData[1] = oidData[1] + 1;
                 callback(oid);
             }
@@ -224,15 +224,15 @@ Lexicon.prototype.parseLiteral = function(literalString) {
         return {token: "literal", value:value, lang:lang};
     }
 
-    var parts = literalString.lastIndexOf("^^");
+    parts = literalString.lastIndexOf("^^");
     if(parts!=-1 && literalString[parts-1]==='"' && literalString[parts+2] === '<' && literalString[literalString.length-1] === '>') {
-        var value = literalString.substring(1,parts-1);
+        value = literalString.substring(1,parts-1);
         var type = literalString.substring(parts+3, literalString.length-1);
 
         return {token: "literal", value:value, type:type};
     }
 
-    var value = literalString.substring(1,literalString.length-1);
+    value = literalString.substring(1,literalString.length-1);
     return {token:"literal", value:value};
 };
 
@@ -441,7 +441,7 @@ Lexicon.prototype._unregisterTerm = function (kind, oid, callback) {
         }
     } else if (kind === 'literal') {
         this.oidCounter++;
-        var oidStr = 'l' + oid;
+        oidStr = 'l' + oid;
 
         that.oidLiterals.search(oidStr, function(literal) {
             that.literals.search(literal, function(oidData){

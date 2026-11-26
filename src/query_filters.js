@@ -123,7 +123,7 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
                 k();
             });
         } else if (filter.value.expressionType === "multiplicativeexpression") {
-            var operands = _.map(filter.value.factors, function(operand){ return {"value": operand}; });
+            operands = _.map(filter.value.factors, function(operand){ return {"value": operand}; });
             QueryFilters.preprocessExistentialFilters(operands, bindings, queryEngine, dataset, env, function(err, preprocessedOperands){
                 if(err != null) {
                     return k(err);
@@ -133,7 +133,7 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
                 k();
             });
         } else if (filter.value.expressionType === "additiveexpression") {
-            var operands = _.map(filter.value.summands, function(operand){ return {"value": operand}; });
+            operands = _.map(filter.value.summands, function(operand){ return {"value": operand}; });
             QueryFilters.preprocessExistentialFilters(operands, bindings, queryEngine, dataset, env, function(err, preprocessedOperands){
                 if(err != null) {
                     return k(err);
@@ -143,7 +143,7 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
                 k();
             });
         } else if(filter.value.expressionType === "relationalexpression") {
-            var operands = [ {"value": filter.value.op1}, {"value": filter.value.op2}];
+            operands = [ {"value": filter.value.op1}, {"value": filter.value.op2}];
             QueryFilters.preprocessExistentialFilters(operands, bindings, queryEngine, dataset, env, function(err, preprocessedOperands){
                 if(err != null) {
                     return k(err);
@@ -155,7 +155,7 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
             });
         } else if(filter.value.expressionType === "irireforfunction" || filter.value.expressionType === "custom") {
             if(filter.value.args != null) {
-                var operands = _.map(filter.value.args, function (operand) {
+                operands = _.map(filter.value.args, function (operand) {
                     return {"value": operand};
                 });
                 QueryFilters.preprocessExistentialFilters(operands, bindings, queryEngine, dataset, env, function(err, preprocessedOperands){
@@ -199,26 +199,26 @@ QueryFilters.boundVars = function(filterExpr) {
                 return [];
             } else {
                 var acum = [];
-                for(var i=0; i< filterExpr.args.length; i++) {
+                for(i=0; i< filterExpr.args.length; i++) {
                     acum = acum.concat(QueryFilters.boundVars(filterExpr.args[i]));
                 }
                 return acum;
             }
         } else if(expressionType == 'multiplicativeexpression') {
-            var acum = QueryFilters.boundVars(filterExpr.factor);
-            for(var i=0; i<filterExpr.factors.length; i++) {
+            acum = QueryFilters.boundVars(filterExpr.factor);
+            for(i=0; i<filterExpr.factors.length; i++) {
                 acum = acum.concat(QueryFilters.boundVars(filterExpr.factors[i].expression));
             }
             return acum;
         } else if(expressionType == 'additiveexpression') {
-            var acum = QueryFilters.boundVars(filterExpr.summand);
-            for(var i=0; i<filterExpr.summands.length; i++) {
+            acum = QueryFilters.boundVars(filterExpr.summand);
+            for(i=0; i<filterExpr.summands.length; i++) {
                 acum = acum.concat(QueryFilters.boundVars(filterExpr.summands[i].expression));
             }
 
             return acum;
         } else if(expressionType == 'regex') {
-            var acum = QueryFilters.boundVars(filterExpr.expression1);
+            acum = QueryFilters.boundVars(filterExpr.expression1);
             return acum.concat(QueryFilters.boundVars(filterExpr.expression2));
         } else if(expressionType == 'unaryexpression') {
             return QueryFilters.boundVars(filterExpr.expression);
@@ -259,7 +259,7 @@ QueryFilters.run = function(filterExpr, bindings, nullifyFilters, dataset, env, 
             } else {
                 // false
                 if(nullifyFilters) {
-                    var thisBindings = {"__nullify__": true, "bindings": bindings[i]};
+                    thisBindings = {"__nullify__": true, "bindings": bindings[i]};
                     filteredBindings.push(thisBindings);
                 }
             }
@@ -317,7 +317,7 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
         return bindingsGroup[0][aggregator.value.value];
     } else if(aggregator.token === 'variable' && aggregator.kind === 'aliased') {
         if(aggregator.expression.expressionType === 'aggregate') {
-            var aggregateType = aggregator.expression.aggregateType;
+            aggregateType = aggregator.expression.aggregateType;
             var isDistinct = aggregator.expression.distinct != null && aggregator.expression.distinct != '';
             if(aggregateType === 'max' || aggregateType === 'min') {
                 // SPARQL defines MIN and MAX by the ORDER BY order, which also orders values that < can't compare
@@ -337,7 +337,7 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
                 var count = 0;
                 if(aggregator.expression.expression === '*') {
                     if(isDistinct) {
-                        for(var i=0; i< bindingsGroup.length; i++) {
+                        for(i=0; i< bindingsGroup.length; i++) {
                             var key = solutionKey(bindingsGroup[i]);
                             if(distinct[key] == null) {
                                 distinct[key] = true;
@@ -348,11 +348,11 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
                         count = bindingsGroup.length;
                     }
                 } else {
-                    for(var i=0; i< bindingsGroup.length; i++) {
-                        var ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
+                    for(i=0; i< bindingsGroup.length; i++) {
+                        ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
                         if(ebv != null) {
                             if(isDistinct) {
-                                var key = Utils.hashTerm(ebv);
+                                key = Utils.hashTerm(ebv);
                                 if(distinct[key] == null) {
                                     distinct[key] = true;
                                     count++;
@@ -366,11 +366,11 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
 
                 return {token: 'literal', type:xmlSchema+"integer", value:''+count};
             } else if(aggregateType === 'sum' || aggregateType === 'avg') {
-                var distinct = {};
+                distinct = {};
                 var aggregated = {token: 'literal', type:xmlSchema+"integer", value:'0'};
-                var count = 0;
-                for(var i=0; i< bindingsGroup.length; i++) {
-                    var ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
+                count = 0;
+                for(i=0; i< bindingsGroup.length; i++) {
+                    ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
                     if(ebv == null) {
                         continue;
                     } else if(!QueryFilters.isNumeric(ebv)) {
@@ -378,7 +378,7 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
                         return QueryFilters.ebvError();
                     }
                     if(isDistinct) {
-                        var key = Utils.hashTerm(ebv);
+                        key = Utils.hashTerm(ebv);
                         if(distinct[key] != null) {
                             continue;
                         }
@@ -394,14 +394,14 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
                 }
                 return QueryFilters.resultTerm(QueryFilters.runDivFunction(aggregated, {token: 'literal', type:xmlSchema+"integer", value:''+count}));
             } else if(aggregateType === 'group_concat') {
-                var distinct = {};
+                distinct = {};
                 var values = [];
                 var separator = aggregator.expression.separator != null ? aggregator.expression.separator : " ";
-                for(var i=0; i< bindingsGroup.length; i++) {
-                    var ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
+                for(i=0; i< bindingsGroup.length; i++) {
+                    ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
                     if(ebv != null && ebv.token === 'literal') {
                         if(isDistinct) {
-                            var key = Utils.hashTerm(ebv);
+                            key = Utils.hashTerm(ebv);
                             if(distinct[key] == null) {
                                 distinct[key] = true;
                                 values.push(ebv.value);
@@ -1490,7 +1490,7 @@ QueryFilters.runIriRefOrFunction = function(iriref, args, bindings,queryEngine, 
                 return QueryFilters.ebvError();
             }
         } else if(fun == xmlSchema+"boolean") {
-            var from = ops[0];
+            from = ops[0];
             if(from.token === "literal" && from.type == null) {
                 if(from.value === "true" || from.value === "1") {
                     return QueryFilters.ebvTrue();
@@ -1509,7 +1509,7 @@ QueryFilters.runIriRefOrFunction = function(iriref, args, bindings,queryEngine, 
                 return QueryFilters.ebvError();
             }
         } else if(fun == xmlSchema+"string") {
-            var from = ops[0];
+            from = ops[0];
             if(from.token === 'literal') {
                 from = QueryFilters.normalizeLiteralDatatype(from, queryEngine, env);
                 if(from.type == xmlSchema+"integer" ||
@@ -1581,7 +1581,7 @@ QueryFilters.runIriRefOrFunction = function(iriref, args, bindings,queryEngine, 
                 return QueryFilters.ebvError();
             }
         } else if(fun == xmlSchema+"float") {
-            var from = ops[0];
+            from = ops[0];
             if(from.token === 'literal') {
                 from = QueryFilters.normalizeLiteralDatatype(from, queryEngine, env);
                 if(from.type == 'http://www.w3.org/2001/XMLSchema#decimal' ||

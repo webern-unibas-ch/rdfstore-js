@@ -1,7 +1,8 @@
 import globals from 'globals';
 
-// Only guards against undeclared names: ES module builds run in strict mode,
+// Guards against undeclared names: ES module builds run in strict mode,
 // where an implicit global throws instead of silently landing on `window`.
+// And against redeclared `var`s, which share one function-scoped variable.
 export default [
   {
     ignores: ['src/parser.js', 'src/perftest/']
@@ -17,7 +18,8 @@ export default [
       }
     },
     rules: {
-      'no-undef': 'error'
+      'no-undef': 'error',
+      'no-redeclare': 'error'
     }
   }
 ];

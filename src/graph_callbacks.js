@@ -155,7 +155,7 @@ Callbacks.CallbacksBackend.prototype.dispatchNotifications = function(notificati
 
 Callbacks.CallbacksBackend.prototype._searchCallbacksInIndex = function(index, order, event, quadPair, notificationsMap) {
     var quadPairNomalized = quadPair[1];
-    var quadPair = quadPair[0];
+    quadPair = quadPair[0];
 
     for(var i=0; i<(order.length+1); i++) {
 	var matched = index['_'] || [];
@@ -459,7 +459,7 @@ Callbacks.CallbacksBackend.prototype.stopObservingQuery = function(query) {
 
 Callbacks.CallbacksBackend.prototype._searchQueriesInIndex = function(index, order, quadPair) {
     var quadPairNomalized = quadPair[1];
-    var quadPair = quadPair[0];
+    quadPair = quadPair[0];
 
     for(var i=0; i<(order.length+1); i++) {
 	var matched = index['_'] || [];

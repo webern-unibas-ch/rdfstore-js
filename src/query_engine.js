@@ -293,8 +293,8 @@ QueryEngine.extractAggregates = function(expression, aggregates) {
         return {token: 'expression', expressionType: 'atomic', primaryexpression: 'var', value: {token: 'var', value: name}};
     }
     var copy = Array.isArray(expression) ? [] : {};
-    for(var key in expression) {
-        copy[key] = QueryEngine.extractAggregates(expression[key], aggregates);
+    for(var prop in expression) {
+        copy[prop] = QueryEngine.extractAggregates(expression[prop], aggregates);
     }
     return copy;
 };
@@ -830,7 +830,7 @@ QueryEngine.prototype.executeQuery = function(syntaxTree, callback, defaultDatas
                             for(var j=0; j<toClear.length; j++)
                                 delete toClear[j].valuetmp;
 
-                            for(var j=0; j<aqt.template.triplesContext.length; j++) {
+                            for(j=0; j<aqt.template.triplesContext.length; j++) {
                                 // fresh IDs for blank nodes in the construct template
                                 var components = ['subject', 'predicate', 'object'];
                                 var tripleTemplate = aqt.template.triplesContext[j];
@@ -847,10 +847,10 @@ QueryEngine.prototype.executeQuery = function(syntaxTree, callback, defaultDatas
                                     }
                                 }
                                 var s = RDFModel.buildRDFResource(tripleTemplate.subject,bindings,that,queryEnv);
-                                var p = RDFModel.buildRDFResource(tripleTemplate.predicate,bindings,that,queryEnv);
+                                var pred = RDFModel.buildRDFResource(tripleTemplate.predicate,bindings,that,queryEnv);
                                 var o = RDFModel.buildRDFResource(tripleTemplate.object,bindings,that,queryEnv);
-                                if(s!=null && p!=null && o!=null) {
-                                    var triple = new RDFModel.Triple(s,p,o);
+                                if(s!=null && pred!=null && o!=null) {
+                                    var triple = new RDFModel.Triple(s,pred,o);
                                     graph.add(triple);
                                     //} else {
                                     //    return callback(false, "Error creating output graph")
@@ -1127,6 +1127,7 @@ QueryEngine.prototype.groupSolution = function(bindings, group, dataset, queryEn
  * Here, all the constructions of the SPARQL algebra are handled
  */
 QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern, env, callback) {
+    var that = this;
     if(pattern.kind === "BGP") {
         this.executeAndBGP(projection, dataset, pattern, env, callback);
     } else if(pattern.kind === "UNION") {
@@ -1137,7 +1138,6 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
         this.executeLEFT_JOIN(projection, dataset, pattern, env, callback);
     } else if(pattern.kind === "FILTER") {
         // Some components may have the filter inside the unit
-        var that = this;
         this.executeSelectUnit(projection, dataset, pattern.value, env, function (err, results) {
             if (err != null) {
                 callback(err);
@@ -1148,7 +1148,6 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
             }
         });
     } else if(pattern.kind === "EXTEND") {
-        var that = this;
         this.executeSelectUnit(projection, dataset, pattern.value, env, function (err, results) {
             if (err != null) {
                 callback(err);
@@ -1548,7 +1547,7 @@ QueryEngine.prototype.batchLoad = function(quads, callback) {
 
     // subject
     var registerComponent = function(quad, component, newQuad, k) {
-        var maybeBlankOid, oid, quad;
+        var maybeBlankOid, oid;
 
         if (quad[component]['uri'] || quad[component].token === 'uri') {
             var uriValue = (quad[component].uri || quad[component].value);

@@ -27,7 +27,7 @@ var Utils = require("./utils");
 
     if (params && params["precedences"] != null) {
         this.precedences = params["precedences"];
-        for (var mime in params["parsers"]) {
+        for (mime in params["parsers"]) {
             if (!Utils.include(this.precedences, mime)) {
                 this.precedences.push(mime);
             }
@@ -120,7 +120,7 @@ RDFLoader.prototype.loadFromFile = function(parser, graph, uri, options, callbac
             if(err) {
                 callback(err);
             } else {
-                var data = data.toString('utf8');
+                data = data.toString('utf8');
                 that.tryToParse(parser, graph, data, parseOptions, callback);
             }
         });

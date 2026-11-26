@@ -190,7 +190,7 @@ Store.prototype.execute = function() {
 
 	if(arguments.length === 1) {
 	    queryString = arguments[0];
-	    var callback = function(){};
+	    callback = function(){};
 	} else if(arguments.length === 2) {
 	    queryString = arguments[0];
 	    callback = arguments [1];
@@ -222,7 +222,7 @@ Store.prototype.executeWithEnvironment = function() {
 	namedGraphs   = arguments[2];
     } else if(arguments.length === 4) {
 	queryString   = arguments[0];
-	var callback      = arguments [3];
+	callback      = arguments [3];
 	defaultGraphs = arguments[1];
 	namedGraphs   = arguments[2];
     }
@@ -633,7 +633,7 @@ Store.prototype.clear = function() {
 
     if(arguments.length === 0) {
 	graph = this.rdf.createNamedNode(this.engine.lexicon.defaultGraphUri);
-	var callback= function(){};
+	callback= function(){};
     } else if(arguments.length === 1) {
 	graph = this.rdf.createNamedNode(this.engine.lexicon.defaultGraphUri);
 	callback= arguments[0] || function(){};
