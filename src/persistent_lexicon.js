@@ -276,7 +276,7 @@ PersistentLexicon.prototype.parseUri = function(uriString) {
  * @returns parsed token or null if not found.
  */
 PersistentLexicon.prototype.retrieve = function(oid, callback) {
-    let that = this, transaction, request;
+    const that = this;
 
     if(oid === this.defaultGraphOid) {
         callback({
@@ -287,8 +287,8 @@ PersistentLexicon.prototype.retrieve = function(oid, callback) {
             defaultGraph: true
         });
     } else {
-        transaction = that.db.transaction(["components"]);
-        request = transaction.objectStore("components").get(oid);
+        const transaction = that.db.transaction(["components"]);
+        const request = transaction.objectStore("components").get(oid);
         request.onsuccess = function(event) {
             if(event.target.result != null) {
                 if(event.target.result.label != null) {
@@ -322,7 +322,7 @@ PersistentLexicon.prototype.clear = function(callback) {
     this.defaultGraphUri = "https://github.com/antoniogarrote/rdfstore-js#default_graph";
     this.defaultGraphUriTerm = {"token":"uri","prefix":null,"suffix":null,"value":this.defaultGraphUri};
 
-    let transaction = that.db.transaction(["components"],"readwrite"), request;
+    const transaction = that.db.transaction(["components"],"readwrite");
     const components = transaction.objectStore("components");
 
     const k = function() {
@@ -330,7 +330,7 @@ PersistentLexicon.prototype.clear = function(callback) {
             callback();
     };
 
-    request = components.clear();
+    const request = components.clear();
     request.onsuccess = k;
     request.onerror = k;
 };
@@ -382,7 +382,8 @@ PersistentLexicon.prototype.unregisterBlank = function (oid, callback) {
  * @private
  */
 PersistentLexicon.prototype._unregisterTerm = function (kind, oid, callback) {
-    let that = this, request;
+    const that = this;
+    let request;
     const transaction = that.db.transaction(["components", "knownGraphs"],"readwrite");
     if (kind === 'uri') {
         if (oid != this.defaultGraphOid) {

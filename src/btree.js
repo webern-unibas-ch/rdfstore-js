@@ -703,10 +703,9 @@ Tree.prototype._deleteKeyFromNode = function (node, index, callback) {
 };
 
 Tree.prototype._mergeNodes = function(n1, key, n2, callback) {
-    let newNode;
     let i;
 
-    newNode = this._allocateNode();
+    const newNode = this._allocateNode();
     newNode.isLeaf = true;
 
     for(i=0; i<n1.numberActives; i++) {

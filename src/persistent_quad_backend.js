@@ -190,8 +190,8 @@ PersistentQuadBackend.prototype._indexForPattern = function (pattern) {
 
 PersistentQuadBackend.prototype.clear = function(callback) {
     const that = this;
-    let transaction = that.db.transaction([that.dbName],"readwrite"), request;
-    request = transaction.objectStore(that.dbName).clear();
+    const transaction = that.db.transaction([that.dbName],"readwrite");
+    const request = transaction.objectStore(that.dbName).clear();
     request.onsuccess = function(){ callback(); };
     request.onerror = function(){ callback(); };
 };
