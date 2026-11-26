@@ -181,60 +181,6 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
     });
 };
 
-QueryFilters.boundVars = function(filterExpr) {
-    if(filterExpr.expressionType != null) {
-        const expressionType = filterExpr.expressionType;
-        if(expressionType == 'relationalexpression') {
-            const op1 = filterExpr.op1;
-            const op2 = filterExpr.op2;
-            return QueryFilters.boundVars(op1)+QueryFilters.boundVars(op2);
-        } else if(expressionType == 'conditionalor' || expressionType == 'conditionaland') {
-            let vars = [];
-            for(let i=0; i< filterExpr.operands; i++) {
-                vars = vars.concat(QueryFilters.boundVars(filterExpr.operands[i]));
-            }
-            return vars;
-        } else if(expressionType == 'builtincall') {
-            if(filterExpr.args == null) {
-                return [];
-            } else {
-                let acum = [];
-                for(let i=0; i< filterExpr.args.length; i++) {
-                    acum = acum.concat(QueryFilters.boundVars(filterExpr.args[i]));
-                }
-                return acum;
-            }
-        } else if(expressionType == 'multiplicativeexpression') {
-            let acum = QueryFilters.boundVars(filterExpr.factor);
-            for(let i=0; i<filterExpr.factors.length; i++) {
-                acum = acum.concat(QueryFilters.boundVars(filterExpr.factors[i].expression));
-            }
-            return acum;
-        } else if(expressionType == 'additiveexpression') {
-            let acum = QueryFilters.boundVars(filterExpr.summand);
-            for(let i=0; i<filterExpr.summands.length; i++) {
-                acum = acum.concat(QueryFilters.boundVars(filterExpr.summands[i].expression));
-            }
-
-            return acum;
-        } else if(expressionType == 'regex') {
-            const acum = QueryFilters.boundVars(filterExpr.expression1);
-            return acum.concat(QueryFilters.boundVars(filterExpr.expression2));
-        } else if(expressionType == 'unaryexpression') {
-            return QueryFilters.boundVars(filterExpr.expression);
-        } else if(expressionType == 'atomic') {
-            if(filterExpr.primaryexpression == 'var') {
-                return [filterExpr.value];
-            } else {
-                // numeric, literal, etc...
-                return [];
-            }
-        }
-    } else {
-        throw("Cannot find bound expressions in a no expression token");
-    }
-};
-
 QueryFilters.run = function(filterExpr, bindings, nullifyFilters, dataset, env, queryEngine, callback) {
     queryEngine.copyDenormalizedBindings(bindings, env.outCache, function(denormBindings){
         const filteredBindings = [];
