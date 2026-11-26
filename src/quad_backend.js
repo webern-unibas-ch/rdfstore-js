@@ -1,8 +1,8 @@
 "use strict";
 
 // imports
-let QuadIndex = require("./quad_index").QuadIndex;
-let utils = require('./utils');
+const QuadIndex = require("./quad_index").QuadIndex;
+const utils = require('./utils');
 
 /*
  * "perfect" indices for RDF indexing
@@ -17,12 +17,12 @@ let utils = require('./utils');
  * @param configuration['treeOrder'] Tree order for the indices that are going to be created
  * @return The newly created backend.
  */
-let QuadBackend = function (configuration, callback) {
+const QuadBackend = function (configuration, callback) {
     this.indexMap = {};
     this.treeOrder = configuration['treeOrder'];
     this.indices = (configuration["index"] || QuadBackend.allIndices);
     this.componentOrders = QuadBackend.componentOrders;
-    let that = this;
+    const that = this;
 
     utils.eachSeries(this.indices,function(indexKey, k){
         new QuadIndex({
@@ -49,11 +49,11 @@ QuadBackend.componentOrders = {
 
 
 QuadBackend.prototype._indexForPattern = function (pattern) {
-    let indexKey = pattern.indexKey;
+    const indexKey = pattern.indexKey;
 
     for (let i = 0; i < QuadBackend.allIndices.length; i++) {
-        let index = QuadBackend.allIndices[i];
-        let indexComponents = QuadBackend.componentOrders[index];
+        const index = QuadBackend.allIndices[i];
+        const indexComponents = QuadBackend.componentOrders[index];
         for (let j = 0; j < indexComponents.length; j++) {
             if (utils.include(indexKey, indexComponents[j]) === false) {
                 break;
@@ -69,9 +69,9 @@ QuadBackend.prototype._indexForPattern = function (pattern) {
 
 
 QuadBackend.prototype.index = function (quad, callback) {
-    let that = this;
+    const that = this;
     utils.eachSeries(this.indices, function (indexKey, k) {
-        let index = that.indexMap[indexKey];
+        const index = that.indexMap[indexKey];
         index.insert(quad, function () {
             k();
         })
@@ -81,8 +81,8 @@ QuadBackend.prototype.index = function (quad, callback) {
 };
 
 QuadBackend.prototype.range = function (pattern, callback) {
-    let indexKey = this._indexForPattern(pattern);
-    let index = this.indexMap[indexKey];
+    const indexKey = this._indexForPattern(pattern);
+    const index = this.indexMap[indexKey];
     if(index != null) {
         index.range(pattern, function (quads) {
             callback(quads);
@@ -91,7 +91,7 @@ QuadBackend.prototype.range = function (pattern, callback) {
 };
 
 QuadBackend.prototype.search = function (quad, callback) {
-    let index = this.indexMap['SPOG'];
+    const index = this.indexMap['SPOG'];
     if(index != null) {
         index.search(quad, function (result) {
             callback(result != null);
@@ -101,9 +101,9 @@ QuadBackend.prototype.search = function (quad, callback) {
 
 
 QuadBackend.prototype.delete = function (quad, callback) {
-    let that = this;
+    const that = this;
     utils.eachSeries(this.indices, function (indexKey, k) {
-        let index = that.indexMap[indexKey];
+        const index = that.indexMap[indexKey];
         index.delete(quad, function () {
             k();
         });
@@ -113,7 +113,7 @@ QuadBackend.prototype.delete = function (quad, callback) {
 };
 
 QuadBackend.prototype.clear = function(callback) {
-    let that = this;
+    const that = this;
     utils.eachSeries(this.indices, function (indexKey, k) {
         new QuadIndex({
             order: that.treeOrder,

@@ -1,20 +1,20 @@
 "use strict";
 
 //imports
-let AbstractQueryTree = require("./abstract_query_tree").AbstractQueryTree;
-let NonSupportedSparqlFeatureError = require("./abstract_query_tree").NonSupportedSparqlFeatureError;
-let Utils = require("./utils");
-let QuadIndex = require("./quad_index");
-let QueryPlan = require("./query_plan").QueryPlan;
-let QueryFilters = require("./query_filters").QueryFilters;
-let PropertyPaths = require("./property_paths").PropertyPaths;
-let RDFModel = require("./rdf_model");
-let RDFLoader = require("./rdf_loader").RDFLoader;
-let Callbacks = require("./graph_callbacks").CallbacksBackend;
-let async = require('./utils');
-let _ = require('./utils');
+const AbstractQueryTree = require("./abstract_query_tree").AbstractQueryTree;
+const NonSupportedSparqlFeatureError = require("./abstract_query_tree").NonSupportedSparqlFeatureError;
+const Utils = require("./utils");
+const QuadIndex = require("./quad_index");
+const QueryPlan = require("./query_plan").QueryPlan;
+const QueryFilters = require("./query_filters").QueryFilters;
+const PropertyPaths = require("./property_paths").PropertyPaths;
+const RDFModel = require("./rdf_model");
+const RDFLoader = require("./rdf_loader").RDFLoader;
+const Callbacks = require("./graph_callbacks").CallbacksBackend;
+const async = require('./utils');
+const _ = require('./utils');
 
-let QueryEngine = function(params) {
+const QueryEngine = function(params) {
     if(arguments.length != 0) {
         this.backend = params.backend;
         this.lexicon = params.lexicon;
@@ -41,18 +41,18 @@ QueryEngine.prototype.setCustomFunctions = function(customFns) {
 // Utils
 // Adds the PREFIX and BASE declarations of a prologue to env, after those it has (the default prefixes for a new env)
 QueryEngine.prototype.registerNsInEnvironment = function(prologue, env) {
-    let namespaces = {};
+    const namespaces = {};
     let p;
-    let previous = env.namespaces || this.defaultPrefixes;
+    const previous = env.namespaces || this.defaultPrefixes;
     for(p in previous) {
         namespaces[p] = previous[p];
     }
 
     // in order: a BASE resolves against the BASE before it, a PREFIX IRI against the BASE in effect there
     let base = env.base || null;
-    let declarations = prologue != null && prologue.declarations != null ? prologue.declarations : [];
+    const declarations = prologue != null && prologue.declarations != null ? prologue.declarations : [];
     for(let i=0; i<declarations.length; i++) {
-        let declaration = declarations[i];
+        const declaration = declarations[i];
         if(declaration.token === "base") {
             base = Utils.resolveIri(base, declaration.value);
         } else if(declaration.token === "prefix") {
@@ -66,17 +66,17 @@ QueryEngine.prototype.registerNsInEnvironment = function(prologue, env) {
 
 QueryEngine.prototype.applyModifier = function(modifier, projectedBindings) {
     if(modifier == "DISTINCT") {
-        let map = {};
-        let result = [];
+        const map = {};
+        const result = [];
         for(let i=0; i<projectedBindings.length; i++) {
-            let bindings = projectedBindings[i];
+            const bindings = projectedBindings[i];
             let key = "";
 
             // if no projection variables hash is passed, all the bound
             // variable in the current bindings will be used.
-            for(let p in (bindings)) {
+            for(const p in (bindings)) {
                 // hashing the object
-                let obj = bindings[p];
+                const obj = bindings[p];
                 if(obj == null) {
                     key = key+p+'null';
                 } else if(obj.token == 'literal') {
@@ -128,8 +128,8 @@ QueryEngine.prototype.applyLimitOffset = function(offset, limit, bindings) {
 
 
 QueryEngine.prototype.applySingleOrderBy = function(orderFilters, modifiedBindings, dataset, outEnv, callback) {
-    let acum = [];
-    let that = this;
+    const acum = [];
+    const that = this;
     async.eachSeries(orderFilters, function(orderFilter,k){
         QueryFilters.collect(orderFilter.expression, [modifiedBindings], dataset, outEnv, that, function(results) {
             acum.push(results[0].value);
@@ -141,8 +141,8 @@ QueryEngine.prototype.applySingleOrderBy = function(orderFilters, modifiedBindin
 };
 
 QueryEngine.prototype.applyOrderBy = function(order, modifiedBindings, dataset, outEnv, callback) {
-    let that = this;
-    let acum = [];
+    const that = this;
+    const acum = [];
     if(order != null && order.length > 0) {
         async.eachSeries(modifiedBindings, function(bindings,k){
             that.applySingleOrderBy(order, bindings, dataset, outEnv, function(results){
@@ -154,7 +154,7 @@ QueryEngine.prototype.applyOrderBy = function(order, modifiedBindings, dataset, 
                 return that.compareFilteredBindings(a, b, order, outEnv);
             });
 
-            let toReturn = [];
+            const toReturn = [];
             for(let i=0; i<acum.length; i++) {
                 toReturn.push(acum[i].binding);
             }
@@ -167,18 +167,18 @@ QueryEngine.prototype.applyOrderBy = function(order, modifiedBindings, dataset, 
     }
 };
 
-let untypedOrString = function(term) {
+const untypedOrString = function(term) {
     return term.token === 'literal' && (term.type == null || QueryFilters.isXsdType("string", term));
 };
 
 QueryEngine.prototype.compareFilteredBindings = function(a, b, order, env) {
-    let found = false;
+    const found = false;
     let i = 0;
     while(!found) {
         if(i==a.value.length) {
             return 0;
         }
-        let direction = order[i].direction;
+        const direction = order[i].direction;
         let filterResult;
 
         // unbound first
@@ -263,7 +263,7 @@ QueryEngine.containsAggregate = function(expression) {
     if(expression.expressionType === 'aggregate') {
         return true;
     }
-    for(let key in expression) {
+    for(const key in expression) {
         if(QueryEngine.containsAggregate(expression[key])) {
             return true;
         }
@@ -279,7 +279,7 @@ QueryEngine.extractAggregates = function(expression, aggregates) {
         return expression;
     }
     if(expression.expressionType === 'aggregate') {
-        let key = JSON.stringify(expression);
+        const key = JSON.stringify(expression);
         let name = null;
         for(let i=0; i<aggregates.length && name == null; i++) {
             if(aggregates[i].key === key) {
@@ -292,8 +292,8 @@ QueryEngine.extractAggregates = function(expression, aggregates) {
         }
         return {token: 'expression', expressionType: 'atomic', primaryexpression: 'var', value: {token: 'var', value: name}};
     }
-    let copy = Array.isArray(expression) ? [] : {};
-    for(let prop in expression) {
+    const copy = Array.isArray(expression) ? [] : {};
+    for(const prop in expression) {
         copy[prop] = QueryEngine.extractAggregates(expression[prop], aggregates);
     }
     return copy;
@@ -307,7 +307,7 @@ QueryEngine.expressionVariables = function(expression, vars) {
     if(expression.token === 'var') {
         vars.push(expression.value);
     } else if(expression.builtincall !== 'exists' && expression.builtincall !== 'notexists') {
-        for(let key in expression) {
+        for(const key in expression) {
             QueryEngine.expressionVariables(expression[key], vars);
         }
     }
@@ -316,7 +316,7 @@ QueryEngine.expressionVariables = function(expression, vars) {
 
 // The variables a GROUP BY binds: grouped variables and the aliases of grouped expressions.
 QueryEngine.groupVariables = function(group) {
-    let vars = [];
+    const vars = [];
     for(let i=0; group !== 'singleGroup' && i<group.length; i++) {
         if(group[i].token === 'var') {
             vars.push(group[i].value);
@@ -332,12 +332,12 @@ QueryEngine.groupVariables = function(group) {
 // the group variables and, more leniently than SPARQL, the SELECT aliases; `ungroupedVariable` names the
 // first other variable.
 QueryEngine.planGroups = function(group, projection, having, order) {
-    let plan = {groupVars: QueryEngine.groupVariables(group), aggregates: [], projection: [], having: [], order: []};
-    let expressions = [];
+    const plan = {groupVars: QueryEngine.groupVariables(group), aggregates: [], projection: [], having: [], order: []};
+    const expressions = [];
     for(let i=0; i<projection.length; i++) {
-        let expression = projection[i].expression;
+        const expression = projection[i].expression;
         // a single aggregate is computed over the group, any other expression evaluated on the group's scope
-        let evaluated = expression != null && expression.expressionType !== 'aggregate';
+        const evaluated = expression != null && expression.expressionType !== 'aggregate';
         plan.projection.push({
             name: projection[i].alias ? projection[i].alias.value : projection[i].value.value,
             item: projection[i],
@@ -356,13 +356,13 @@ QueryEngine.planGroups = function(group, projection, having, order) {
         expressions.push(plan.order[i].expression);
     }
 
-    let inScope = {};
-    let names = plan.groupVars.concat(plan.projection.map(function(projected) { return projected.name; }),
+    const inScope = {};
+    const names = plan.groupVars.concat(plan.projection.map(function(projected) { return projected.name; }),
         plan.aggregates.map(function(aggregate) { return aggregate.name; }));
     for(let i=0; i<names.length; i++) {
         inScope[names[i]] = true;
     }
-    let used = QueryEngine.expressionVariables(expressions, []);
+    const used = QueryEngine.expressionVariables(expressions, []);
     for(let i=0; i<used.length && plan.ungroupedVariable == null; i++) {
         if(inScope[used[i]] !== true) {
             plan.ungroupedVariable = used[i];
@@ -374,19 +374,19 @@ QueryEngine.planGroups = function(group, projection, having, order) {
 // One group's solution as SELECT expressions, HAVING and ORDER BY see it: the group variables, the
 // aggregates of the plan and the projected values.
 QueryEngine.prototype.groupScope = function(plan, denormGroup, dataset, env) {
-    let scope = {};
+    const scope = {};
     for(let i=0; i<plan.groupVars.length; i++) {
         scope[plan.groupVars[i]] = denormGroup.length > 0 ? denormGroup[0][plan.groupVars[i]] : null;
     }
     for(let i=0; i<plan.aggregates.length; i++) {
-        let value = QueryFilters.runAggregator({token: 'variable', kind: 'aliased', expression: plan.aggregates[i].expression}, denormGroup, this, dataset, env);
+        const value = QueryFilters.runAggregator({token: 'variable', kind: 'aliased', expression: plan.aggregates[i].expression}, denormGroup, this, dataset, env);
         if(!QueryFilters.isEbvError(value)) {
             scope[plan.aggregates[i].name] = value;
         }
     }
     for(let i=0; i<plan.projection.length; i++) {
-        let projected = plan.projection[i];
-        let value = projected.expression == null ?
+        const projected = plan.projection[i];
+        const value = projected.expression == null ?
             QueryFilters.runAggregator(projected.item, denormGroup, this, dataset, env) :
             QueryFilters.runFilter(projected.expression, scope, this, dataset, env);
         // an error leaves the variable unbound
@@ -401,8 +401,8 @@ QueryEngine.prototype.groupScope = function(plan, denormGroup, dataset, env) {
 // Adds the SELECT aliases to copies of the solutions (SPARQL 1.1 Extend, before ORDER BY). Expressions are
 // evaluated on the terms of the variables they use, not on OIDs; an error leaves the alias unbound.
 QueryEngine.prototype.extendBindings = function(projection, results, dataset, env, callback) {
-    let aliased = [];
-    let used = [];
+    const aliased = [];
+    const used = [];
     for(let j=0; projection[0].kind !== '*' && j<projection.length; j++) {
         if(projection[j].kind === 'aliased') {
             aliased.push(projection[j]);
@@ -412,24 +412,24 @@ QueryEngine.prototype.extendBindings = function(projection, results, dataset, en
     if(aliased.length === 0) {
         return callback(results);
     }
-    let usedBindings = results.map(function(result) {
-        let usedResult = {};
+    const usedBindings = results.map(function(result) {
+        const usedResult = {};
         for(let u=0; u<used.length; u++) {
             usedResult[used[u]] = result[used[u]];
         }
         return usedResult;
     });
-    let that = this;
+    const that = this;
     this.copyDenormalizedBindings(usedBindings, env.outCache, function(denormResults) {
-        let expressionEnv = {blanks:{}, outCache:{}, namespaces: env.namespaces, base: env.base};
-        let extended = [];
+        const expressionEnv = {blanks:{}, outCache:{}, namespaces: env.namespaces, base: env.base};
+        const extended = [];
         for(let i=0; i<results.length; i++) {
-            let extendedResult = {};
-            for(let p in results[i]) {
+            const extendedResult = {};
+            for(const p in results[i]) {
                 extendedResult[p] = results[i][p];
             }
             for(let j=0; j<aliased.length; j++) {
-                let ebv = QueryFilters.runFilter(aliased[j].expression, denormResults[i], that, dataset, expressionEnv);
+                const ebv = QueryFilters.runFilter(aliased[j].expression, denormResults[i], that, dataset, expressionEnv);
                 extendedResult[aliased[j].alias.value] = QueryFilters.isEbvError(ebv) ? null : QueryFilters.resultTerm(ebv);
             }
             extended.push(extendedResult);
@@ -446,9 +446,9 @@ QueryEngine.prototype.projectBindings = function(projection, results) {
         return results;
     }
     return results.map(function(result) {
-        let projected = {};
+        const projected = {};
         for(let j=0; j<projection.length; j++) {
-            let name = projection[j].kind === 'aliased' ? projection[j].alias.value : projection[j].value.value;
+            const name = projection[j].kind === 'aliased' ? projection[j].alias.value : projection[j].value.value;
             projected[name] = result[name];
         }
         return projected;
@@ -456,13 +456,13 @@ QueryEngine.prototype.projectBindings = function(projection, results) {
 };
 
 QueryEngine.prototype.resolveNsInEnvironment = function(prefix, env) {
-    let namespaces = env.namespaces;
+    const namespaces = env.namespaces;
     return namespaces[prefix];
 };
 
 QueryEngine.prototype.normalizeTerm = function(term, env, shouldIndex, callback) {
     if(term.token === 'uri') {
-        let uri = Utils.lexicalFormBaseUri(term, env);
+        const uri = Utils.lexicalFormBaseUri(term, env);
         if(uri == null) {
             callback(null);
         } else {
@@ -474,14 +474,14 @@ QueryEngine.prototype.normalizeTerm = function(term, env, shouldIndex, callback)
         }
 
     } else if(term.token === 'literal') {
-        let lexicalFormLiteral = Utils.lexicalFormLiteral(term, env);
+        const lexicalFormLiteral = Utils.lexicalFormLiteral(term, env);
         if(shouldIndex) {
             this.lexicon.registerLiteral(lexicalFormLiteral,callback);
         } else {
             this.lexicon.resolveLiteral(lexicalFormLiteral,callback);
         }
     } else if(term.token === 'blank') {
-        let label = term.value;
+        const label = term.value;
         if(term.oid != null) {
             // a blank node of the store bound into an EXISTS pattern
             callback(term.oid);
@@ -505,7 +505,7 @@ QueryEngine.prototype.normalizeTerm = function(term, env, shouldIndex, callback)
 };
 
 QueryEngine.prototype.normalizeDatasets = function(datasets, outerEnv, callback) {
-    let that = this;
+    const that = this;
     async.eachSeries(datasets, function(dataset, k){
         if(dataset.value === that.lexicon.defaultGraphUri) {
             dataset.oid = that.lexicon.defaultGraphOid;
@@ -529,7 +529,7 @@ QueryEngine.prototype.normalizeDatasets = function(datasets, outerEnv, callback)
  * graphs are cached on the dataset, which belongs to one query or update operation.
  */
 QueryEngine.prototype.isDatasetGraph = function(graph, dataset, env, callback) {
-    let that = this;
+    const that = this;
     this.normalizeTerm(graph, env, false, function(oid){
         if(oid == null || oid === -1) {
             callback(false);
@@ -551,7 +551,7 @@ QueryEngine.prototype.normalizeQuad = function(quad, queryEnv, shouldIndex, call
     let predicate  = null;
     let object     = null;
     let graph      = null;
-    let that = this;
+    const that = this;
     let error = false;
 
     async.seq(function(k){
@@ -559,7 +559,7 @@ QueryEngine.prototype.normalizeQuad = function(quad, queryEnv, shouldIndex, call
             graph = 0; // default graph
             k();
         } else {
-            let graphUriValue = Utils.lexicalFormBaseUri(quad.graph, queryEnv);
+            const graphUriValue = Utils.lexicalFormBaseUri(quad.graph, queryEnv);
             that.normalizeTerm(quad.graph, queryEnv, shouldIndex, function(oid){
                 if(oid != null) {
                     graph = oid;
@@ -634,8 +634,8 @@ QueryEngine.prototype.normalizeQuad = function(quad, queryEnv, shouldIndex, call
 };
 
 QueryEngine.prototype.denormalizeBindingsList = function(bindingsList, env, callback) {
-    let that = this;
-    let denormList = [];
+    const that = this;
+    const denormList = [];
 
     async.eachSeries(bindingsList, function(bindings, k){
         that.denormalizeBindings(bindings, env, function(denorm){
@@ -654,13 +654,13 @@ QueryEngine.prototype.denormalizeBindingsList = function(bindingsList, env, call
  * This is required just to save lookups when final results are generated.
  */
 QueryEngine.prototype.copyDenormalizedBindings = function(bindingsList, out, callback) {
-    let that = this;
-    let denormList = [];
+    const that = this;
+    const denormList = [];
     async.eachSeries(bindingsList, function(bindings, k){
-        let denorm = {};
-        let variables = _.keys(bindings);
+        const denorm = {};
+        const variables = _.keys(bindings);
         async.eachSeries(variables, function(variable, kk){
-            let oid = bindings[variable];
+            const oid = bindings[variable];
             if(oid == null) {
                 // this can be null, e.g. union different variables (check SPARQL recommendation examples UNION)
                 denorm[variable] = null;
@@ -671,7 +671,7 @@ QueryEngine.prototype.copyDenormalizedBindings = function(bindingsList, out, cal
                 denorm[variable] = oid;
                 kk();
             } else {
-                let inOut = out[oid];
+                const inOut = out[oid];
                 if(inOut!= null) {
                     denorm[variable] = inOut;
                     kk();
@@ -693,11 +693,11 @@ QueryEngine.prototype.copyDenormalizedBindings = function(bindingsList, out, cal
 };
 
 QueryEngine.prototype.denormalizeBindings = function(bindings, env, callback) {
-    let variables = _.keys(bindings);
-    let envOut = env.outCache;
-    let that = this;
+    const variables = _.keys(bindings);
+    const envOut = env.outCache;
+    const that = this;
     async.eachSeries(variables, function(variable, k){
-        let oid = bindings[variable];
+        const oid = bindings[variable];
         if(oid == null) {
             // this can be null, e.g. union different variables (check SPARQL recommendation examples UNION)
             bindings[variable] = null;
@@ -725,12 +725,12 @@ QueryEngine.prototype.denormalizeBindings = function(bindings, env, callback) {
 // Queries execution
 
 QueryEngine.prototype.execute = function(queryString, callback, defaultDataset, namedDataset){
-    let that = this;
-    let done = Utils.once(callback);
+    const that = this;
+    const done = Utils.once(callback);
     let modificationStarted = false;
     try {
         queryString = Utils.normalizeUnicodeLiterals(queryString);
-        let syntaxTree = this.abstractQueryTree.parseQueryString(queryString);
+        const syntaxTree = this.abstractQueryTree.parseQueryString(queryString);
         if(syntaxTree == null) {
             done(new Error("Error parsing query string"));
         } else if(syntaxTree.token === 'query' && syntaxTree.kind == 'update')  {
@@ -767,16 +767,16 @@ QueryEngine.prototype.execute = function(queryString, callback, defaultDataset, 
 // Retrieval queries
 
 QueryEngine.prototype.executeQuery = function(syntaxTree, callback, defaultDataset, namedDataset) {
-    let prologue = syntaxTree.prologue;
-    let units = syntaxTree.units;
+    const prologue = syntaxTree.prologue;
+    const units = syntaxTree.units;
     let that = this;
 
     // environment for the operation -> base ns, declared ns, etc.
-    let queryEnv = {blanks:{}, outCache:{}};
+    const queryEnv = {blanks:{}, outCache:{}};
     this.registerNsInEnvironment(prologue, queryEnv);
 
     // retrieval queries can only have 1 executable unit
-    let aqt = that.abstractQueryTree.parseExecutableUnit(units[0]);
+    const aqt = that.abstractQueryTree.parseExecutableUnit(units[0]);
 
     // can be anything else but a select???
     if(aqt.kind === 'select') {
@@ -817,39 +817,39 @@ QueryEngine.prototype.executeQuery = function(syntaxTree, callback, defaultDatas
 
                 that.denormalizeBindingsList(result, queryEnv, function(result){
                     if(result != null) {
-                        let graph = new RDFModel.Graph();
+                        const graph = new RDFModel.Graph();
 
                         // CONSTRUCT WHERE {} case
                         if(aqt.template == null) {
                             aqt.template = {triplesContext: aqt.pattern};
                         }
                         let blankIdCounter = 1;
-                        let toClear = [];
+                        const toClear = [];
                         for(let i=0; i<result.length; i++) {
-                            let bindings = result[i];
+                            const bindings = result[i];
                             for(let j=0; j<toClear.length; j++)
                                 delete toClear[j].valuetmp;
 
                             for(let j=0; j<aqt.template.triplesContext.length; j++) {
                                 // fresh IDs for blank nodes in the construct template
-                                let components = ['subject', 'predicate', 'object'];
-                                let tripleTemplate = aqt.template.triplesContext[j];
+                                const components = ['subject', 'predicate', 'object'];
+                                const tripleTemplate = aqt.template.triplesContext[j];
                                 for(let p=0; p<components.length; p++) {
-                                    let component = components[p];
+                                    const component = components[p];
                                     if(tripleTemplate[component].token === 'blank') {
                                         if(!tripleTemplate[component].valuetmp) {
-                                            let blankId = "_:b"+blankIdCounter;
+                                            const blankId = "_:b"+blankIdCounter;
                                             blankIdCounter++;
                                             tripleTemplate[component].valuetmp = blankId;
                                             toClear.push(tripleTemplate[component]);
                                         }
                                     }
                                 }
-                                let s = RDFModel.buildRDFResource(tripleTemplate.subject,bindings,that,queryEnv);
-                                let pred = RDFModel.buildRDFResource(tripleTemplate.predicate,bindings,that,queryEnv);
-                                let o = RDFModel.buildRDFResource(tripleTemplate.object,bindings,that,queryEnv);
+                                const s = RDFModel.buildRDFResource(tripleTemplate.subject,bindings,that,queryEnv);
+                                const pred = RDFModel.buildRDFResource(tripleTemplate.predicate,bindings,that,queryEnv);
+                                const o = RDFModel.buildRDFResource(tripleTemplate.object,bindings,that,queryEnv);
                                 if(s!=null && pred!=null && o!=null) {
-                                    let triple = new RDFModel.Triple(s,pred,o);
+                                    const triple = new RDFModel.Triple(s,pred,o);
                                     graph.add(triple);
                                     //} else {
                                     //    return callback(false, "Error creating output graph")
@@ -873,16 +873,16 @@ QueryEngine.prototype.executeQuery = function(syntaxTree, callback, defaultDatas
 
 QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedDataset, callback) {
     if(unit.kind === "select" || unit.kind === "ask" || unit.kind === "construct" || unit.kind === "modify") {
-        let projection = unit.projection;
-        let dataset    = unit.dataset;
-        let modifier   = unit.modifier;
-        let limit      = unit.limit;
-        let offset     = unit.offset;
-        let order      = unit.order;
-        let that = this;
+        const projection = unit.projection;
+        const dataset    = unit.dataset;
+        const modifier   = unit.modifier;
+        const limit      = unit.limit;
+        const offset     = unit.offset;
+        const order      = unit.order;
+        const that = this;
 
         // an unsupported feature met while evaluating an expression (see QueryFilters.runFilter) fails the query
-        let reply = callback;
+        const reply = callback;
         callback = function(err, result) {
             if(err == null && env.unsupportedFeature != null)
                 reply(env.unsupportedFeature);
@@ -895,7 +895,7 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
             dataset.named   = namedDataset || [];
         }
 
-        let completeDataset = function(next) {
+        const completeDataset = function(next) {
             if(dataset.implicit.length > 0 || dataset.named.length > 0) {
                 next();
             } else if(that.unionDefaultGraph && unit.kind !== 'modify') {
@@ -903,7 +903,7 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
                 // named graphs are all graphs of the store. As without FROM NAMED, GRAPH <iri> stays unrestricted
                 // (store.graph() reads the default graph by its IRI).
                 that.lexicon.registeredGraphs(true, function(uris) {
-                    let graphs = uris.map(function(uri) {
+                    const graphs = uris.map(function(uri) {
                         return {token: 'uri', prefix: null, suffix: null, value: uri};
                     });
                     dataset.implicit = [that.lexicon.defaultGraphUriTerm].concat(graphs);
@@ -942,15 +942,15 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
                     }
                     if (unit.group && unit.group != "") {
                         if (that.checkGroupSemantics(unit.group, projection)) {
-                            let plan = QueryEngine.planGroups(unit.group, projection, unit.having, order);
+                            const plan = QueryEngine.planGroups(unit.group, projection, unit.having, order);
                             if (plan.ungroupedVariable != null) {
                                 return callback(new Error("Variable ?" + plan.ungroupedVariable + " is neither grouped nor aggregated"));
                             }
                             that.groupSolution(result, unit.group, dataset, env, function(groupedBindings){
-                                let scopes = [];
+                                const scopes = [];
                                 async.eachSeries(groupedBindings, function(groupedBindingsGroup, k){
                                     that.copyDenormalizedBindings(groupedBindingsGroup, env.outCache, function(denormGroup){
-                                        let scope = that.groupScope(plan, denormGroup, dataset, env);
+                                        const scope = that.groupScope(plan, denormGroup, dataset, env);
                                         for (let h = 0; h < plan.having.length; h++) {
                                             if (QueryFilters.ebv(QueryFilters.runFilter(plan.having[h], scope, that, dataset, env)) !== true) {
                                                 return k();
@@ -961,16 +961,16 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
                                     });
                                 }, function(){
                                     that.applyOrderBy(plan.order, scopes, dataset, env, function(orderedScopes){
-                                        let aggregatedBindings = [];
+                                        const aggregatedBindings = [];
                                         for (let s = 0; s < orderedScopes.length; s++) {
-                                            let projected = {};
+                                            const projected = {};
                                             for (let p = 0; p < plan.projection.length; p++) {
                                                 projected[plan.projection[p].name] = orderedScopes[s][plan.projection[p].name];
                                             }
                                             aggregatedBindings.push(projected);
                                         }
-                                        let modifiedBindings = that.applyModifier(modifier, aggregatedBindings);
-                                        let limitedBindings = that.applyLimitOffset(offset, limit, modifiedBindings);
+                                        const modifiedBindings = that.applyModifier(modifier, aggregatedBindings);
+                                        const limitedBindings = that.applyLimitOffset(offset, limit, modifiedBindings);
                                         callback(null, {'bindings': limitedBindings, 'denorm': true});
                                     });
                                 });
@@ -981,9 +981,9 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
                     } else {
                         that.extendBindings(projection, result, dataset, env, function(extendedBindings){
                             that.applyOrderBy(order, extendedBindings, dataset, env, function(orderedBindings){
-                                let projectedBindings = that.projectBindings(projection, orderedBindings);
-                                let modifiedBindings = that.applyModifier(modifier, projectedBindings);
-                                let limitedBindings = that.applyLimitOffset(offset, limit, modifiedBindings);
+                                const projectedBindings = that.projectBindings(projection, orderedBindings);
+                                const modifiedBindings = that.applyModifier(modifier, projectedBindings);
+                                const limitedBindings = that.applyLimitOffset(offset, limit, modifiedBindings);
                                 callback(null, limitedBindings);
                             });
                         });
@@ -1001,10 +1001,10 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
 
 
 QueryEngine.prototype.groupSolution = function(bindings, group, dataset, queryEnv, callback){
-    let order = [];
-    let filteredBindings = [];
+    const order = [];
+    const filteredBindings = [];
     let initialized = false;
-    let that = this;
+    const that = this;
     if(group === 'singleGroup') {
         callback([bindings]);
     } else {
@@ -1038,7 +1038,7 @@ QueryEngine.prototype.groupSolution = function(bindings, group, dataset, queryEn
                         kk();
                     } else {
                         that.copyDenormalizedBindings([currentBindings], queryEnv.outCache, function(denormBindings){
-                            let filterResultEbv = QueryFilters.runFilter(currentOrderClause.expression, denormBindings[0], that, dataset, queryEnv);
+                            const filterResultEbv = QueryFilters.runFilter(currentOrderClause.expression, denormBindings[0], that, dataset, queryEnv);
                             if(!QueryFilters.isEbvError(filterResultEbv)) {
                                 currentBindings[currentOrderClause.alias.value] = QueryFilters.resultTerm(filterResultEbv);
                             } else {
@@ -1055,7 +1055,7 @@ QueryEngine.prototype.groupSolution = function(bindings, group, dataset, queryEn
                         order.push(orderVariable);
                     }
                     that.copyDenormalizedBindings([currentBindings], queryEnv.outCache, function(denormBindings){
-                        let filterResultEbv = QueryFilters.runFilter(currentOrderClause, denormBindings[0], that, dataset, queryEnv);
+                        const filterResultEbv = QueryFilters.runFilter(currentOrderClause, denormBindings[0], that, dataset, queryEnv);
                         if(!QueryFilters.isEbvError(filterResultEbv)) {
                             currentBindings[orderVariable] = filterResultEbv;
                         } else {
@@ -1078,16 +1078,16 @@ QueryEngine.prototype.groupSolution = function(bindings, group, dataset, queryEn
              * After processing all the bindings, we build the group using the
              * information stored about the order of the group variables.
              */
-            let dups = {};
-            let groupMap = {};
-            let groupCounter = 0;
+            const dups = {};
+            const groupMap = {};
+            const groupCounter = 0;
             for(let i=0; i<filteredBindings.length; i++) {
-                let currentTransformedBinding = filteredBindings[i];
+                const currentTransformedBinding = filteredBindings[i];
                 // one entry per group clause, so ("a","bc") and ("ab","c") or 1 and "1" stay apart;
                 // a single OID keeps its plain key and with it the previous (numeric) group order
-                let keyParts = [];
+                const keyParts = [];
                 for(let j=0; j<order.length; j++) {
-                    let maybeObject = currentTransformedBinding[order[j]];
+                    const maybeObject = currentTransformedBinding[order[j]];
                     if(maybeObject == null) {
                         keyParts.push(null);
                     } else if(typeof(maybeObject) === 'object') {
@@ -1096,7 +1096,7 @@ QueryEngine.prototype.groupSolution = function(bindings, group, dataset, queryEn
                         keyParts.push(maybeObject);
                     }
                 }
-                let key = (keyParts.length === 1 && typeof(keyParts[0]) !== 'object') ? String(keyParts[0]) : JSON.stringify(keyParts);
+                const key = (keyParts.length === 1 && typeof(keyParts[0]) !== 'object') ? String(keyParts[0]) : JSON.stringify(keyParts);
 
                 if(dups[key] == null) {
                     //currentTransformedBinding["__group__"] = groupCounter;
@@ -1110,9 +1110,9 @@ QueryEngine.prototype.groupSolution = function(bindings, group, dataset, queryEn
             }
 
             // The final result is an array of arrays with all the groups
-            let groups = [];
+            const groups = [];
 
-            for(let k in dups) {
+            for(const k in dups) {
                 groups.push(dups[k]);
             }
 
@@ -1126,7 +1126,7 @@ QueryEngine.prototype.groupSolution = function(bindings, group, dataset, queryEn
  * Here, all the constructions of the SPARQL algebra are handled
  */
 QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern, env, callback) {
-    let that = this;
+    const that = this;
     if(pattern.kind === "BGP") {
         this.executeAndBGP(projection, dataset, pattern, env, callback);
     } else if(pattern.kind === "UNION") {
@@ -1163,12 +1163,12 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
             if (err != null || results == null || pattern.internal == null) {
                 callback(err, results);
             } else {
-                let name = pattern.graph.value;
-                let internal = pattern.internal.value;
-                let solutions = [];
+                const name = pattern.graph.value;
+                const internal = pattern.internal.value;
+                const solutions = [];
                 for(let i=0; i<results.length; i++) {
-                    let solution = results[i];
-                    let graph = solution[internal];
+                    const solution = results[i];
+                    const graph = solution[internal];
                     delete solution[internal];
                     if(graph == null) {
                         // not reached: every pattern inside GRAPH binds its graph
@@ -1190,12 +1190,12 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
         if(pattern.graph == null) {
             callback(null, [{}]);
         } else if(pattern.graph.token === 'var') {
-            let solutions = [];
-            let seen = {};
+            const solutions = [];
+            const seen = {};
             for(let i=0; i<dataset.named.length; i++) {
                 if(seen[dataset.named[i].oid] == null) {
                     seen[dataset.named[i].oid] = true;
-                    let solution = {};
+                    const solution = {};
                     solution[pattern.graph.value] = dataset.named[i].oid;
                     solutions.push(solution);
                 }
@@ -1218,7 +1218,7 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
 // Evaluates two sub-patterns one after the other; stops at the first error. With skipIfFirstEmpty
 // (joins), the second one is not evaluated when the first has no solutions.
 QueryEngine.prototype.executeSelectUnits = function(projection, dataset, setQuery1, setQuery2, env, skipIfFirstEmpty, callback) {
-    let that = this;
+    const that = this;
     let set1, set2;
     async.seq(
         function(k){
@@ -1249,7 +1249,7 @@ QueryEngine.prototype.executeUNION = function(projection, dataset, patterns, env
         return callback(new Error("SPARQL algebra UNION with more than two components"));
     }
 
-    let that = this;
+    const that = this;
     this.executeSelectUnits(projection, dataset, patterns[0], patterns[1], env, false, function(err, set1, set2){
         if(err != null) {
             callback(err);
@@ -1261,10 +1261,10 @@ QueryEngine.prototype.executeUNION = function(projection, dataset, patterns, env
 
 // The blank nodes of a basic graph pattern match like variables (see normalizeTerm), but are scoped to it:
 // they are dropped from its solutions, like the internal variables of property path sequences (fresh:).
-let withoutInternalVariables = function(results) {
+const withoutInternalVariables = function(results) {
     return results.map(function(result) {
-        let solution = {};
-        for(let name in result) {
+        const solution = {};
+        for(const name in result) {
             if(name.indexOf("blank:") !== 0 && name.indexOf("fresh:") !== 0) {
                 solution[name] = result[name];
             }
@@ -1274,14 +1274,14 @@ let withoutInternalVariables = function(results) {
 };
 
 // the distinct values of a variable in the solutions, or undefined if it is not a variable or unbound in some
-let boundValues = function(term, solutions) {
-    let name = term.token === 'var' ? term.value : (term.token === 'blank' && term.oid == null ? "blank:" + term.value : null);
+const boundValues = function(term, solutions) {
+    const name = term.token === 'var' ? term.value : (term.token === 'blank' && term.oid == null ? "blank:" + term.value : null);
     if(name == null) {
         return undefined;
     }
-    let values = new Map();
+    const values = new Map();
     for(let i=0; i<solutions.length; i++) {
-        let value = solutions[i][name];
+        const value = solutions[i][name];
         if(value == null) {
             return undefined;
         }
@@ -1297,20 +1297,20 @@ let boundValues = function(term, solutions) {
  * at the end.
  */
 QueryEngine.prototype.executeBGPScope = function(projection, dataset, parts, env, callback) {
-    let that = this;
+    const that = this;
     let solutions = null;
     async.eachSeries(parts, function(part, k) {
         if(solutions != null && solutions.length === 0) {
             return k();
         }
-        let join = function(err, results) {
+        const join = function(err, results) {
             if(err == null) {
                 solutions = solutions == null ? results : QueryPlan.joinBindings(solutions, results);
             }
             k(err);
         };
         if(part.kind === 'PATH') {
-            let candidates = solutions == null ? {} :
+            const candidates = solutions == null ? {} :
                 {starts: boundValues(part.subject, solutions), ends: boundValues(part.object, solutions)};
             PropertyPaths.execute(that, dataset, part, env, candidates, join);
         } else {
@@ -1326,7 +1326,7 @@ QueryEngine.prototype.executeBGPScope = function(projection, dataset, parts, env
 };
 
 QueryEngine.prototype.executeAndBGP = function(projection, dataset, pattern, env, callback) {
-    let that = this;
+    const that = this;
     QueryPlan.executeAndBGPsDPSize(pattern.value, dataset, this, env, function(err, result){
         if(err != null) {
             callback(err);
@@ -1342,11 +1342,11 @@ QueryEngine.prototype.executeAndBGP = function(projection, dataset, pattern, env
 // LeftJoin keeps a left solution if none of its merged solutions passes the OPTIONAL's filter
 // (SPARQL 1.1 §18.5). checkFilters returns the failed merged solutions wrapped (__nullify__): each
 // such left solution comes back once, with the right side's variables unbound.
-let restoreFailedLeftSolutions = function(bindings, leftSolutions, set2) {
-    let acum = [];
-    let failed = [];
+const restoreFailedLeftSolutions = function(bindings, leftSolutions, set2) {
+    const acum = [];
+    const failed = [];
     // left solutions already represented in acum
-    let kept = new Set();
+    const kept = new Set();
     for(let i=0; i<bindings.length; i++) {
         if(bindings[i]["__nullify__"] === true) {
             failed.push(bindings[i]["bindings"]);
@@ -1356,22 +1356,22 @@ let restoreFailedLeftSolutions = function(bindings, leftSolutions, set2) {
         }
     }
 
-    let rightVars = {};
+    const rightVars = {};
     for(let i=0; i<set2.length; i++) {
-        for(let p in set2[i]) {
+        for(const p in set2[i]) {
             rightVars[p] = true;
         }
     }
     for(let i=0; i<failed.length; i++) {
-        let merged = failed[i];
+        const merged = failed[i];
         // an unmatched left solution was not merged
-        let left = leftSolutions.get(merged) || merged;
+        const left = leftSolutions.get(merged) || merged;
         if(kept.has(left)) {
             continue;
         }
         kept.add(left);
-        let solution = {};
-        for(let p in left) {
+        const solution = {};
+        for(const p in left) {
             solution[p] = left[p];
         }
         QueryPlan.augmentMissingBindings(solution, rightVars);
@@ -1381,16 +1381,16 @@ let restoreFailedLeftSolutions = function(bindings, leftSolutions, set2) {
 };
 
 QueryEngine.prototype.executeLEFT_JOIN = function(projection, dataset, patterns, env, callback) {
-    let setQuery1 = patterns.lvalue;
-    let setQuery2 = patterns.rvalue;
-    let that = this;
+    const setQuery1 = patterns.lvalue;
+    const setQuery2 = patterns.rvalue;
+    const that = this;
     this.executeSelectUnits(projection, dataset, setQuery1, setQuery2, env, true, function(err, set1, set2){
         if(err != null) {
             callback(err);
         } else {
             // merged solution -> the left solution it came from, only needed to undo a failed filter
-            let leftSolutions = patterns.filter != null && patterns.filter.length > 0 ? new Map() : null;
-            let result = QueryPlan.leftOuterJoinBindings(set1, set2, leftSolutions);
+            const leftSolutions = patterns.filter != null && patterns.filter.length > 0 ? new Map() : null;
+            const result = QueryPlan.leftOuterJoinBindings(set1, set2, leftSolutions);
             if(leftSolutions == null) {
                 callback(null, result);
             } else {
@@ -1407,9 +1407,9 @@ QueryEngine.prototype.executeLEFT_JOIN = function(projection, dataset, patterns,
 };
 
 QueryEngine.prototype.executeJOIN = function(projection, dataset, patterns, env, callback) {
-    let setQuery1 = patterns.lvalue;
-    let setQuery2 = patterns.rvalue;
-    let that = this;
+    const setQuery1 = patterns.lvalue;
+    const setQuery2 = patterns.rvalue;
+    const that = this;
 
     this.executeSelectUnits(projection, dataset, setQuery1, setQuery2, env, true, function(err, set1, set2){
         if(err != null) {
@@ -1424,7 +1424,7 @@ QueryEngine.prototype.executeJOIN = function(projection, dataset, patterns, env,
 
 
 QueryEngine.prototype.rangeQuery = function(quad, queryEnv, callback) {
-    let that = this;
+    const that = this;
     that.normalizeQuad(quad, queryEnv, false, function(key){
         if(key != null) {
             that.backend.range(new QuadIndex.Pattern(key), function(quads) {
@@ -1443,13 +1443,13 @@ QueryEngine.prototype.rangeQuery = function(quad, queryEnv, callback) {
 // Update queries
 
 QueryEngine.prototype.executeUpdate = function(syntaxTree, callback) {
-    let prologue = syntaxTree.prologue;
-    let units = syntaxTree.units;
-    let that = this;
+    const prologue = syntaxTree.prologue;
+    const units = syntaxTree.units;
+    const that = this;
 
     // environment for the operation -> base ns, declared ns, etc.
-    let queryEnv = {blanks:{}, outCache:{}};
-    let prologues = syntaxTree.prologues || [prologue];
+    const queryEnv = {blanks:{}, outCache:{}};
+    const prologues = syntaxTree.prologues || [prologue];
     this.registerNsInEnvironment(prologues[0], queryEnv);
 
     // operations separated by ';' run one after the other; the first error stops the request
@@ -1480,7 +1480,7 @@ QueryEngine.prototype.executeUpdate = function(syntaxTree, callback) {
 };
 
 QueryEngine.prototype._executeUpdateUnit = function(aqt, queryEnv, callback) {
-    let that = this;
+    const that = this;
     if(aqt.kind === 'insertdata') {
         async.eachSeries(aqt.quads, function(quad, k){
             that._executeQuadInsert(quad, queryEnv, k);
@@ -1528,11 +1528,11 @@ QueryEngine.prototype._executeUpdateUnit = function(aqt, queryEnv, callback) {
 // Stores parsed quads; calls back (err) or (null, number of new quads).
 QueryEngine.prototype.batchLoad = function(quads, callback) {
     let counter = 0;
-    let blanks = {};
-    let that = this;
+    const blanks = {};
+    const that = this;
 
     // check every quad first, so that a broken one does not leave the batch half stored
-    let components = ['subject','predicate','object','graph'];
+    const components = ['subject','predicate','object','graph'];
     for(let q=0; q<quads.length; q++) {
         for(let c=0; c<components.length; c++) {
             if(quads[q][components[c]] == null || typeof(quads[q][components[c]]) !== 'object') {
@@ -1545,13 +1545,13 @@ QueryEngine.prototype.batchLoad = function(quads, callback) {
         this.callbacksBackend.startGraphModification();
 
     // subject
-    let registerComponent = function(quad, component, newQuad, k) {
+    const registerComponent = function(quad, component, newQuad, k) {
         let maybeBlankOid;
 
         if (quad[component]['uri'] || quad[component].token === 'uri') {
-            let uriValue = (quad[component].uri || quad[component].value);
+            const uriValue = (quad[component].uri || quad[component].value);
             that.lexicon.registerUri(uriValue, function(oid){
-                let returnUriComponent = function(){
+                const returnUriComponent = function(){
                     if (quad[component].uri != null) {
                         quad[component] = {'token': 'uri', 'value': quad[component].uri};
                         delete quad[component]['uri'];
@@ -1607,13 +1607,13 @@ QueryEngine.prototype.batchLoad = function(quads, callback) {
 
 
     async.eachSeries(quads, function(quad,k){
-        let newQuad = {};
+        const newQuad = {};
         async.eachSeries(components, function(component,kk){
             registerComponent(quad, component, newQuad, kk)
         }, function(){
-            let originalQuad = quad;
+            const originalQuad = quad;
             quad = newQuad;
-            let key = new QuadIndex.NodeKey(quad);
+            const key = new QuadIndex.NodeKey(quad);
 
             that.backend.search(key, function(result){
                 if(!result) {
@@ -1635,7 +1635,7 @@ QueryEngine.prototype.batchLoad = function(quads, callback) {
         if(that.lexicon.updateAfterWrite != null)
             that.lexicon.updateAfterWrite();
 
-        let exitFn = function(){
+        const exitFn = function(){
             callback(null, counter);
         };
 
@@ -1650,13 +1650,13 @@ QueryEngine.prototype.batchLoad = function(quads, callback) {
 // Low level operations for update queries
 
 QueryEngine.prototype._executeModifyQuery = function(aqt, queryEnv, callback) {
-    let that = this;
+    const that = this;
     let querySuccess = true;
     let error = new Error("Error executing modify query");
     let solutions = null;
     let bindings = null;
     // blank nodes of deleted quads and of the insert template: released at the end unless a quad uses them
-    let blanks = [];
+    const blanks = [];
 
     aqt.insert = aqt.insert == null ? [] : aqt.insert;
     aqt.delete = aqt.delete == null ? [] : aqt.delete;
@@ -1665,7 +1665,7 @@ QueryEngine.prototype._executeModifyQuery = function(aqt, queryEnv, callback) {
         function(k) {
             // select query
 
-            let defaultGraph = [];
+            const defaultGraph = [];
             let namedGraph = [];
 
             if(aqt.with != null) {
@@ -1675,7 +1675,7 @@ QueryEngine.prototype._executeModifyQuery = function(aqt, queryEnv, callback) {
             if(aqt.using != null) {
                 namedGraph = [];
                 for(let i=0; i<aqt.using.length; i++) {
-                    let usingGraph = aqt.using[i];
+                    const usingGraph = aqt.using[i];
                     if(usingGraph.kind === 'named') {
                         namedGraph.push(usingGraph.uri);
                     } else {
@@ -1746,31 +1746,31 @@ QueryEngine.prototype._executeModifyQuery = function(aqt, queryEnv, callback) {
  * DELETE template must not contain blank nodes, and a new blank node is in no quad.
  */
 QueryEngine.prototype.instantiateTemplate = function(template, solutions, bindings, defaultGraph, newBlanks, queryEnv, callback) {
-    let that = this;
-    let components = ['subject', 'predicate', 'object', 'graph'];
-    let instances = [];
+    const that = this;
+    const components = ['subject', 'predicate', 'object', 'graph'];
+    const instances = [];
     let index = 0;
     async.eachSeries(bindings, function(binding, k) {
-        let solution = solutions[index++];
-        let env = {blanks: {}, outCache: queryEnv.outCache, namespaces: queryEnv.namespaces, base: queryEnv.base};
-        for(let variable in solution) {
+        const solution = solutions[index++];
+        const env = {blanks: {}, outCache: queryEnv.outCache, namespaces: queryEnv.namespaces, base: queryEnv.base};
+        for(const variable in solution) {
             if(typeof(solution[variable]) === 'number' && binding[variable] != null && binding[variable].token === 'blank') {
                 env.blanks[binding[variable].value] = solution[variable];
             }
         }
         // template label or BNODE() label -> blank node of this solution, with the label the lexicon gives its OID
-        let fresh = {};
+        const fresh = {};
         async.eachSeries(template, function(src, kk) {
-            let quad = {};
+            const quad = {};
             // [component, key in fresh]
-            let newTerms = [];
+            const newTerms = [];
             for(let c=0; c<components.length; c++) {
-                let component = components[c];
-                let term = src[component];
+                const component = components[c];
+                const term = src[component];
                 if(component === 'graph' && term == null) {
                     quad.graph = defaultGraph;
                 } else if(term.token === 'var') {
-                    let value = binding[term.value];
+                    const value = binding[term.value];
                     if(value == null)
                         return kk();
                     if(value.token === 'blank' && env.blanks[value.value] == null) {
@@ -1789,7 +1789,7 @@ QueryEngine.prototype.instantiateTemplate = function(template, solutions, bindin
                 }
             }
             async.eachSeries(newTerms, function(newTerm, kkk) {
-                let component = newTerm[0], key = newTerm[1];
+                const component = newTerm[0], key = newTerm[1];
                 if(fresh[key] != null) {
                     quad[component] = fresh[key];
                     return kkk();
@@ -1812,7 +1812,7 @@ QueryEngine.prototype.instantiateTemplate = function(template, solutions, bindin
 };
 
 QueryEngine.prototype._executeQuadInsert = function(quad, queryEnv, callback) {
-    let that = this;
+    const that = this;
     let normalized;
     let error = false;
     let errorMessage = null;
@@ -1830,7 +1830,7 @@ QueryEngine.prototype._executeQuadInsert = function(quad, queryEnv, callback) {
         },
         function(k){
             if(error === false) {
-                let key = new QuadIndex.NodeKey(normalized);
+                const key = new QuadIndex.NodeKey(normalized);
                 that.backend.search(key, function(found){
                     if(found === true){
                         k();
@@ -1857,7 +1857,7 @@ QueryEngine.prototype._executeQuadInsert = function(quad, queryEnv, callback) {
 // Deletes a quad if the store has it. The OIDs of its blank nodes are added to deletedBlanks, to be released
 // later with _releaseBlanks (null: released right away).
 QueryEngine.prototype._executeQuadDelete = function(quad, queryEnv, deletedBlanks, callback) {
-    let that = this;
+    const that = this;
     let normalized;
     let error = false;
     let found = false;
@@ -1903,7 +1903,7 @@ QueryEngine.prototype._executeQuadDelete = function(quad, queryEnv, deletedBlank
             }
         },
         function(k){
-            let blanks = error === false ? that._blankOids(quad, normalized) : [];
+            const blanks = error === false ? that._blankOids(quad, normalized) : [];
             if(deletedBlanks != null) {
                 Array.prototype.push.apply(deletedBlanks, blanks);
                 k();
@@ -1922,7 +1922,7 @@ QueryEngine.prototype._executeQuadDelete = function(quad, queryEnv, deletedBlank
 
 // The OIDs of the blank nodes of a quad (subject or object; a predicate or graph name is never a blank node)
 QueryEngine.prototype._blankOids = function(quad, normalized) {
-    let oids = [];
+    const oids = [];
     if(quad.subject.token === 'blank')
         oids.push(normalized.subject);
     if(quad.object.token === 'blank')
@@ -1932,7 +1932,7 @@ QueryEngine.prototype._blankOids = function(quad, normalized) {
 
 // Removes the blank nodes with these OIDs from the lexicon if no quad uses them anymore.
 QueryEngine.prototype._releaseBlanks = function(oids, callback) {
-    let that = this;
+    const that = this;
     async.eachSeries(Array.from(new Set(oids)), function(oid, k){
         that.backend.range(new QuadIndex.Pattern({subject: oid, predicate: 'p', object: 'o', graph: 'g'}), function(asSubject){
             if(asSubject != null && asSubject.length > 0)
@@ -1961,8 +1961,8 @@ QueryEngine.prototype._executeNestedUpdate = function(queryString, callback) {
 };
 
 QueryEngine.prototype._executeClearGraph = function(destinyGraph, queryEnv, callback) {
-    let that = this;
-    let finish = function(err) {
+    const that = this;
+    const finish = function(err) {
         if(err)
             callback(err);
         else
@@ -2014,7 +2014,7 @@ QueryEngine.prototype._executeClearGraph = function(destinyGraph, queryEnv, call
     } else {
         // destinyGraph is an URI
         if(destinyGraph.token == 'uri') {
-            let graphUri = Utils.lexicalFormBaseUri(destinyGraph,queryEnv);
+            const graphUri = Utils.lexicalFormBaseUri(destinyGraph,queryEnv);
             if(graphUri != null) {
                 this._executeNestedUpdate("DELETE { GRAPH <"+graphUri+"> { ?s ?p ?o } } WHERE { GRAPH <"+graphUri+"> { ?s ?p ?o } }", finish);
             } else {
@@ -2031,14 +2031,14 @@ QueryEngine.prototype.checkGroupSemantics = function(groupVars, projectionVars) 
         return false;
     }
     // aggregates without GROUP BY ('singleGroup') have no group variables: nothing may be projected without being aggregated
-    let projection = {};
-    let names = QueryEngine.groupVariables(groupVars);
+    const projection = {};
+    const names = QueryEngine.groupVariables(groupVars);
     for(let i=0; i<names.length; i++) {
         projection[names[i]] = true;
     }
 
     for(let i=0; i<projectionVars.length; i++) {
-        let projectionVar = projectionVars[i];
+        const projectionVar = projectionVars[i];
         if(projectionVar.kind === 'var') {
             if(projection[projectionVar.value.value] == null) {
                 return false;
@@ -2056,29 +2056,29 @@ QueryEngine.prototype.checkGroupSemantics = function(groupVars, projectionVars) 
 };
 
 QueryEngine.prototype.runBinds = function(binds, bindings, dataset, env, callback) {
-    let that = this;
-    let originalBindings = bindings;
+    const that = this;
+    const originalBindings = bindings;
     if(binds != null && binds.length > 0) {
         that.copyDenormalizedBindings(bindings, env.outCache, function(denormBindings){
             // IRIs and literals to replace by their OID
-            let terms = [];
+            const terms = [];
             for(let i=0; i<bindings.length; i++) {
                 for(let j=0; j<binds.length; j++) {
-                    let bind = binds[j];
-                    let thisDenormBindings = denormBindings[i];
-                    let ebv = QueryFilters.runFilter(bind.expression, thisDenormBindings, that, dataset, env);
+                    const bind = binds[j];
+                    const thisDenormBindings = denormBindings[i];
+                    const ebv = QueryFilters.runFilter(bind.expression, thisDenormBindings, that, dataset, env);
                     // SPARQL 1.1 Extend: if the expression raises an error, the variable stays unbound;
                     // otherwise the following BINDs see it
                     if(!QueryFilters.isEbvError(ebv)) {
                         // null for an unbound variable (BIND(?unbound AS ?y))
-                        let term = QueryFilters.resultTerm(ebv);
+                        const term = QueryFilters.resultTerm(ebv);
                         originalBindings[i][bind.as.value] = term;
                         thisDenormBindings[bind.as.value] = term;
                         if(term != null && term.token === 'blank') {
                             // a blank node of the store can only come from a variable of the solution: it takes
                             // that OID (a new one from BNODE() has none)
-                            for(let v in originalBindings[i]) {
-                                let bound = thisDenormBindings[v];
+                            for(const v in originalBindings[i]) {
+                                const bound = thisDenormBindings[v];
                                 if(typeof(originalBindings[i][v]) === 'number' && bound != null && bound.token === 'blank' && bound.value === term.value) {
                                     originalBindings[i][bind.as.value] = originalBindings[i][v];
                                     break;
@@ -2094,10 +2094,10 @@ QueryEngine.prototype.runBinds = function(binds, bindings, dataset, env, callbac
             // term object in a solution is never in the lexicon: joins (areCompatibleBindings), GROUP BY and
             // DISTINCT can then compare OIDs and term objects as they are.
             // lexical form -> OID or -1, for values that repeat (e.g. a constant)
-            let oids = new Map();
+            const oids = new Map();
             async.eachSeries(terms, function(entry, k){
-                let key = entry.term.token === 'uri' ? "u" + entry.term.value : "l" + Utils.lexicalFormLiteral(entry.term, env);
-                let replace = function(oid) {
+                const key = entry.term.token === 'uri' ? "u" + entry.term.value : "l" + Utils.lexicalFormLiteral(entry.term, env);
+                const replace = function(oid) {
                     if(oid != null && oid !== -1) {
                         entry.solution[entry.variable] = oid;
                     }

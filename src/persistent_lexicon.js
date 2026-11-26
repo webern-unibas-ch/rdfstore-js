@@ -1,16 +1,16 @@
 "use strict";
 
-let utils = require('./utils');
-let async = utils;
-let InMemoryLexicon = require('./lexicon').Lexicon;
+const utils = require('./utils');
+const async = utils;
+const InMemoryLexicon = require('./lexicon').Lexicon;
 
 /**
  * Temporal implementation of the lexicon
  */
 
 
-let PersistentLexicon = function(callback, dbName){
-    let that = this;
+const PersistentLexicon = function(callback, dbName){
+    const that = this;
 
     utils.registerIndexedDB(that);
 
@@ -20,7 +20,7 @@ let PersistentLexicon = function(callback, dbName){
     this.oidCounter = 1;
 
     that.dbName = dbName || "rdfstorejs";
-    let request = that.indexedDB.open(this.dbName+"_lexicon", 1);
+    const request = that.indexedDB.open(this.dbName+"_lexicon", 1);
     request.onerror = function(event) {
         callback(null,new Error("Error opening IndexedDB: " + event.target.errorCode));
     };
@@ -32,10 +32,10 @@ let PersistentLexicon = function(callback, dbName){
         that.db = event.target.result;
 
         // graphs
-        let graphStore = that.db.createObjectStore('knownGraphs', { keyPath: 'oid'});
+        const graphStore = that.db.createObjectStore('knownGraphs', { keyPath: 'oid'});
         graphStore.createIndex("uriToken","uriToken",{unique: true});
         // uris,literal,blanks mapping
-        let uriStore = that.db.createObjectStore('components', { keyPath: 'id', autoIncrement : true });
+        const uriStore = that.db.createObjectStore('components', { keyPath: 'id', autoIncrement : true });
         uriStore.createIndex("value","value",{unique: true});
 
         //setTimeout(function(){ callback(that); },0);
@@ -51,19 +51,19 @@ let PersistentLexicon = function(callback, dbName){
  */
 PersistentLexicon.prototype.registerGraph = function(oid, uriToken, callback){
     if(oid != this.defaultGraphOid) {
-        let transaction = this.db.transaction(['knownGraphs'], 'readwrite');
+        const transaction = this.db.transaction(['knownGraphs'], 'readwrite');
         transaction.onerror = function (event) {
             callback(null, new Error(event.target.statusCode));
         };
-        let objectStore = transaction.objectStore('knownGraphs');
-        let request = objectStore.get(uriToken)
+        const objectStore = transaction.objectStore('knownGraphs');
+        const request = objectStore.get(uriToken)
         request.onsuccess = function(event) {
-            let graphData = event.target.result;
+            const graphData = event.target.result;
             if(graphData) {
                 // found graph -> return
                 callback(true)
             } else {
-                let request = objectStore.add({oid: oid, uriToken: uriToken});
+                const request = objectStore.add({oid: oid, uriToken: uriToken});
                 request.onsuccess = function (_) {
                     callback(true);
                 };
@@ -80,12 +80,12 @@ PersistentLexicon.prototype.registerGraph = function(oid, uriToken, callback){
  * @param callback
  */
 PersistentLexicon.prototype.registeredGraphs = function(returnUris, callback) {
-    let graphs = [];
-    let objectStore = this.db.transaction(['knownGraphs'],'readwrite').objectStore("knownGraphs");
+    const graphs = [];
+    const objectStore = this.db.transaction(['knownGraphs'],'readwrite').objectStore("knownGraphs");
 
-    let request = objectStore.openCursor();
+    const request = objectStore.openCursor();
     request.onsuccess = function(event) {
-        let cursor = event.target.result;
+        const cursor = event.target.result;
         if(cursor) {
             if(returnUris === true) {
                 graphs.push(cursor.value.uriToken);
@@ -110,19 +110,19 @@ PersistentLexicon.prototype.registeredGraphs = function(returnUris, callback) {
  * @returns URI's OID.
  */
 PersistentLexicon.prototype.registerUri = function(uri, callback) {
-    let that = this;
+    const that = this;
     if(uri === this.defaultGraphUri) {
         callback(this.defaultGraphOid);
     } else{
-        let objectStore = that.db.transaction(["components"],"readwrite").objectStore("components");
-        let request = objectStore.index("value").get("_u:"+uri);
+        const objectStore = that.db.transaction(["components"],"readwrite").objectStore("components");
+        const request = objectStore.index("value").get("_u:"+uri);
         request.onsuccess = function(event) {
-            let uriData = event.target.result;
+            const uriData = event.target.result;
             if(uriData) {
                 // found in index -> update
                 uriData.counter++;
-                let oid = uriData.id;
-                let requestUpdate = objectStore.put(uriData);
+                const oid = uriData.id;
+                const requestUpdate = objectStore.put(uriData);
                 requestUpdate.onsuccess =function (_) {
                     callback(oid);
                 };
@@ -131,7 +131,7 @@ PersistentLexicon.prototype.registerUri = function(uri, callback) {
                 };
             } else {
                 // not found -> create
-                let requestAdd = objectStore.add({value: "_u:"+uri, counter:0, uri:true});
+                const requestAdd = objectStore.add({value: "_u:"+uri, counter:0, uri:true});
                 requestAdd.onsuccess = function(event){
                     callback(event.target.result);
                 };
@@ -156,8 +156,8 @@ PersistentLexicon.prototype.resolveUri = function(uri,callback) {
     if(uri === this.defaultGraphUri) {
         callback(this.defaultGraphOid);
     } else {
-        let objectStore = this.db.transaction(["components"]).objectStore("components");
-        let request = objectStore.index("value").get("_u:"+uri);
+        const objectStore = this.db.transaction(["components"]).objectStore("components");
+        const request = objectStore.index("value").get("_u:"+uri);
         request.onsuccess = function(event) {
             if(event.target.result != null) {
                 callback(event.target.result.id);
@@ -176,11 +176,11 @@ PersistentLexicon.prototype.resolveUri = function(uri,callback) {
  * @returns {string}
  */
 PersistentLexicon.prototype.registerBlank = function(callback) {
-    let oidStr = utils.guid();
-    let that = this;
+    const oidStr = utils.guid();
+    const that = this;
 
-    let objectStore = that.db.transaction(["components"],"readwrite").objectStore("components");
-    let requestAdd = objectStore.add({value: "_b:"+oidStr, counter:0, label:true});
+    const objectStore = that.db.transaction(["components"],"readwrite").objectStore("components");
+    const requestAdd = objectStore.add({value: "_b:"+oidStr, counter:0, label:true});
     requestAdd.onsuccess = function(event){
         callback(event.target.result);
     };
@@ -196,17 +196,17 @@ PersistentLexicon.prototype.registerBlank = function(callback) {
  * @returns the OID of the newly registered literal
  */
 PersistentLexicon.prototype.registerLiteral = function(literal, callback) {
-    let that = this;
+    const that = this;
 
-    let objectStore = that.db.transaction(["components"],"readwrite").objectStore("components");
-    let request = objectStore.index("value").get("_l:"+literal);
+    const objectStore = that.db.transaction(["components"],"readwrite").objectStore("components");
+    const request = objectStore.index("value").get("_l:"+literal);
     request.onsuccess = function(event) {
-        let literalData = event.target.result;
+        const literalData = event.target.result;
         if(literalData) {
             // found in index -> update
             literalData.counter++;
-            let oid = literalData.id;
-            let requestUpdate = objectStore.put(literalData);
+            const oid = literalData.id;
+            const requestUpdate = objectStore.put(literalData);
             requestUpdate.onsuccess =function (event) {
                 callback(oid);
             };
@@ -215,7 +215,7 @@ PersistentLexicon.prototype.registerLiteral = function(literal, callback) {
             };
         } else {
             // not found -> create
-            let requestAdd = objectStore.add({value: "_l:"+literal, counter:0, literal:true});
+            const requestAdd = objectStore.add({value: "_l:"+literal, counter:0, literal:true});
             requestAdd.onsuccess = function(event){
                 callback(event.target.result);
             };
@@ -235,8 +235,8 @@ PersistentLexicon.prototype.registerLiteral = function(literal, callback) {
  * @param callback
  */
 PersistentLexicon.prototype.resolveLiteral = function (literal,callback) {
-    let objectStore = this.db.transaction(["components"]).objectStore("components");
-    let request = objectStore.index("value").get("_l:"+literal);
+    const objectStore = this.db.transaction(["components"]).objectStore("components");
+    const request = objectStore.index("value").get("_l:"+literal);
     request.onsuccess = function(event) {
         if(event.target.result != null) {
             callback(event.target.result.id);
@@ -292,7 +292,7 @@ PersistentLexicon.prototype.retrieve = function(oid, callback) {
         request.onsuccess = function(event) {
             if(event.target.result != null) {
                 if(event.target.result.label != null) {
-                    let label = "_:" + event.target.result.id;
+                    const label = "_:" + event.target.result.id;
                     callback({token: "blank", value: label});
                 } else if(event.target.result.uri != null) {
                     callback(that.parseUri(event.target.result.value.slice(3,event.target.result.value.length)));
@@ -317,15 +317,15 @@ PersistentLexicon.prototype.retrieve = function(oid, callback) {
  * @param callback
  */
 PersistentLexicon.prototype.clear = function(callback) {
-    let that = this;
+    const that = this;
     this.defaultGraphOid = 0;
     this.defaultGraphUri = "https://github.com/antoniogarrote/rdfstore-js#default_graph";
     this.defaultGraphUriTerm = {"token":"uri","prefix":null,"suffix":null,"value":this.defaultGraphUri};
 
     let transaction = that.db.transaction(["components"],"readwrite"), request;
-    let components = transaction.objectStore("components");
+    const components = transaction.objectStore("components");
 
-    let k = function() {
+    const k = function() {
         if(callback != null)
             callback();
     };
@@ -344,8 +344,8 @@ PersistentLexicon.prototype.clear = function(callback) {
  * @param callback
  */
 PersistentLexicon.prototype.unregister = function (quad, key, callback) {
-    let that = this;
-    let unregisterTerm = function(term, oid, k) {
+    const that = this;
+    const unregisterTerm = function(term, oid, k) {
         if (term == null || term.token === 'blank') {
             k();
         } else {
@@ -383,11 +383,11 @@ PersistentLexicon.prototype.unregisterBlank = function (oid, callback) {
  */
 PersistentLexicon.prototype._unregisterTerm = function (kind, oid, callback) {
     let that = this, request;
-    let transaction = that.db.transaction(["components", "knownGraphs"],"readwrite");
+    const transaction = that.db.transaction(["components", "knownGraphs"],"readwrite");
     if (kind === 'uri') {
         if (oid != this.defaultGraphOid) {
-            let removeKnownGraphs = function() {
-                let request = transaction.objectStore("knownGraphs").delete(oid);
+            const removeKnownGraphs = function() {
+                const request = transaction.objectStore("knownGraphs").delete(oid);
                 request.onsuccess = function() { callback(); };
             };
             request = transaction.objectStore("components").delete(oid);

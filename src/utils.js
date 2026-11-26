@@ -1,6 +1,6 @@
 "use strict";
 
-let slowNextTick = (function () {
+const slowNextTick = (function () {
 
     if(typeof(process) !== 'undefined' && process.nextTick) {
         return process.nextTick;
@@ -18,7 +18,7 @@ let slowNextTick = (function () {
 
 let spin = 0;
 let yieldFrequency = 100;
-let nextTick = function(f) {
+const nextTick = function(f) {
     spin++;
     if(spin < yieldFrequency) {
         f();
@@ -33,7 +33,7 @@ let nextTick = function(f) {
  * @param term
  * @returns {*}
  */
-let hashTerm = function(term) {
+const hashTerm = function(term) {
     try {
         if(term == null) {
             return "";
@@ -51,7 +51,7 @@ let hashTerm = function(term) {
     } catch(e) {
         if(typeof(term) === 'object') {
             let key = "";
-            for(let p in term) {
+            for(const p in term) {
                 key = key + p + term[p];
             }
 
@@ -67,14 +67,14 @@ let hashTerm = function(term) {
  * @param env Repository of the prefixes where th prefix of the URI will be resolved.
  * @returns the lexical representation of the URI term.
  */
-let lexicalFormBaseUri = function(term, env) {
+const lexicalFormBaseUri = function(term, env) {
     let uri = null;
     env = env || {};
     if(term.value == null) {
         // URI has prefix and suffix, we'll try to resolve it.
-        let prefix = term.prefix;
-        let suffix = term.suffix;
-        let resolvedPrefix = env.namespaces[prefix];
+        const prefix = term.prefix;
+        const suffix = term.suffix;
+        const resolvedPrefix = env.namespaces[prefix];
         if(resolvedPrefix != null) {
             uri = resolvedPrefix+suffix;
         } else {
@@ -89,16 +89,16 @@ let lexicalFormBaseUri = function(term, env) {
     return uri === null ? null : resolveIri(env.base, uri);
 };
 
-let SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+const SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 
 // RFC 3986 appendix B
-let parseReference = function(iri) {
-    let m = /^(([^:/?#]+):)?(\/\/([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?$/.exec(iri);
+const parseReference = function(iri) {
+    const m = /^(([^:/?#]+):)?(\/\/([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?$/.exec(iri);
     return {scheme: m[2], authority: m[4], path: m[5], query: m[7], fragment: m[9]};
 };
 
 // RFC 3986 5.2.4
-let removeDotSegments = function(input) {
+const removeDotSegments = function(input) {
     let output = "";
     while(input.length > 0) {
         if(input.indexOf("../") === 0) {
@@ -131,15 +131,15 @@ let removeDotSegments = function(input) {
  * its first segment but no valid scheme (a_b:c, no relative reference). A base that has no scheme itself is
  * prepended.
  */
-let resolveIri = function(base, iri) {
+const resolveIri = function(base, iri) {
     // a colon in the first segment: a scheme, or no relative reference
     if(/^[^/?#]*:/.test(iri) || base == null || base === "") {
         return iri;
     } else if(!SCHEME.test(base)) {
         return base + iri;
     }
-    let b = parseReference(base);
-    let r = parseReference(iri);
+    const b = parseReference(base);
+    const r = parseReference(iri);
     let authority = b.authority;
     let path, query = r.query;
     if(r.authority !== undefined) {
@@ -160,7 +160,7 @@ let resolveIri = function(base, iri) {
 };
 
 
-let parseISO8601 = function (str) {
+const parseISO8601 = function (str) {
     return Date.parse(str);
 };
 
@@ -188,24 +188,24 @@ if (!Date.prototype.toISOString) {
     }());
 }
 
-let iso8601 = function(date) {
+const iso8601 = function(date) {
     return date.toISOString();
 };
 
-let lexicalFormLiteral = function(term, env) {
-    let value = term.value;
-    let lang = term.lang;
-    let type = term.type;
+const lexicalFormLiteral = function(term, env) {
+    const value = term.value;
+    const lang = term.lang;
+    const type = term.type;
 
     let indexedValue = null;
     if(value != null && type != null && typeof(type) != 'string') {
         let typeValue = type.value;
 
         if(typeValue == null) {
-            let typePrefix = type.prefix;
-            let typeSuffix = type.suffix;
+            const typePrefix = type.prefix;
+            const typeSuffix = type.suffix;
 
-            let resolvedPrefix = env.namespaces[typePrefix];
+            const resolvedPrefix = env.namespaces[typePrefix];
             term.type = resolvedPrefix+typeSuffix;
             typeValue = resolvedPrefix+typeSuffix;
         }
@@ -234,16 +234,16 @@ let lexicalFormLiteral = function(term, env) {
 };
 
 // Replaces \uXXXX escapes with their characters, without eval (which a CSP without 'unsafe-eval' blocks).
-let normalizeUnicodeLiterals = function (string) {
+const normalizeUnicodeLiterals = function (string) {
     return string.replace(/\\u([0-9a-fA-F]{4})/g, function (escape, hex) {
         return String.fromCharCode(parseInt(hex, 16));
     });
 };
 
 // Persistence relies on the native IndexedDB of the runtime (browser window or worker).
-let registerIndexedDB = function(that) {
+const registerIndexedDB = function(that) {
     // In the following line, you should include the prefixes of implementations you want to test.
-    let context = globalThis;
+    const context = globalThis;
 
     context.indexedDB = context.indexedDB || context.mozIndexedDB || context.webkitIndexedDB || context.msIndexedDB;
     context.IDBKeyRange = context.IDBKeyRange || context.webkitIDBKeyRange || context.msIDBKeyRange;
@@ -257,7 +257,7 @@ let registerIndexedDB = function(that) {
     }
 };
 
-let guid = function() {
+const guid = function() {
     function s4() {
         return Math.floor((1 + Math.random()) * 0x10000)
             .toString(16)
@@ -268,8 +268,8 @@ let guid = function() {
 };
 
 // Returns a new array without the elements matching p.
-let reject = function(xs,p) {
-    let acc = [];
+const reject = function(xs,p) {
+    const acc = [];
     for(let i=0; i<xs.length; i++) {
         if(!p(xs[i])) {
             acc.push(xs[i]);
@@ -280,8 +280,8 @@ let reject = function(xs,p) {
 };
 
 // Removes the elements matching p from xs itself and returns them.
-let remove = function(xs,p) {
-    let removed = [];
+const remove = function(xs,p) {
+    const removed = [];
     let kept = 0;
     for(let i=0; i<xs.length; i++) {
         if(p(xs[i])) {
@@ -295,7 +295,7 @@ let remove = function(xs,p) {
     return removed;
 };
 
-let include = function(xs,p) {
+const include = function(xs,p) {
     for(let i=0; i<xs.length; i++){
         if(xs[i] === p)
             return true;
@@ -304,7 +304,7 @@ let include = function(xs,p) {
     return false;
 };
 
-let each = function(xs,f) {
+const each = function(xs,f) {
     if(xs.forEach) {
         xs.forEach(f);
     } else {
@@ -313,11 +313,11 @@ let each = function(xs,f) {
     }
 };
 
-let map = function(xs,f) {
+const map = function(xs,f) {
     if(xs.map) {
         return xs.map(f);
     } else {
-        let acc = [];
+        const acc = [];
         for (let i = 0; i < xs.length; i++)
             acc[i] = f(xs[i]);
 
@@ -325,21 +325,21 @@ let map = function(xs,f) {
     }
 };
 
-let keys = function(xs) {
-    let acc = [];
-    for(let p in xs)
+const keys = function(xs) {
+    const acc = [];
+    for(const p in xs)
         acc.push(p);
     return acc;
 };
 
-let values = function(xs) {
-    let acc = [];
-    for(let p in xs)
+const values = function(xs) {
+    const acc = [];
+    for(const p in xs)
         acc.push(xs[p]);
     return acc;
 };
 
-let size = function(xs) {
+const size = function(xs) {
     if(xs.length) {
         return xs.length;
     } else {
@@ -347,19 +347,19 @@ let size = function(xs) {
     }
 };
 
-let clone = function(value) {
+const clone = function(value) {
     return JSON.parse(JSON.stringify(value));
 };
 
-let isObject = function(value) {
+const isObject = function(value) {
     // Avoid a V8 JIT bug in Chrome 19-20.
     // See https://code.google.com/p/v8/issues/detail?id=2291 for more details.
-    let type = typeof value;
+    const type = typeof value;
     return type == 'function' || (value && type == 'object') || false;
 };
 
 
-let create = (function() {
+const create = (function() {
     function Object() {}
     return function(prototype) {
         let result;
@@ -372,7 +372,7 @@ let create = (function() {
     };
 }());
 
-let whilst = function (test, iterator, callback) {
+const whilst = function (test, iterator, callback) {
     if (test()) {
         iterator(function (err) {
             if (err) {
@@ -390,13 +390,13 @@ let whilst = function (test, iterator, callback) {
 };
 
 
-let eachSeries = function (arr, iterator, callback) {
+const eachSeries = function (arr, iterator, callback) {
     callback = callback || function () {};
     if (!arr.length) {
         return callback();
     }
     let completed = 0;
-    let iterate = function () {
+    const iterate = function () {
         iterator(arr[completed], function (err) {
             if (err) {
                 callback(err);
@@ -416,7 +416,7 @@ let eachSeries = function (arr, iterator, callback) {
     iterate();
 };
 
-let eachParallel = function (arr, iterator, callback) {
+const eachParallel = function (arr, iterator, callback) {
     callback = callback || function () {};
     if (!arr.length) {
         return callback();
@@ -424,7 +424,7 @@ let eachParallel = function (arr, iterator, callback) {
     let failed = false;
     let completed = 0;
 
-    let innerCallback = function(err) {
+    const innerCallback = function(err) {
         if(err) {
             failed = true;
             throw(new Error(err));
@@ -454,7 +454,7 @@ let eachParallel = function (arr, iterator, callback) {
 };
 
 
-let reduce = function (arr, memo, iterator, callback) {
+const reduce = function (arr, memo, iterator, callback) {
     eachSeries(arr, function (x, callback) {
         iterator(memo, x, function (err, v) {
             memo = v;
@@ -465,16 +465,16 @@ let reduce = function (arr, memo, iterator, callback) {
     });
 };
 
-let seq = function (/* functions... */) {
-    let fns = arguments;
+const seq = function (/* functions... */) {
+    const fns = arguments;
     return function () {
-        let that = this;
-        let args = Array.prototype.slice.call(arguments);
-        let callback = args.pop();
+        const that = this;
+        const args = Array.prototype.slice.call(arguments);
+        const callback = args.pop();
         reduce(fns, args, function (newargs, fn, cb) {
                 fn.apply(that, newargs.concat([function () {
-                    let err = arguments[0];
-                    let nextargs = Array.prototype.slice.call(arguments, 1);
+                    const err = arguments[0];
+                    const nextargs = Array.prototype.slice.call(arguments, 1);
                     cb(err, nextargs);
                 }]));
             },
@@ -486,13 +486,13 @@ let seq = function (/* functions... */) {
 
 
 // Thrown values that are not Errors (some builtins throw strings) are wrapped, so callers always get an Error.
-let toError = function (e) {
+const toError = function (e) {
     return (e instanceof Error) ? e : new Error(String(e));
 };
 
 // Wraps a callback so that only its first invocation runs; `called` tells whether it already ran.
-let once = function (callback) {
-    let wrapped = function () {
+const once = function (callback) {
+    const wrapped = function () {
         if (wrapped.called) {
             return;
         }
@@ -506,9 +506,9 @@ let once = function (callback) {
 // Runs fn(callback) and settles a promise with its node-style result; a synchronous throw rejects too.
 // A throw after the callback already ran is rethrown, as at the callback entry points: the promise
 // is settled by then and would swallow it.
-let toPromise = function (fn) {
+const toPromise = function (fn) {
     let settle;
-    let promise = new Promise(function (resolve, reject) {
+    const promise = new Promise(function (resolve, reject) {
         settle = function (err, result) {
             if (err) {
                 reject(toError(err));
@@ -517,7 +517,7 @@ let toPromise = function (fn) {
             }
         };
     });
-    let done = once(settle);
+    const done = once(settle);
     try {
         fn(done);
     } catch (e) {
@@ -530,7 +530,7 @@ let toPromise = function (fn) {
 };
 
 
-let isWorker = function() {
+const isWorker = function() {
     if(typeof(process) === "undefined" || process.browser === true) {
         if (typeof(window) === "undefined") {
             return true;

@@ -1,11 +1,11 @@
 "use strict";
 
-let utils = require('./utils');
-let async = utils;
-let nextTick = utils.nextTick;
+const utils = require('./utils');
+const async = utils;
+const nextTick = utils.nextTick;
 
-let left = -1;
-let right = 1;
+const left = -1;
+const right = 1;
 
 /**
  * @doc
@@ -20,13 +20,13 @@ let right = 1;
  *
  * An implementation of an in memory B-Tree.
  */
-let Tree = function(order,f) {
+const Tree = function(order,f) {
     if(arguments.length != 0) {
         this.order = order;
         this.root = this._allocateNode();
         this.root.isLeaf = true;
         this.root.level = 0;
-        let that = this;
+        const that = this;
         this._diskWrite(this.root, function(root){
             that.root = root;
             that._updateRootNode(that.root, function(n){
@@ -116,8 +116,8 @@ Tree.prototype._updateRootNode = function(node,f) {
  * If no node is found, null is returned.
  */
 Tree.prototype.search = function(key,f, checkExists) {
-    let node = this.root;
-    let tree = this;
+    const node = this.root;
+    const tree = this;
     tree.__search(tree,key,node,f, checkExists);
 };
 Tree.prototype.__search = function (tree, key, node, f, checkExists) {
@@ -153,7 +153,7 @@ Tree.prototype.walk = function(f,e) {
     this.__walk(this,this.root,f,e);
 };
 Tree.prototype.__walk = function(tree,node,f,callback) {
-    let max = node.numberActives;
+    const max = node.numberActives;
     let i = 0;
     if(node.isLeaf) {
         for(i=0; i<node.numberActives; i++) {
@@ -188,13 +188,13 @@ Tree.prototype.__walk = function(tree,node,f,callback) {
  * Split the child node and adjusts the parent.
  */
 Tree.prototype._splitChild = function(parent, index, child, callback) {
-    let newChild = this._allocateNode();
+    const newChild = this._allocateNode();
     newChild.isLeaf = child.isLeaf;
     newChild.level = child.level;
     newChild.numberActives = this.order - 1;
 
     // Copy the higher order keys to the new child
-    let newParentChild = child.keys[this.order-1];
+    const newParentChild = child.keys[this.order-1];
     child.keys[this.order-1] = null;
 
     let i;
@@ -229,7 +229,7 @@ Tree.prototype._splitChild = function(parent, index, child, callback) {
     parent.keys[index] = newParentChild;
     parent.numberActives++;
 
-    let that = this;
+    const that = this;
     this._diskWrite(newChild,function(newChild){
         that._diskWrite(parent,function(parent){
             parent.children[index+1] = newChild;
@@ -255,7 +255,7 @@ Tree.prototype.insert = function(key,data,callback) {
         newRoot.numberActives = 0;
         newRoot.children[0] = this.root;
 
-        let that = this;
+        const that = this;
         this._splitChild(newRoot, 0, this.root, function(updatedParent){
             newRoot = updatedParent; // @warning tricky!
             that.root = newRoot;
@@ -276,7 +276,7 @@ Tree.prototype.insert = function(key,data,callback) {
  * in the BTree hierarchy.
  */
 Tree.prototype._insertNonFull = function (node, key, data, callback) {
-    let idx = node.numberActives - 1;
+    const idx = node.numberActives - 1;
     this.__insertNonFull(this, node, idx, key, data, callback);
 };
 Tree.prototype.__insertNonFull = function(tree,node,idx,key,data,callback) {
@@ -285,7 +285,7 @@ Tree.prototype.__insertNonFull = function(tree,node,idx,key,data,callback) {
             idx--;
         }
         idx++;
-        let that = tree;
+        const that = tree;
         tree._diskRead(node.children[idx],function(child) {
             if(child.numberActives === 2*that.order -1) {
                 that._splitChild(node,idx,child,function(){
@@ -333,7 +333,7 @@ Tree.prototype.__insertNonFull = function(tree,node,idx,key,data,callback) {
  * @returns true if the key is deleted false otherwise
  */
 Tree.prototype.delete = function(key,callback) {
-    let node = this.root;
+    const node = this.root;
     Tree.prototype.__deleteSearchNode(this,key,node,callback);
 };
 Tree.prototype.__deleteSearchNode = function(tree,key,node,callback) {
@@ -347,7 +347,7 @@ Tree.prototype.__deleteSearchNode = function(tree,key,node,callback) {
         i++;
     }
 
-    let idx = i;
+    const idx = i;
 
     if(i<node.numberActives && tree.comparator(key, node.keys[i].key) === 0) {
         return tree.__deleteNodeFound(tree,idx,key,node,callback);
@@ -357,7 +357,7 @@ Tree.prototype.__deleteSearchNode = function(tree,key,node,callback) {
         return callback(false);
     }
 
-    let parent = node;
+    const parent = node;
     tree._diskRead(node.children[i], function(node){
         if(node===null) {
             return callback(false);
@@ -530,7 +530,7 @@ Tree.prototype._moveKey = function (parent, i, position, callback) {
         i--;
     }
 
-    let that = this;
+    const that = this;
     //var lchild = parent.children[i-1];
     that._diskRead(parent.children[i], function (lchild) {
         that._diskRead(parent.children[i + 1], function (rchild) {
@@ -601,12 +601,12 @@ Tree.prototype._mergeSiblings = function(parent,index,pos,callback) {
         tolookn2 = parent.children[index + 1];
     }
 
-    let that = this;
+    const that = this;
     that._diskRead(tolookn1, function(n1){
         that._diskRead(tolookn2, function(n2){
 
             //Merge the current node with the left node
-            let newNode = that._allocateNode();
+            const newNode = that._allocateNode();
             newNode.isLeaf = n1.isLeaf;
             newNode.level = n1.level;
 
@@ -727,7 +727,7 @@ Tree.prototype._mergeNodes = function(n1, key, n2, callback) {
     newNode.level = n1.level;
 
 
-    let that = this;
+    const that = this;
     this._diskWrite(newNode, function(newNode){
         that._diskDelete(n1, function(){
             that._diskDelete(n2, function(){
@@ -744,7 +744,7 @@ Tree.prototype._mergeNodes = function(n1, key, n2, callback) {
  *  @return An object containing the key and position of the key
  */
 Tree.prototype._getMaxKeyPos = function (tree, node, callback) {
-    let node_pos = {};
+    const node_pos = {};
 
     if (node === null) {
         return callback(null);
@@ -770,7 +770,7 @@ Tree.prototype._getMaxKeyPos = function (tree, node, callback) {
  *  @return An object containing the key and position of the key
  */
 Tree.prototype._getMinKeyPos = function (tree, node, callback) {
-    let node_pos = {};
+    const node_pos = {};
 
     if (node === null) {
         callback(null);
@@ -798,7 +798,7 @@ Tree.prototype._getMinKeyPos = function (tree, node, callback) {
  * A Tree node augmented with BTree
  * node structures
  */
-let Node = function() {
+const Node = function() {
     this.numberActives = 0;
     this.isLeaf = null;
     this.keys = [];

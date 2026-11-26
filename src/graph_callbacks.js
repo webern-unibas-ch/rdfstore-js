@@ -1,13 +1,13 @@
 "use strict";
 
 //imports
-let _ = require('./utils');
-let async = require('./utils');
-let Pattern = require('./quad_index').Pattern;
-let RDFModel = require('./rdf_model');
-let AbstractQueryTree = require('./abstract_query_tree').AbstractQueryTree;
+const _ = require('./utils');
+const async = require('./utils');
+const Pattern = require('./quad_index').Pattern;
+const RDFModel = require('./rdf_model');
+const AbstractQueryTree = require('./abstract_query_tree').AbstractQueryTree;
 
-let Callbacks = {};
+const Callbacks = {};
 
 Callbacks.ANYTHING = {
     'token': 'var',
@@ -51,7 +51,7 @@ Callbacks.CallbacksBackend = function() {
     this.queriesInverseMap = {};
 
     for(let i=0; i<this.indices.length; i++) {
-	let indexKey = this.indices[i];
+	const indexKey = this.indices[i];
 	this.indexMap[indexKey] = {};
 	this.queriesIndexMap[indexKey] = {};
     }
@@ -76,9 +76,9 @@ Callbacks.CallbacksBackend.prototype.nextGraphModification = function(event, qua
 
 Callbacks.CallbacksBackend.prototype.endGraphModification = function(callback) {
     if(this.ongoingModification !== true) {
-	let that = this;
+	const that = this;
 	if (this.updateInProgress != null) {
-	    let tmp = that.updateInProgress;
+	    const tmp = that.updateInProgress;
 	    that.updateInProgress = null;
 	    this.sendNotification(Callbacks['deleted'], tmp[Callbacks['deleted']], function () {
 		that.sendNotification(Callbacks['added'], tmp[Callbacks['added']], function () {
@@ -104,12 +104,12 @@ Callbacks.CallbacksBackend.prototype.cancelGraphModification = function() {
 };
 
 Callbacks.CallbacksBackend.prototype.sendNotification = function(event, quadsPairs, doneCallback) {
-    let notificationsMap = {};
+    const notificationsMap = {};
     for(let i=0; i<quadsPairs.length; i++) {
-	let quadPair = quadsPairs[i];
-	for(let indexKey in this.indexMap) {
+	const quadPair = quadsPairs[i];
+	for(const indexKey in this.indexMap) {
 	    let index = this.indexMap[indexKey];
-	    let order = this.componentOrders[indexKey];
+	    const order = this.componentOrders[indexKey];
 	    this._searchCallbacksInIndex(index, order, event, quadPair, notificationsMap);
 	    if(this.pendingQueries.length != 0) {
 		index = this.queriesIndexMap[indexKey];
@@ -125,7 +125,7 @@ Callbacks.CallbacksBackend.prototype.sendNotification = function(event, quadsPai
 };
 
 Callbacks.CallbacksBackend.prototype.sendEmptyNotification = function(event, value, doneCallback) {
-    let callbacks = this.emptyNotificationsMap[event] || [];
+    const callbacks = this.emptyNotificationsMap[event] || [];
     for(let i=0; i<callbacks.length; i++) {
 	callbacks[i](event, value);
     }
@@ -133,15 +133,15 @@ Callbacks.CallbacksBackend.prototype.sendEmptyNotification = function(event, val
 };
 
 Callbacks.CallbacksBackend.prototype.dispatchNotifications = function(notificationsMap) {
-    for(let callbackId in notificationsMap) {
-	let callback = this.callbacksMap[callbackId];
-	let deleted = notificationsMap[callbackId][Callbacks['deleted']];
+    for(const callbackId in notificationsMap) {
+	const callback = this.callbacksMap[callbackId];
+	const deleted = notificationsMap[callbackId][Callbacks['deleted']];
 	if(deleted!=null) {
 	    try {
 		callback(Callbacks['deleted'],deleted);
 	    }catch(e){ /* swallowed on purpose: a failing handler must not stop the other notifications */ }
 	}
-	for(let event in notificationsMap[callbackId]) {
+	for(const event in notificationsMap[callbackId]) {
 	    if(event!=Callbacks['deleted']) {
 		try{
 		    callback(event, notificationsMap[callbackId][event]);
@@ -153,15 +153,15 @@ Callbacks.CallbacksBackend.prototype.dispatchNotifications = function(notificati
 };
 
 Callbacks.CallbacksBackend.prototype._searchCallbacksInIndex = function(index, order, event, quadPair, notificationsMap) {
-    let quadPairNomalized = quadPair[1];
+    const quadPairNomalized = quadPair[1];
     quadPair = quadPair[0];
 
     for(let i=0; i<(order.length+1); i++) {
-	let matched = index['_'] || [];
+	const matched = index['_'] || [];
 
-	let filteredIds = [];
+	const filteredIds = [];
 	for(let j=0; j<matched.length; j++) {
-	    let callbackId = matched[j];
+	    const callbackId = matched[j];
 	    if(this.callbacksMap[callbackId] != null) {
 		notificationsMap[callbackId] = notificationsMap[callbackId] || {};
 		notificationsMap[callbackId][event] = notificationsMap[callbackId][event] || [];
@@ -170,7 +170,7 @@ Callbacks.CallbacksBackend.prototype._searchCallbacksInIndex = function(index, o
 	    }
 	}
 	index['_'] = filteredIds;
-	let component = order[i];
+	const component = order[i];
 	if(index[''+quadPairNomalized[component]] != null) {
 	    index = index[''+quadPairNomalized[component]];
 	} else {
@@ -180,7 +180,7 @@ Callbacks.CallbacksBackend.prototype._searchCallbacksInIndex = function(index, o
 };
 
 Callbacks.CallbacksBackend.prototype.subscribeEmpty = function(event, callback) {
-    let callbacks = this.emptyNotificationsMap[event] || [];
+    const callbacks = this.emptyNotificationsMap[event] || [];
     callbacks.push(callback);
     this.emptyNotificationsMap[event] = callbacks;
 };
@@ -194,18 +194,18 @@ Callbacks.CallbacksBackend.prototype.unsubscribeEmpty = function(event, callback
 };
 
 Callbacks.CallbacksBackend.prototype.subscribe = function(s,p,o,g,callback, doneCallback) {
-    let quad = this._tokenizeComponents(s,p,o,g);
-    let queryEnv = {blanks:{}, outCache:{}};
+    const quad = this._tokenizeComponents(s,p,o,g);
+    const queryEnv = {blanks:{}, outCache:{}};
     this.engine.registerNsInEnvironment(null, queryEnv);
-    let that = this;
+    const that = this;
     this.engine.normalizeQuad(quad, queryEnv, true, function(normalized){
-	let pattern =  new Pattern(normalized);
-	let indexKey = that._indexForPattern(pattern);
-	let indexOrder = that.componentOrders[indexKey];
+	const pattern =  new Pattern(normalized);
+	const indexKey = that._indexForPattern(pattern);
+	const indexOrder = that.componentOrders[indexKey];
 	let index = that.indexMap[indexKey];
 	for(let i=0; i<indexOrder.length; i++) {
-	    let component = indexOrder[i];
-	    let quadValue = normalized[component];
+	    const component = indexOrder[i];
+	    const quadValue = normalized[component];
 	    if(quadValue === '_') {
 		if(index['_'] == null) {
 		    index['_'] = [];
@@ -234,7 +234,7 @@ Callbacks.CallbacksBackend.prototype.subscribe = function(s,p,o,g,callback, done
 };
 
 Callbacks.CallbacksBackend.prototype.unsubscribe = function(callback) {
-    let id = this.callbacksInverseMap.get(callback);
+    const id = this.callbacksInverseMap.get(callback);
     if(id != null) {
 	this.callbacksInverseMap.delete(callback);
 	delete this.callbacksMap[id];
@@ -242,7 +242,7 @@ Callbacks.CallbacksBackend.prototype.unsubscribe = function(callback) {
 };
 
 Callbacks.CallbacksBackend.prototype._tokenizeComponents = function(s, p, o, g) {
-    let pattern = {};
+    const pattern = {};
 
     if(s == null) {
 	pattern['subject'] = Callbacks.ANYTHING;
@@ -276,12 +276,12 @@ Callbacks.CallbacksBackend.prototype._tokenizeComponents = function(s, p, o, g) 
 };
 
 Callbacks.CallbacksBackend.prototype._indexForPattern = function(pattern) {
-    let indexKey = pattern.indexKey;
-    let matchingIndices = this.indices;
+    const indexKey = pattern.indexKey;
+    const matchingIndices = this.indices;
 
     for(let i=0; i<matchingIndices.length; i++) {
-	let index = matchingIndices[i];
-	let indexComponents = this.componentOrders[index];
+	const index = matchingIndices[i];
+	const indexComponents = this.componentOrders[index];
 	for(let j=0; j<indexComponents.length; j++) {
 	    if(_.include(indexKey, indexComponents[j])===false) {
 		break;
@@ -309,16 +309,16 @@ Callbacks.CallbacksBackend.prototype.observeNode = function() {
 	callback = arguments[1];
 	doneCallback = arguments[2];
     }
-    let query = "CONSTRUCT { <" + uri + "> ?p ?o } WHERE { GRAPH <" + graphUri + "> { <" + uri + "> ?p ?o } }";
-    let that = this;
-    let queryEnv = {blanks:{}, outCache:{}};
+    const query = "CONSTRUCT { <" + uri + "> ?p ?o } WHERE { GRAPH <" + graphUri + "> { <" + uri + "> ?p ?o } }";
+    const that = this;
+    const queryEnv = {blanks:{}, outCache:{}};
     this.engine.registerNsInEnvironment(null, queryEnv);
-    let bindings = [];
+    const bindings = [];
     this.engine.execute(query,  function(err, graph){
 	if(!err) {
-	    let node = graph;
+	    const node = graph;
 	    let mustFlush = false;
-	    let observer = function(event, triples){
+	    const observer = function(event, triples){
 		if(event === 'eventsFlushed' && mustFlush ) {
 		    mustFlush = false;
 		    try {
@@ -328,9 +328,9 @@ Callbacks.CallbacksBackend.prototype.observeNode = function() {
 		    mustFlush = true;
 		    for(let i = 0; i<triples.length; i++) {
 			let triple = triples[i];
-			let s = RDFModel.buildRDFResource(triple.subject,bindings,that.engine,queryEnv);
-			let p = RDFModel.buildRDFResource(triple.predicate,bindings,that.engine,queryEnv);
-			let o = RDFModel.buildRDFResource(triple.object,bindings,that.engine,queryEnv);
+			const s = RDFModel.buildRDFResource(triple.subject,bindings,that.engine,queryEnv);
+			const p = RDFModel.buildRDFResource(triple.predicate,bindings,that.engine,queryEnv);
+			const o = RDFModel.buildRDFResource(triple.object,bindings,that.engine,queryEnv);
 			if(s!=null && p!=null && o!=null) {
 			    triple = new RDFModel.Triple(s,p,o);
 			    if(event === Callbacks['added']) {
@@ -360,7 +360,7 @@ Callbacks.CallbacksBackend.prototype.observeNode = function() {
 };
 
 Callbacks.CallbacksBackend.prototype.stopObservingNode = function(callback) {
-    let observers = this.observersMap.get(callback);
+    const observers = this.observersMap.get(callback);
     if(observers) {
 	this.observersMap.delete(callback);
 	for(let i=0; i<observers.length; i++) {
@@ -376,14 +376,14 @@ Callbacks.CallbacksBackend.prototype.stopObservingNode = function(callback) {
 // Queries
 
 Callbacks.CallbacksBackend.prototype.observeQuery = function(query, callback, endCallback) {
-    let queryParsed = this.aqt.parseQueryString(query);
-    let parsedTree = this.aqt.parseSelect(queryParsed.units[0]);
-    let patterns = this.aqt.collectBasicTriples(parsedTree);
-    let that = this;
-    let queryEnv = {blanks:{}, outCache:{}};
+    const queryParsed = this.aqt.parseQueryString(query);
+    const parsedTree = this.aqt.parseSelect(queryParsed.units[0]);
+    const patterns = this.aqt.collectBasicTriples(parsedTree);
+    const that = this;
+    const queryEnv = {blanks:{}, outCache:{}};
     // the query's PREFIX and BASE, so that its patterns are registered under the IRIs that change
     this.engine.registerNsInEnvironment(queryParsed.prologue, queryEnv);
-    let counter = this.queryCounter;
+    const counter = this.queryCounter;
     this.queryCounter++;
     this.queriesMap[counter] = query;
     // a query observed more than once has one id per call
@@ -392,8 +392,8 @@ Callbacks.CallbacksBackend.prototype.observeQuery = function(query, callback, en
     this.queriesCallbacksMap[counter] = callback;
 
     // a query without a dataset in a store with a union default graph: its patterns match in every graph
-    let dataset = parsedTree.dataset;
-    let union = this.engine.unionDefaultGraph && dataset.implicit.length === 0 && dataset.named.length === 0;
+    const dataset = parsedTree.dataset;
+    const union = this.engine.unionDefaultGraph && dataset.implicit.length === 0 && dataset.named.length === 0;
 
     async.eachSeries(patterns, function(quad, k) {
 	if(quad.graph == null) {
@@ -401,14 +401,14 @@ Callbacks.CallbacksBackend.prototype.observeQuery = function(query, callback, en
 	}
 
 	that.engine.normalizeQuad(quad, queryEnv, true, function(normalized) {
-	    let pattern =  new Pattern(normalized);
-	    let indexKey = that._indexForPattern(pattern);
-	    let indexOrder = that.componentOrders[indexKey];
+	    const pattern =  new Pattern(normalized);
+	    const indexKey = that._indexForPattern(pattern);
+	    const indexOrder = that.componentOrders[indexKey];
 	    let index = that.queriesIndexMap[indexKey];
 
 	    for(let j=0; j<indexOrder.length; j++) {
-		let component = indexOrder[j];
-		let quadValue = normalized[component];
+		const component = indexOrder[j];
+		const quadValue = normalized[component];
 		if(typeof(quadValue) === 'string') {
 		    if(index['_'] == null) {
 			index['_'] = [];
@@ -445,7 +445,7 @@ Callbacks.CallbacksBackend.prototype.observeQuery = function(query, callback, en
 };
 
 Callbacks.CallbacksBackend.prototype.stopObservingQuery = function(query) {
-    let ids = this.queriesInverseMap[query];
+    const ids = this.queriesInverseMap[query];
     if(ids != null) {
 	delete this.queriesInverseMap[query];
 	for(let i=0; i<ids.length; i++) {
@@ -457,15 +457,15 @@ Callbacks.CallbacksBackend.prototype.stopObservingQuery = function(query) {
 };
 
 Callbacks.CallbacksBackend.prototype._searchQueriesInIndex = function(index, order, quadPair) {
-    let quadPairNomalized = quadPair[1];
+    const quadPairNomalized = quadPair[1];
     quadPair = quadPair[0];
 
     for(let i=0; i<(order.length+1); i++) {
-	let matched = index['_'] || [];
+	const matched = index['_'] || [];
 
-	let filteredIds = [];
+	const filteredIds = [];
 	for(let j=0; j<matched.length; j++) {
-	    let queryId = matched[j];
+	    const queryId = matched[j];
 	    if(_.include(this.pendingQueries,queryId)) {
 		_.remove(this.pendingQueries,function(pendingQueryId){ return pendingQueryId === queryId });
 		this.matchedQueries.push(queryId);
@@ -477,7 +477,7 @@ Callbacks.CallbacksBackend.prototype._searchQueriesInIndex = function(index, ord
 	}
 	index['_'] = filteredIds;
 
-	let component = order[i];
+	const component = order[i];
 	if(index[''+quadPairNomalized[component]] != null) {
 	    index = index[''+quadPairNomalized[component]];
 	} else {
@@ -487,9 +487,9 @@ Callbacks.CallbacksBackend.prototype._searchQueriesInIndex = function(index, ord
 };
 
 Callbacks.CallbacksBackend.prototype.dispatchQueries = function(callback) {
-    let that = this;
+    const that = this;
     let query, queryCallback;
-    let toDispatchMap = {};
+    const toDispatchMap = {};
 
     async.eachSeries(this.matchedQueries, function(queryId,k) {
 	// avoid duplicate notifications

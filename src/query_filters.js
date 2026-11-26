@@ -1,19 +1,19 @@
 "use strict";
 
-let Utils = require('./utils');
-let     _ = Utils;
-let async = require('./utils');
-let NonSupportedSparqlFeatureError = require('./abstract_query_tree').NonSupportedSparqlFeatureError;
+const Utils = require('./utils');
+const     _ = Utils;
+const async = require('./utils');
+const NonSupportedSparqlFeatureError = require('./abstract_query_tree').NonSupportedSparqlFeatureError;
 
-let QueryFilters = {};
+const QueryFilters = {};
 
-let xmlSchema = "http://www.w3.org/2001/XMLSchema#";
+const xmlSchema = "http://www.w3.org/2001/XMLSchema#";
 
 QueryFilters.checkFilters = function(pattern, bindings, nullifyErrors, dataset, queryEnv, queryEngine, callback) {
     let filters = [];
     if (pattern.filter && typeof(pattern.filter) !== 'function')
         filters = pattern.filter;
-    let nullified = [];
+    const nullified = [];
     if(filters==null || filters.length === 0 || pattern.length != null) {
         return callback(null, bindings);
     }
@@ -26,9 +26,9 @@ QueryFilters.checkFilters = function(pattern, bindings, nullifyErrors, dataset, 
                 if(err != null) {
                     return k(err);
                 }
-                let acum = [];
+                const acum = [];
                 for(let i=0; i<filteredBindings.length; i++) {
-                    let filteredBinding = filteredBindings[i];
+                    const filteredBinding = filteredBindings[i];
                     if(filteredBinding["__nullify__"]!=null) {
                         nullified.push(filteredBinding);
                     } else {
@@ -49,20 +49,20 @@ QueryFilters.checkFilters = function(pattern, bindings, nullifyErrors, dataset, 
 };
 
 QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEngine, dataset, env ,cb) {
-    let preProcessedFilters = [];
+    const preProcessedFilters = [];
     async.eachSeries(filters, function(filter, k){
         if(filter.value.expressionType === 'builtincall' &&
            (filter.value.builtincall === 'exists' ||
             filter.value.builtincall === 'notexists')) {
-            let builtincall = filter.value.builtincall;
-            let args = filter.value.args;
+            const builtincall = filter.value.builtincall;
+            const args = filter.value.args;
 
-            let bindingsResults = {};
-            let solutionsWithOids = bindings;
+            const bindingsResults = {};
+            const solutionsWithOids = bindings;
             queryEngine.copyDenormalizedBindings(bindings, env.outCache, function(denormBindings){
                 let index = 0;
                 async.eachSeries(denormBindings, function(bindings, kk) {
-                    let solution = solutionsWithOids[index++];
+                    const solution = solutionsWithOids[index++];
                     let ast;
                     // inside GRAPH, the active graph of this solution (see AbstractQueryTree.setExistsGraph)
                     let graph = filter.value.graph;
@@ -74,8 +74,8 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
                         ast = queryEngine.abstractQueryTree.parseSelect({pattern: _.clone(args[0],true)}, graph);
                         // in the pattern a blank node matches like a variable: a bound one keeps its OID, and
                         // one from BNODE(), not in the store, gets -1 (matches nothing)
-                        let patternBindings = {};
-                        for(let v in bindings) {
+                        const patternBindings = {};
+                        for(const v in bindings) {
                             let bound = bindings[v];
                             if(bound != null && bound.token === 'blank') {
                                 bound = {token: 'blank', value: bound.value, oid: typeof(solution[v]) === 'number' ? solution[v] : -1};
@@ -97,7 +97,7 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
                             success = QueryFilters.ebvBoolean(result.length===0);
                         }
                         let bindingsKey = [];
-                        for(let p in bindings) { bindingsKey.push(JSON.stringify(bindings[p]));}
+                        for(const p in bindings) { bindingsKey.push(JSON.stringify(bindings[p]));}
                         bindingsKey = bindingsKey.sort().join("");
                         bindingsResults[bindingsKey] = success;
                         kk();
@@ -113,7 +113,7 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
                 });
             });
         } else if (filter.value.expressionType === "conditionalor" || filter.value.expressionType === "conditionaland") {
-            let operands = _.map(filter.value.operands, function(operand){ return {"value": operand}; });
+            const operands = _.map(filter.value.operands, function(operand){ return {"value": operand}; });
             QueryFilters.preprocessExistentialFilters(operands, bindings, queryEngine, dataset, env, function(err, preprocessedOperands){
                 if(err != null) {
                     return k(err);
@@ -123,7 +123,7 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
                 k();
             });
         } else if (filter.value.expressionType === "multiplicativeexpression") {
-            let operands = _.map(filter.value.factors, function(operand){ return {"value": operand}; });
+            const operands = _.map(filter.value.factors, function(operand){ return {"value": operand}; });
             QueryFilters.preprocessExistentialFilters(operands, bindings, queryEngine, dataset, env, function(err, preprocessedOperands){
                 if(err != null) {
                     return k(err);
@@ -133,7 +133,7 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
                 k();
             });
         } else if (filter.value.expressionType === "additiveexpression") {
-            let operands = _.map(filter.value.summands, function(operand){ return {"value": operand}; });
+            const operands = _.map(filter.value.summands, function(operand){ return {"value": operand}; });
             QueryFilters.preprocessExistentialFilters(operands, bindings, queryEngine, dataset, env, function(err, preprocessedOperands){
                 if(err != null) {
                     return k(err);
@@ -143,7 +143,7 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
                 k();
             });
         } else if(filter.value.expressionType === "relationalexpression") {
-            let operands = [ {"value": filter.value.op1}, {"value": filter.value.op2}];
+            const operands = [ {"value": filter.value.op1}, {"value": filter.value.op2}];
             QueryFilters.preprocessExistentialFilters(operands, bindings, queryEngine, dataset, env, function(err, preprocessedOperands){
                 if(err != null) {
                     return k(err);
@@ -155,7 +155,7 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
             });
         } else if(filter.value.expressionType === "irireforfunction" || filter.value.expressionType === "custom") {
             if(filter.value.args != null) {
-                let operands = _.map(filter.value.args, function (operand) {
+                const operands = _.map(filter.value.args, function (operand) {
                     return {"value": operand};
                 });
                 QueryFilters.preprocessExistentialFilters(operands, bindings, queryEngine, dataset, env, function(err, preprocessedOperands){
@@ -183,10 +183,10 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
 
 QueryFilters.boundVars = function(filterExpr) {
     if(filterExpr.expressionType != null) {
-        let expressionType = filterExpr.expressionType;
+        const expressionType = filterExpr.expressionType;
         if(expressionType == 'relationalexpression') {
-            let op1 = filterExpr.op1;
-            let op2 = filterExpr.op2;
+            const op1 = filterExpr.op1;
+            const op2 = filterExpr.op2;
             return QueryFilters.boundVars(op1)+QueryFilters.boundVars(op2);
         } else if(expressionType == 'conditionalor' || expressionType == 'conditionaland') {
             let vars = [];
@@ -218,7 +218,7 @@ QueryFilters.boundVars = function(filterExpr) {
 
             return acum;
         } else if(expressionType == 'regex') {
-            let acum = QueryFilters.boundVars(filterExpr.expression1);
+            const acum = QueryFilters.boundVars(filterExpr.expression1);
             return acum.concat(QueryFilters.boundVars(filterExpr.expression2));
         } else if(expressionType == 'unaryexpression') {
             return QueryFilters.boundVars(filterExpr.expression);
@@ -237,12 +237,12 @@ QueryFilters.boundVars = function(filterExpr) {
 
 QueryFilters.run = function(filterExpr, bindings, nullifyFilters, dataset, env, queryEngine, callback) {
     queryEngine.copyDenormalizedBindings(bindings, env.outCache, function(denormBindings){
-        let filteredBindings = [];
+        const filteredBindings = [];
         for(let i=0; i<bindings.length; i++) {
-            let thisDenormBindings = denormBindings[i];
+            const thisDenormBindings = denormBindings[i];
             // ebv can be directly a RDFTerm (e.g. atomic expression in filter)
             // this additional call to ebv will return -> true/false/error
-            let ebv = QueryFilters.ebv(QueryFilters.runFilter(filterExpr, thisDenormBindings, queryEngine, dataset, env));
+            const ebv = QueryFilters.ebv(QueryFilters.runFilter(filterExpr, thisDenormBindings, queryEngine, dataset, env));
             //console.log("EBV:")
             //console.log(ebv)
             //console.log("FOR:")
@@ -250,7 +250,7 @@ QueryFilters.run = function(filterExpr, bindings, nullifyFilters, dataset, env, 
             if(QueryFilters.isEbvError(ebv)) {
                 // error
                 if(nullifyFilters) {
-                    let thisBindings = {"__nullify__": true, "bindings": bindings[i]};
+                    const thisBindings = {"__nullify__": true, "bindings": bindings[i]};
                     filteredBindings.push(thisBindings);
                 }
             } else if(ebv === true) {
@@ -259,7 +259,7 @@ QueryFilters.run = function(filterExpr, bindings, nullifyFilters, dataset, env, 
             } else {
                 // false
                 if(nullifyFilters) {
-                    let thisBindings = {"__nullify__": true, "bindings": bindings[i]};
+                    const thisBindings = {"__nullify__": true, "bindings": bindings[i]};
                     filteredBindings.push(thisBindings);
                 }
             }
@@ -270,10 +270,10 @@ QueryFilters.run = function(filterExpr, bindings, nullifyFilters, dataset, env, 
 
 QueryFilters.collect = function(filterExpr, bindings, dataset, env, queryEngine, callback) {
     queryEngine.copyDenormalizedBindings(bindings, env.outCache, function(denormBindings) {
-        let filteredBindings = [];
+        const filteredBindings = [];
         for(let i=0; i<denormBindings.length; i++) {
-            let thisDenormBindings = denormBindings[i];
-            let ebv = QueryFilters.runFilter(filterExpr, thisDenormBindings, queryEngine, dataset, env);
+            const thisDenormBindings = denormBindings[i];
+            const ebv = QueryFilters.runFilter(filterExpr, thisDenormBindings, queryEngine, dataset, env);
             filteredBindings.push({binding:bindings[i], value:ebv});
         }
         return callback(filteredBindings);
@@ -284,9 +284,9 @@ QueryFilters.runDistinct = function(projectedBindings, projectionVariables) {
 };
 
 // A key for a whole solution, for COUNT(DISTINCT *)
-let solutionKey = function(bindings) {
-    let names = Object.keys(bindings).sort();
-    let key = [];
+const solutionKey = function(bindings) {
+    const names = Object.keys(bindings).sort();
+    const key = [];
     for(let i=0; i<names.length; i++) {
         if(bindings[names[i]] != null) {
             key.push(names[i], Utils.hashTerm(bindings[names[i]]));
@@ -296,8 +296,8 @@ let solutionKey = function(bindings) {
 };
 
 // The value of an aggregate's expression for one solution; null if it is unbound or an error, which aggregates skip
-let aggregateValue = function(aggregator, bindings, queryEngine, dataset, env) {
-    let ebv = QueryFilters.runFilter(aggregator.expression.expression, bindings, queryEngine, dataset, env);
+const aggregateValue = function(aggregator, bindings, queryEngine, dataset, env) {
+    const ebv = QueryFilters.runFilter(aggregator.expression.expression, bindings, queryEngine, dataset, env);
     return QueryFilters.isEbvError(ebv) ? null : ebv;
 };
 
@@ -305,7 +305,7 @@ let aggregateValue = function(aggregator, bindings, queryEngine, dataset, env) {
 QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, dataset, env) {
     if(bindingsGroup == null || bindingsGroup.length === 0) {
         // an aggregate without GROUP BY over no solutions: SPARQL 1.1 defines 0 for COUNT, SUM, AVG and "" for GROUP_CONCAT
-        let aggregateType = aggregator.expression != null ? aggregator.expression.aggregateType : null;
+        const aggregateType = aggregator.expression != null ? aggregator.expression.aggregateType : null;
         if(aggregateType === 'count' || aggregateType === 'sum' || aggregateType === 'avg') {
             return {token: 'literal', type:xmlSchema+"integer", value:'0'};
         } else if(aggregateType === 'group_concat') {
@@ -317,14 +317,14 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
         return bindingsGroup[0][aggregator.value.value];
     } else if(aggregator.token === 'variable' && aggregator.kind === 'aliased') {
         if(aggregator.expression.expressionType === 'aggregate') {
-            let aggregateType = aggregator.expression.aggregateType;
-            let isDistinct = aggregator.expression.distinct != null && aggregator.expression.distinct != '';
+            const aggregateType = aggregator.expression.aggregateType;
+            const isDistinct = aggregator.expression.distinct != null && aggregator.expression.distinct != '';
             if(aggregateType === 'max' || aggregateType === 'min') {
                 // SPARQL defines MIN and MAX by the ORDER BY order, which also orders values that < can't compare
-                let sign = aggregateType === 'max' ? 1 : -1;
+                const sign = aggregateType === 'max' ? 1 : -1;
                 let best = null;
                 for(let i=0; i< bindingsGroup.length; i++) {
-                    let ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
+                    const ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
                     if(ebv != null &&
                         (best === null || sign * queryEngine.compareFilteredBindings({value: [ebv]}, {value: [best]}, [{direction: 'ASC'}], env) > 0)) {
                         best = ebv;
@@ -333,12 +333,12 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
 
                 return best === null ? QueryFilters.ebvError() : best;
             } else if(aggregateType === 'count') {
-                let distinct = {};
+                const distinct = {};
                 let count = 0;
                 if(aggregator.expression.expression === '*') {
                     if(isDistinct) {
                         for(let i=0; i< bindingsGroup.length; i++) {
-                            let key = solutionKey(bindingsGroup[i]);
+                            const key = solutionKey(bindingsGroup[i]);
                             if(distinct[key] == null) {
                                 distinct[key] = true;
                                 count++;
@@ -349,10 +349,10 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
                     }
                 } else {
                     for(let i=0; i< bindingsGroup.length; i++) {
-                        let ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
+                        const ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
                         if(ebv != null) {
                             if(isDistinct) {
-                                let key = Utils.hashTerm(ebv);
+                                const key = Utils.hashTerm(ebv);
                                 if(distinct[key] == null) {
                                     distinct[key] = true;
                                     count++;
@@ -366,11 +366,11 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
 
                 return {token: 'literal', type:xmlSchema+"integer", value:''+count};
             } else if(aggregateType === 'sum' || aggregateType === 'avg') {
-                let distinct = {};
+                const distinct = {};
                 let aggregated = {token: 'literal', type:xmlSchema+"integer", value:'0'};
                 let count = 0;
                 for(let i=0; i< bindingsGroup.length; i++) {
-                    let ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
+                    const ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
                     if(ebv == null) {
                         continue;
                     } else if(!QueryFilters.isNumeric(ebv)) {
@@ -378,7 +378,7 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
                         return QueryFilters.ebvError();
                     }
                     if(isDistinct) {
-                        let key = Utils.hashTerm(ebv);
+                        const key = Utils.hashTerm(ebv);
                         if(distinct[key] != null) {
                             continue;
                         }
@@ -394,14 +394,14 @@ QueryFilters.runAggregator = function(aggregator, bindingsGroup, queryEngine, da
                 }
                 return QueryFilters.resultTerm(QueryFilters.runDivFunction(aggregated, {token: 'literal', type:xmlSchema+"integer", value:''+count}));
             } else if(aggregateType === 'group_concat') {
-                let distinct = {};
-                let values = [];
-                let separator = aggregator.expression.separator != null ? aggregator.expression.separator : " ";
+                const distinct = {};
+                const values = [];
+                const separator = aggregator.expression.separator != null ? aggregator.expression.separator : " ";
                 for(let i=0; i< bindingsGroup.length; i++) {
-                    let ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
+                    const ebv = aggregateValue(aggregator, bindingsGroup[i], queryEngine, dataset, env);
                     if(ebv != null && ebv.token === 'literal') {
                         if(isDistinct) {
-                            let key = Utils.hashTerm(ebv);
+                            const key = Utils.hashTerm(ebv);
                             if(distinct[key] == null) {
                                 distinct[key] = true;
                                 values.push(ebv.value);
@@ -436,10 +436,10 @@ QueryFilters.runExpression = function(filterExpr, bindings, queryEngine, dataset
     //console.log("RUNNING FILTER");
     //console.log(filterExpr);
     if(filterExpr.expressionType != null) {
-        let expressionType = filterExpr.expressionType;
+        const expressionType = filterExpr.expressionType;
         if(expressionType == 'relationalexpression') {
-            let op1 = QueryFilters.runFilter(filterExpr.op1, bindings,queryEngine, dataset, env);
-            let op2 = QueryFilters.runFilter(filterExpr.op2, bindings,queryEngine, dataset, env);
+            const op1 = QueryFilters.runFilter(filterExpr.op1, bindings,queryEngine, dataset, env);
+            const op2 = QueryFilters.runFilter(filterExpr.op2, bindings,queryEngine, dataset, env);
             return QueryFilters.runRelationalFilter(filterExpr, op1, op2, bindings, queryEngine, dataset, env);
         } else if(expressionType == 'conditionalor') {
             return QueryFilters.runOrFunction(filterExpr, bindings, queryEngine, dataset, env);
@@ -676,7 +676,7 @@ QueryFilters.ebv = function (term) {
                 term.type == xmlSchema+"unsignedShort" ||
                 term.type == xmlSchema+"unsignedByte" ||
                 term.type == xmlSchema+"positiveInteger") {
-                let tmp = parseFloat(term.value);
+                const tmp = parseFloat(term.value);
                 if (isNaN(tmp)) {
                     return false;
                 } else {
@@ -711,17 +711,17 @@ QueryFilters.ebv = function (term) {
 QueryFilters.effectiveBooleanValue = QueryFilters.ebv;
 
 QueryFilters.ebvTrue = function() {
-    let val = {token: 'literal', type:xmlSchema+"boolean", value:true};
+    const val = {token: 'literal', type:xmlSchema+"boolean", value:true};
     return val;
 };
 
 QueryFilters.ebvFalse = function() {
-    let val = {token: 'literal', type:xmlSchema+"boolean", value:false};
+    const val = {token: 'literal', type:xmlSchema+"boolean", value:false};
     return val;
 };
 
 QueryFilters.ebvError = function() {
-    let val = {token: 'literal', type:"https://github.com/antoniogarrote/js-tools/types#error", value:null};
+    const val = {token: 'literal', type:"https://github.com/antoniogarrote/js-tools/types#error", value:null};
     return val;
 };
 
@@ -749,11 +749,11 @@ QueryFilters.ebvBoolean = function (bool) {
 
 
 QueryFilters.runRelationalFilter = function(filterExpr, op1, op2, bindings, queryEngine, dataset, env) {
-    let operator = filterExpr.operator;
+    const operator = filterExpr.operator;
     if(operator === '=') {
         return QueryFilters.runEqualityFunction(op1, op2, bindings, queryEngine, dataset, env);
     } else if(operator === '!=') {
-        let res = QueryFilters.runEqualityFunction(op1, op2, bindings, queryEngine, dataset, env);
+        const res = QueryFilters.runEqualityFunction(op1, op2, bindings, queryEngine, dataset, env);
         if(QueryFilters.isEbvError(res)) {
             return res;
         } else {
@@ -808,7 +808,7 @@ QueryFilters.resultTerm = function(term) {
     if(term == null || term.value == null || typeof(term.value) === 'string') {
         return term;
     }
-    let copy = Utils.clone(term);
+    const copy = Utils.clone(term);
     copy.value = QueryFilters.lexicalForm(term.value, term.type);
     return copy;
 };
@@ -820,7 +820,7 @@ QueryFilters.effectiveTypeValue = function(val){
         } else if (val.type == xmlSchema+"date" ||
             val.type == xmlSchema+"dateTime" ) {
             try {
-                let d = Utils.parseISO8601(val.value);
+                const d = Utils.parseISO8601(val.value);
                 return(d);
             } catch(e) {
                 return null;
@@ -920,7 +920,7 @@ QueryFilters.runAndFunction = function(filterExpr, bindings, queryEngine, datase
 // The kind of value by which two terms compare (SPARQL operator mapping), or null if they can't be compared.
 // Simple literals and xsd:string compare as strings, as RDF 1.1 makes them the same.
 QueryFilters.comparisonKind = function(op1, op2) {
-    let isString = function(op) {
+    const isString = function(op) {
         return QueryFilters.isSimpleLiteral(op) || QueryFilters.isXsdType("string", op);
     };
     if(QueryFilters.isNumeric(op1) && QueryFilters.isNumeric(op2)) {
@@ -928,7 +928,7 @@ QueryFilters.comparisonKind = function(op1, op2) {
     } else if(isString(op1) && isString(op2)) {
         return 'string';
     }
-    let types = ["boolean", "dateTime", "date"];
+    const types = ["boolean", "dateTime", "date"];
     for(let i=0; i<types.length; i++) {
         if(QueryFilters.isXsdType(types[i], op1) && QueryFilters.isXsdType(types[i], op2)) {
             return types[i];
@@ -943,12 +943,12 @@ QueryFilters.runCompare = function(op1, op2) {
     if(QueryFilters.isEbvError(op1) || QueryFilters.isEbvError(op2) || QueryFilters.comparisonKind(op1, op2) == null) {
         return QueryFilters.ebvError();
     }
-    let isValid = function(op, value) {
+    const isValid = function(op, value) {
         return value !== undefined && (value === value ||
             (QueryFilters.isNumeric(op) && (op.value === 'NaN' || typeof(op.value) === 'number')));
     };
-    let v1 = QueryFilters.effectiveTypeValue(op1);
-    let v2 = QueryFilters.effectiveTypeValue(op2);
+    const v1 = QueryFilters.effectiveTypeValue(op1);
+    const v2 = QueryFilters.effectiveTypeValue(op2);
     if(!isValid(op1, v1) || !isValid(op2, v2)) {
         return QueryFilters.ebvError();
     } else if(v1 < v2) {
@@ -972,7 +972,7 @@ QueryFilters.runEqualityFunction = function(op1, op2, bindings, queryEngine, dat
         // an error or an unbound variable
         return QueryFilters.ebvError();
     }
-    let comp = QueryFilters.runCompare(op1, op2);
+    const comp = QueryFilters.runCompare(op1, op2);
     if(comp === null) {
         return QueryFilters.ebvFalse();
     } else if(!QueryFilters.isEbvError(comp)) {
@@ -981,9 +981,9 @@ QueryFilters.runEqualityFunction = function(op1, op2, bindings, queryEngine, dat
     return QueryFilters.ebvBoolean(QueryFilters.RDFTermEquality(op1, op2, queryEngine, env));
 };
 
-let relationalFunction = function(test) {
+const relationalFunction = function(test) {
     return function(op1, op2) {
-        let comp = QueryFilters.runCompare(op1, op2);
+        const comp = QueryFilters.runCompare(op1, op2);
         if(QueryFilters.isEbvError(comp)) {
             return comp;
         }
@@ -1007,7 +1007,7 @@ QueryFilters.runTotalGtFunction = function(op1,op2) {
         return QueryFilters.ebvError();
     }
 
-    let comp = QueryFilters.runCompare(op1, op2);
+    const comp = QueryFilters.runCompare(op1, op2);
     if(typeof(comp) === 'number') {
         return QueryFilters.ebvBoolean(comp > 0);
     } else if(op1.token && op1.token === 'uri' && op2.token && op2.token === 'uri') {
@@ -1026,7 +1026,7 @@ QueryFilters.runTotalGtFunction = function(op1,op2) {
 
 
 QueryFilters.runAddition = function(summand, summands, bindings, queryEngine, dataset, env) {
-    let summandOp = QueryFilters.runFilter(summand,bindings,queryEngine, dataset, env);
+    const summandOp = QueryFilters.runFilter(summand,bindings,queryEngine, dataset, env);
     if(QueryFilters.isEbvError(summandOp)) {
         return QueryFilters.ebvError();
     }
@@ -1035,7 +1035,7 @@ QueryFilters.runAddition = function(summand, summands, bindings, queryEngine, da
     let acum = summandOp;
     if(QueryFilters.isNumeric(summandOp)) {
         for(let i=0; i<summands.length; i++) {
-            let nextSummandOp = QueryFilters.runFilter(summands[i].expression, bindings,queryEngine, dataset, env);
+            const nextSummandOp = QueryFilters.runFilter(summands[i].expression, bindings,queryEngine, dataset, env);
             if(QueryFilters.isNumeric(nextSummandOp)) {
                 if(summands[i].operator === '+') {
                     acum = QueryFilters.runSumFunction(acum, nextSummandOp);
@@ -1056,7 +1056,7 @@ QueryFilters.runSumFunction = function(suma, sumb) {
     if(QueryFilters.isEbvError(suma) || QueryFilters.isEbvError(sumb)) {
         return QueryFilters.ebvError();
     }
-    let val = QueryFilters.effectiveTypeValue(suma) + QueryFilters.effectiveTypeValue(sumb);
+    const val = QueryFilters.effectiveTypeValue(suma) + QueryFilters.effectiveTypeValue(sumb);
 
     if(QueryFilters.isDouble(suma) || QueryFilters.isDouble(sumb)) {
         return {token: 'literal', type:xmlSchema+"double", value:val};
@@ -1073,7 +1073,7 @@ QueryFilters.runSubFunction = function(suma, sumb) {
     if(QueryFilters.isEbvError(suma) || QueryFilters.isEbvError(sumb)) {
         return QueryFilters.ebvError();
     }
-    let val = QueryFilters.effectiveTypeValue(suma) - QueryFilters.effectiveTypeValue(sumb);
+    const val = QueryFilters.effectiveTypeValue(suma) - QueryFilters.effectiveTypeValue(sumb);
 
     if(QueryFilters.isDouble(suma) || QueryFilters.isDouble(sumb)) {
         return {token: 'literal', type:xmlSchema+"double", value:val};
@@ -1087,7 +1087,7 @@ QueryFilters.runSubFunction = function(suma, sumb) {
 };
 
 QueryFilters.runMultiplication = function(factor, factors, bindings, queryEngine, dataset, env) {
-    let factorOp = QueryFilters.runFilter(factor,bindings,queryEngine, dataset, env);
+    const factorOp = QueryFilters.runFilter(factor,bindings,queryEngine, dataset, env);
     if(QueryFilters.isEbvError(factorOp)) {
         return factorOp;
     }
@@ -1096,7 +1096,7 @@ QueryFilters.runMultiplication = function(factor, factors, bindings, queryEngine
     let acum = factorOp;
     if(QueryFilters.isNumeric(factorOp)) {
         for(let i=0; i<factors.length; i++) {
-            let nextFactorOp = QueryFilters.runFilter(factors[i].expression, bindings,queryEngine, dataset, env);
+            const nextFactorOp = QueryFilters.runFilter(factors[i].expression, bindings,queryEngine, dataset, env);
             if(QueryFilters.isNumeric(nextFactorOp)) {
                 if(factors[i].operator === '*') {
                     acum = QueryFilters.runMulFunction(acum, nextFactorOp);
@@ -1117,7 +1117,7 @@ QueryFilters.runMulFunction = function(faca, facb) {
     if(QueryFilters.isEbvError(faca) || QueryFilters.isEbvError(facb)) {
         return QueryFilters.ebvError();
     }
-    let val = QueryFilters.effectiveTypeValue(faca) * QueryFilters.effectiveTypeValue(facb);
+    const val = QueryFilters.effectiveTypeValue(faca) * QueryFilters.effectiveTypeValue(facb);
 
     if(QueryFilters.isDouble(faca) || QueryFilters.isDouble(facb)) {
         return {token: 'literal', type:xmlSchema+"double", value:val};
@@ -1136,8 +1136,8 @@ QueryFilters.runDivFunction = function(faca, facb) {
     if(QueryFilters.isEbvError(faca) || QueryFilters.isEbvError(facb)) {
         return QueryFilters.ebvError();
     }
-    let divisor = QueryFilters.effectiveTypeValue(facb);
-    let val = QueryFilters.effectiveTypeValue(faca) / divisor;
+    const divisor = QueryFilters.effectiveTypeValue(facb);
+    const val = QueryFilters.effectiveTypeValue(faca) / divisor;
 
     if(QueryFilters.isDouble(faca) || QueryFilters.isDouble(facb)) {
         return {token: 'literal', type:xmlSchema+"double", value:val};
@@ -1154,18 +1154,18 @@ QueryFilters.runBuiltInCall = function(builtincall, args, bindings, queryEngine,
     if(builtincall === 'notexists' || builtincall === 'exists') {
         // args hast to be the boolean value preprocessed already so we can keep this function sync
         let bindingsKey = [];
-        for(let p in bindings) { bindingsKey.push(JSON.stringify(bindings[p]));}
+        for(const p in bindings) { bindingsKey.push(JSON.stringify(bindings[p]));}
         bindingsKey = bindingsKey.sort().join("");
 
         return args[bindingsKey];
     }  else {
 
-        let ops = [];
+        const ops = [];
         for(let i=0; i<args.length; i++) {
             if(args[i].token === 'var') {
                 ops.push(args[i]);
             } else {
-                let op = QueryFilters.runFilter(args[i], bindings, queryEngine, dataset, env);
+                const op = QueryFilters.runFilter(args[i], bindings, queryEngine, dataset, env);
                 if(QueryFilters.isEbvError(op)) {
                     return op;
                 }
@@ -1195,7 +1195,7 @@ QueryFilters.runBuiltInCall = function(builtincall, args, bindings, queryEngine,
             }
         } else if(builtincall === 'datatype') {
             if(ops[0].token === 'literal'){
-                let lit = ops[0];
+                const lit = ops[0];
                 if(lit.type != null) {
                     if(typeof(lit.type) === 'string') {
                         return {token: 'uri', value:lit.type, prefix:null, suffix:null};
@@ -1229,31 +1229,31 @@ QueryFilters.runBuiltInCall = function(builtincall, args, bindings, queryEngine,
                 return QueryFilters.ebvFalse();
             }
         } else if(builtincall === 'sameterm') {
-            let op1 = ops[0];
-            let op2 = ops[1];
+            const op1 = ops[0];
+            const op2 = ops[1];
             let res = QueryFilters.RDFTermEquality(op1, op2, queryEngine, env);
             if(QueryFilters.isEbvError(res)) {
                 res = false;
             }
             return QueryFilters.ebvBoolean(res);
         } else if(builtincall === 'langmatches') {
-            let lang = ops[0];
-            let langRange = ops[1];
+            const lang = ops[0];
+            const langRange = ops[1];
 
             if(lang.token === 'literal' && langRange.token === 'literal'){
                 if(langRange.value === '*' && lang.value != '') {
                     return QueryFilters.ebvTrue();
                 } else {
                     // RFC 4647 basic filtering: the range equals the tag or is a prefix ending before a '-'
-                    let tag = lang.value.toLowerCase();
-                    let range = langRange.value.toLowerCase();
+                    const tag = lang.value.toLowerCase();
+                    const range = langRange.value.toLowerCase();
                     return QueryFilters.ebvBoolean(tag === range || tag.indexOf(range + "-") === 0);
                 }
             } else {
                 return QueryFilters.ebvError();
             }
         } else if(builtincall === 'bound') {
-            let boundVar = ops[0].value;
+            const boundVar = ops[0].value;
             if(boundVar == null) {
                 return QueryFilters.ebvError();
             } else  if(bindings[boundVar] != null) {
@@ -1288,13 +1288,13 @@ QueryFilters.runBuiltInCall = function(builtincall, args, bindings, queryEngine,
 };
 
 QueryFilters.runUnaryExpression = function(unaryexpression, expression, bindings, queryEngine, dataset, env) {
-    let op = QueryFilters.runFilter(expression, bindings,queryEngine, dataset, env);
+    const op = QueryFilters.runFilter(expression, bindings,queryEngine, dataset, env);
     if(QueryFilters.isEbvError(op)) {
         return op;
     }
 
     if(unaryexpression === '!') {
-        let res = QueryFilters.ebv(op);
+        const res = QueryFilters.ebv(op);
         if(QueryFilters.isEbvError(res)) {
             return res;
         } else {
@@ -1308,8 +1308,8 @@ QueryFilters.runUnaryExpression = function(unaryexpression, expression, bindings
         }
     } else if(unaryexpression === '-') {
         if(QueryFilters.isNumeric(op)) {
-            let clone = {};
-            for(let p in op) {
+            const clone = {};
+            for(const p in op) {
                 clone[p] = op[p];
             }
             clone.value = -clone.value;
@@ -1390,12 +1390,12 @@ QueryFilters.runIriRefOrFunction = function(iriref, args, bindings,queryEngine, 
         // an IRI of the query, possibly prefixed or relative
         return {token: 'uri', value: Utils.lexicalFormBaseUri(iriref, env)};
     } else {
-        let ops = [];
+        const ops = [];
         for(let i=0; i<args.length; i++) {
             ops.push(QueryFilters.runFilter(args[i], bindings, queryEngine, dataset, env));
         }
 
-        let fun = Utils.lexicalFormBaseUri(iriref, env);
+        const fun = Utils.lexicalFormBaseUri(iriref, env);
 
         if(fun == xmlSchema+"integer" ||
             fun == xmlSchema+"decimal" ||
@@ -1489,7 +1489,7 @@ QueryFilters.runIriRefOrFunction = function(iriref, args, bindings,queryEngine, 
                 return QueryFilters.ebvError();
             }
         } else if(fun == xmlSchema+"boolean") {
-            let from = ops[0];
+            const from = ops[0];
             if(from.token === "literal" && from.type == null) {
                 if(from.value === "true" || from.value === "1") {
                     return QueryFilters.ebvTrue();
@@ -1565,7 +1565,7 @@ QueryFilters.runIriRefOrFunction = function(iriref, args, bindings,queryEngine, 
                 return QueryFilters.ebvError();
             }
         } else if(fun == xmlSchema+"dateTime" || fun == xmlSchema+"date") {
-            let from = ops[0];
+            const from = ops[0];
             if(from.type == xmlSchema+"dateTime" || from.type == xmlSchema+"date") {
                 return from;
             } else if(from.type == xmlSchema+"string" || from.type == null) {

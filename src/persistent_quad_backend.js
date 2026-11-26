@@ -1,7 +1,7 @@
 "use strict";
 
 // imports
-let utils = require('./utils');
+const utils = require('./utils');
 
 /*
  * "perfect" indices for RDF indexing
@@ -16,8 +16,8 @@ let utils = require('./utils');
  * @param configuration['dbName'] Name for the IndexedDB
  * @return The newly created backend.
  */
-let PersistentQuadBackend = function (configuration, callback) {
-    let that = this;
+const PersistentQuadBackend = function (configuration, callback) {
+    const that = this;
 
     if (arguments !== 0) {
 
@@ -43,14 +43,14 @@ let PersistentQuadBackend = function (configuration, callback) {
             SPOG: ['subject', 'predicate', 'object', 'graph']
         };
         this.componentOrdersMap  = {};
-        for(let index in this.componentOrders) {
-            let indexComponents = this.componentOrders[index];
-            let key = indexComponents.slice(0,index.length).sort().join(".");
+        for(const index in this.componentOrders) {
+            const indexComponents = this.componentOrders[index];
+            const key = indexComponents.slice(0,index.length).sort().join(".");
             this.componentOrdersMap[key] = index;
         }
 
         that.dbName = configuration['name'] || "rdfstorejs";
-        let request = that.indexedDB.open(this.dbName+"_db", 1);
+        const request = that.indexedDB.open(this.dbName+"_db", 1);
         request.onerror = function(event) {
             callback(null,new Error("Error opening IndexedDB: " + event.target.errorCode));
         };
@@ -59,8 +59,8 @@ let PersistentQuadBackend = function (configuration, callback) {
             callback(that);
         };
         request.onupgradeneeded = function(event) {
-            let db = event.target.result;
-            let objectStore = db.createObjectStore(that.dbName, { keyPath: 'SPOG'});
+            const db = event.target.result;
+            const objectStore = db.createObjectStore(that.dbName, { keyPath: 'SPOG'});
             utils.each(that.indices, function(index){
                 if(index !== 'SPOG') {
                     objectStore.createIndex(index,index,{unique: false});
@@ -72,33 +72,33 @@ let PersistentQuadBackend = function (configuration, callback) {
 
 
 PersistentQuadBackend.prototype.index = function (quad, callback) {
-    let that = this;
+    const that = this;
     utils.each(this.indices, function(index){
         quad[index] = that._genMinIndexKey(quad, index);
     });
 
-    let transaction = that.db.transaction([that.dbName],"readwrite");
+    const transaction = that.db.transaction([that.dbName],"readwrite");
     transaction.oncomplete = function(event) {
         //callback(true)
     };
     transaction.onerror = function(event) {
         callback(null, new Error(event.target.statusCode));
     };
-    let objectStore = transaction.objectStore(that.dbName);
-    let request = objectStore.add(quad);
+    const objectStore = transaction.objectStore(that.dbName);
+    const request = objectStore.add(quad);
     request.onsuccess = function(event) {
         callback(true)
     };
 };
 
 PersistentQuadBackend.prototype.range = function (pattern, callback) {
-    let that = this;
-    let objectStore = that.db.transaction([that.dbName]).objectStore(that.dbName);
-    let indexKey = this._indexForPattern(pattern);
-    let minIndexKeyValue = this._genMinIndexKey(pattern,indexKey);
-    let maxIndexKeyValue = this._genMaxIndexKey(pattern,indexKey);
-    let keyRange = that.IDBKeyRange.bound(minIndexKeyValue, maxIndexKeyValue, false, false);
-    let quads = [];
+    const that = this;
+    const objectStore = that.db.transaction([that.dbName]).objectStore(that.dbName);
+    const indexKey = this._indexForPattern(pattern);
+    const minIndexKeyValue = this._genMinIndexKey(pattern,indexKey);
+    const maxIndexKeyValue = this._genMaxIndexKey(pattern,indexKey);
+    const keyRange = that.IDBKeyRange.bound(minIndexKeyValue, maxIndexKeyValue, false, false);
+    const quads = [];
     let cursorSource;
 
     if(indexKey === 'SPOG') {
@@ -108,7 +108,7 @@ PersistentQuadBackend.prototype.range = function (pattern, callback) {
     }
 
     cursorSource.openCursor(keyRange).onsuccess = function(event) {
-        let cursor = event.target.result;
+        const cursor = event.target.result;
         if (cursor) {
             quads.push(cursor.value);
             cursor.continue();
@@ -119,10 +119,10 @@ PersistentQuadBackend.prototype.range = function (pattern, callback) {
 };
 
 PersistentQuadBackend.prototype.search = function (quad, callback) {
-    let that = this;
-    let objectStore = that.db.transaction([that.dbName]).objectStore(that.dbName);
-    let indexKey = this._genMinIndexKey(quad, 'SPOG');
-    let request = objectStore.get(indexKey);
+    const that = this;
+    const objectStore = that.db.transaction([that.dbName]).objectStore(that.dbName);
+    const indexKey = this._genMinIndexKey(quad, 'SPOG');
+    const request = objectStore.get(indexKey);
     request.onerror = function(event) {
         callback(null, new Error(event.target.statusCode));
     };
@@ -133,9 +133,9 @@ PersistentQuadBackend.prototype.search = function (quad, callback) {
 
 
 PersistentQuadBackend.prototype.delete = function (quad, callback) {
-    let that = this;
-    let indexKey = that._genMinIndexKey(quad, 'SPOG');
-    let request = that.db.transaction([that.dbName], "readwrite")
+    const that = this;
+    const indexKey = that._genMinIndexKey(quad, 'SPOG');
+    const request = that.db.transaction([that.dbName], "readwrite")
         .objectStore(that.dbName)
         .delete(indexKey);
     request.onsuccess = function() {
@@ -147,7 +147,7 @@ PersistentQuadBackend.prototype.delete = function (quad, callback) {
 };
 
 PersistentQuadBackend.prototype._genMinIndexKey = function(quad,index) {
-    let indexComponents = this.componentOrders[index];
+    const indexComponents = this.componentOrders[index];
     return utils.map(indexComponents, function(component){
         if(typeof(quad[component]) === 'string' || quad[component] == null) {
             return "0";
@@ -158,11 +158,11 @@ PersistentQuadBackend.prototype._genMinIndexKey = function(quad,index) {
 };
 
 PersistentQuadBackend.prototype._genMaxIndexKey = function(quad,index) {
-    let indexComponents = this.componentOrders[index];
-    let acum = [];
+    const indexComponents = this.componentOrders[index];
+    const acum = [];
     for(let i=0; i<indexComponents.length; i++){
-        let component = indexComponents[i];
-        let componentValue = quad[component];
+        const component = indexComponents[i];
+        const componentValue = quad[component];
         if(typeof(componentValue) === 'string') {
             acum[i] = 'z';
         } else {
@@ -176,10 +176,10 @@ PersistentQuadBackend.prototype._genMaxIndexKey = function(quad,index) {
 
 
 PersistentQuadBackend.prototype._indexForPattern = function (pattern) {
-    let that = this;
-    let indexKey = pattern.indexKey;
-    let indexKeyString = indexKey.sort().join(".");
-    let index = that.componentOrdersMap[indexKeyString];
+    const that = this;
+    const indexKey = pattern.indexKey;
+    const indexKeyString = indexKey.sort().join(".");
+    const index = that.componentOrdersMap[indexKeyString];
     if(index == null) {
         throw new Error("Error, cannot find index for indexKey "+indexKeyString);
     } else {
@@ -189,7 +189,7 @@ PersistentQuadBackend.prototype._indexForPattern = function (pattern) {
 
 
 PersistentQuadBackend.prototype.clear = function(callback) {
-    let that = this;
+    const that = this;
     let transaction = that.db.transaction([that.dbName],"readwrite"), request;
     request = transaction.objectStore(that.dbName).clear();
     request.onsuccess = function(){ callback(); };

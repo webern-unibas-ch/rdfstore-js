@@ -10,25 +10,25 @@
  * the dataset is evaluated on its own, and every solution binds the graph.
  */
 
-let Utils = require("./utils");
-let async = require("./utils");
+const Utils = require("./utils");
+const async = require("./utils");
 
-let PropertyPaths = {};
+const PropertyPaths = {};
 
 // a Map/Set key for a node
-let nodeKey = function(node) {
+const nodeKey = function(node) {
     return typeof(node) === 'number' ? node : "t" + JSON.stringify(node);
 };
 
-let pairKey = function(pair) {
+const pairKey = function(pair) {
     return nodeKey(pair[0]) + " " + nodeKey(pair[1]);
 };
 
-let distinctPairs = function(pairs) {
-    let seen = new Set();
-    let acum = [];
+const distinctPairs = function(pairs) {
+    const seen = new Set();
+    const acum = [];
     for(let i=0; i<pairs.length; i++) {
-        let key = pairKey(pairs[i]);
+        const key = pairKey(pairs[i]);
         if(!seen.has(key)) {
             seen.add(key);
             acum.push(pairs[i]);
@@ -38,8 +38,8 @@ let distinctPairs = function(pairs) {
 };
 
 // applies fn to the pairs of every graph
-let mapRelation = function(relation, fn) {
-    let result = new Map();
+const mapRelation = function(relation, fn) {
+    const result = new Map();
     relation.forEach(function(pairs, graph) {
         result.set(graph, fn(pairs, graph));
     });
@@ -50,7 +50,7 @@ let mapRelation = function(relation, fn) {
  * An end of the path: {variable: name}, or {node: OID or term}. A blank node of the query matches like a
  * variable; a bound one (EXISTS) carries its OID.
  */
-let resolveEndpoint = function(ctx, term, callback) {
+const resolveEndpoint = function(ctx, term, callback) {
     if(term.token === 'var') {
         callback({variable: term.value});
     } else if(term.token === 'blank') {
@@ -74,11 +74,11 @@ let resolveEndpoint = function(ctx, term, callback) {
 
 // the graphs to evaluate the path in: the default graph, the GRAPH IRI if it is in the dataset, or the named
 // graphs of the dataset (GRAPH ?g)
-let graphKeys = function(ctx, callback) {
+const graphKeys = function(ctx, callback) {
     if(ctx.graph == null) {
         callback(["default"]);
     } else if(ctx.graph.token === 'var') {
-        let keys = [];
+        const keys = [];
         for(let i=0; i<ctx.dataset.named.length; i++) {
             if(keys.indexOf(ctx.dataset.named[i].oid) === -1) {
                 keys.push(ctx.dataset.named[i].oid);
@@ -93,8 +93,8 @@ let graphKeys = function(ctx, callback) {
 };
 
 // the solutions of one triple pattern over the path's graph(s), as a relation of the subject and object
-let matchTriple = function(ctx, predicate, callback) {
-    let triple = {
+const matchTriple = function(ctx, predicate, callback) {
+    const triple = {
         subject: {token: 'var', value: 'path:s'},
         predicate: predicate,
         object: {token: 'var', value: 'path:o'}
@@ -106,14 +106,14 @@ let matchTriple = function(ctx, predicate, callback) {
         if(err != null) {
             return callback(err);
         }
-        let relation = new Map();
+        const relation = new Map();
         ctx.keys.forEach(function(key) {
             relation.set(key, []);
         });
-        let graphVariable = ctx.graph != null && ctx.graph.token === 'var' ? ctx.graph.value : null;
+        const graphVariable = ctx.graph != null && ctx.graph.token === 'var' ? ctx.graph.value : null;
         results = results || [];
         for(let i=0; i<results.length; i++) {
-            let pairs = relation.get(graphVariable == null ? ctx.keys[0] : results[i][graphVariable]);
+            const pairs = relation.get(graphVariable == null ? ctx.keys[0] : results[i][graphVariable]);
             if(pairs != null) {
                 pairs.push([results[i]['path:s'], results[i]['path:o']]);
             }
@@ -124,7 +124,7 @@ let matchTriple = function(ctx, predicate, callback) {
 };
 
 // every node of each graph (subjects and objects), for zero-length paths between two variables
-let graphNodes = function(ctx, callback) {
+const graphNodes = function(ctx, callback) {
     if(ctx.nodes != null) {
         return callback(null, ctx.nodes);
     }
@@ -133,7 +133,7 @@ let graphNodes = function(ctx, callback) {
             return callback(err);
         }
         ctx.nodes = mapRelation(relation, function(pairs) {
-            let nodes = new Set();
+            const nodes = new Set();
             for(let i=0; i<pairs.length; i++) {
                 nodes.add(pairs[i][0]);
                 nodes.add(pairs[i][1]);
@@ -147,8 +147,8 @@ let graphNodes = function(ctx, callback) {
 // the zero-length pairs: the start (or end) nodes of the path (a constant also if it is not in the graph), else
 // every node of the graph. Inside |, / or a modifier the ends are not known, so the constant ends of the whole path
 // are added: they need not be in the graph either (<x> (:p?|:q) ?y gives ?y = <x>), and pair only with themselves.
-let zeroLength = function(ctx, ends, callback) {
-    let nodes = ends.starts || ends.ends;
+const zeroLength = function(ctx, ends, callback) {
+    const nodes = ends.starts || ends.ends;
     if(nodes !== undefined) {
         callback(null, new Map(ctx.keys.map(function(key) {
             return [key, nodes.map(function(n) { return [n, n]; })];
@@ -166,14 +166,14 @@ let zeroLength = function(ctx, ends, callback) {
 };
 
 // the nodes reachable from start in one or more steps; iterative, so that long chains and cycles end
-let reachable = function(adjacency, start) {
-    let visited = new Set();
-    let pending = (adjacency.get(start) || []).slice();
+const reachable = function(adjacency, start) {
+    const visited = new Set();
+    const pending = (adjacency.get(start) || []).slice();
     while(pending.length > 0) {
-        let node = pending.pop();
+        const node = pending.pop();
         if(!visited.has(node)) {
             visited.add(node);
-            let next = adjacency.get(node);
+            const next = adjacency.get(node);
             if(next != null) {
                 for(let i=0; i<next.length; i++) {
                     if(!visited.has(next[i])) {
@@ -187,19 +187,19 @@ let reachable = function(adjacency, start) {
 };
 
 // the transitive closure of a relation (path+), distinct pairs; only from the start nodes or to the end nodes
-let closure = function(pairs, ends) {
-    let backwards = ends.starts === undefined && ends.ends !== undefined;
-    let adjacency = new Map();
+const closure = function(pairs, ends) {
+    const backwards = ends.starts === undefined && ends.ends !== undefined;
+    const adjacency = new Map();
     for(let i=0; i<pairs.length; i++) {
-        let from = backwards ? pairs[i][1] : pairs[i][0];
-        let to = backwards ? pairs[i][0] : pairs[i][1];
+        const from = backwards ? pairs[i][1] : pairs[i][0];
+        const to = backwards ? pairs[i][0] : pairs[i][1];
         if(!adjacency.has(from)) {
             adjacency.set(from, []);
         }
         adjacency.get(from).push(to);
     }
-    let starts = ends.starts || ends.ends || Array.from(adjacency.keys());
-    let acum = [];
+    const starts = ends.starts || ends.ends || Array.from(adjacency.keys());
+    const acum = [];
     for(let j=0; j<starts.length; j++) {
         reachable(adjacency, starts[j]).forEach(function(node) {
             acum.push(backwards ? [node, starts[j]] : [starts[j], node]);
@@ -209,18 +209,18 @@ let closure = function(pairs, ends) {
 };
 
 // joins two relations on the end of the first and the start of the second
-let compose = function(left, right) {
-    let byStart = new Map();
+const compose = function(left, right) {
+    const byStart = new Map();
     for(let i=0; i<right.length; i++) {
-        let key = nodeKey(right[i][0]);
+        const key = nodeKey(right[i][0]);
         if(!byStart.has(key)) {
             byStart.set(key, []);
         }
         byStart.get(key).push(right[i][1]);
     }
-    let acum = [];
+    const acum = [];
     for(let j=0; j<left.length; j++) {
-        let ends = byStart.get(nodeKey(left[j][1]));
+        const ends = byStart.get(nodeKey(left[j][1]));
         if(ends != null) {
             for(let k=0; k<ends.length; k++) {
                 acum.push([left[j][0], ends[k]]);
@@ -234,7 +234,7 @@ let compose = function(left, right) {
  * Evaluates a path to a relation (Map graph -> pairs). ends holds the nodes the whole path starts (starts) or ends
  * (ends) at, undefined if any; inner paths get {} and are evaluated over the whole graph.
  */
-let evaluate = function(ctx, path, ends, callback) {
+const evaluate = function(ctx, path, ends, callback) {
     if(path.type === 'link') {
         matchTriple(ctx, path.iri, callback);
     } else if(path.type === 'inverse') {
@@ -260,8 +260,8 @@ let evaluate = function(ctx, path, ends, callback) {
     } else if(path.type === 'seq') {
         // step by step from the start nodes, or backwards from the end nodes: each part starts (ends) only at the
         // nodes the parts before reached
-        let backwards = ends.starts === undefined && ends.ends !== undefined;
-        let parts = backwards ? path.paths.slice().reverse() : path.paths;
+        const backwards = ends.starts === undefined && ends.ends !== undefined;
+        const parts = backwards ? path.paths.slice().reverse() : path.paths;
         let result = null;
         let reached = backwards ? ends.ends : ends.starts;
         async.eachSeries(parts, function(part, k) {
@@ -273,10 +273,10 @@ let evaluate = function(ctx, path, ends, callback) {
                     return backwards ? compose(relation.get(graph), pairs) : compose(pairs, relation.get(graph));
                 });
                 if(reached !== undefined) {
-                    let nodes = new Map();
+                    const nodes = new Map();
                     result.forEach(function(pairs) {
                         pairs.forEach(function(pair) {
-                            let node = backwards ? pair[0] : pair[1];
+                            const node = backwards ? pair[0] : pair[1];
                             nodes.set(nodeKey(node), node);
                         });
                     });
@@ -293,7 +293,7 @@ let evaluate = function(ctx, path, ends, callback) {
             if(err != null) {
                 return callback(err);
             }
-            let steps = mapRelation(relation, function(pairs) {
+            const steps = mapRelation(relation, function(pairs) {
                 return path.type === 'zeroOrOne' ? pairs : closure(pairs, ends);
             });
             if(path.type === 'oneOrMore') {
@@ -313,7 +313,7 @@ let evaluate = function(ctx, path, ends, callback) {
     }
 };
 
-let sameNode = function(a, b) {
+const sameNode = function(a, b) {
     return nodeKey(a) === nodeKey(b);
 };
 
@@ -322,7 +322,7 @@ let sameNode = function(a, b) {
  * may restrict a variable start or end to nodes, the values a join will keep: {starts: [...], ends: [...]}.
  */
 PropertyPaths.execute = function(engine, dataset, pattern, env, candidates, callback) {
-    let ctx = {engine: engine, dataset: dataset, env: env, graph: pattern.graph};
+    const ctx = {engine: engine, dataset: dataset, env: env, graph: pattern.graph};
     resolveEndpoint(ctx, pattern.subject, function(subject) {
         resolveEndpoint(ctx, pattern.object, function(object) {
             graphKeys(ctx, function(keys) {
@@ -330,7 +330,7 @@ PropertyPaths.execute = function(engine, dataset, pattern, env, candidates, call
                 if(keys.length === 0) {
                     return callback(null, []);
                 }
-                let ends = {
+                const ends = {
                     starts: subject.node !== undefined ? [subject.node] : candidates.starts,
                     ends: object.node !== undefined ? [object.node] : candidates.ends
                 };
@@ -339,18 +339,18 @@ PropertyPaths.execute = function(engine, dataset, pattern, env, candidates, call
                     if(err != null) {
                         return callback(err);
                     }
-                    let graphVariable = ctx.graph != null && ctx.graph.token === 'var' ? ctx.graph.value : null;
-                    let sameVariable = subject.variable != null && subject.variable === object.variable;
-                    let solutions = [];
+                    const graphVariable = ctx.graph != null && ctx.graph.token === 'var' ? ctx.graph.value : null;
+                    const sameVariable = subject.variable != null && subject.variable === object.variable;
+                    const solutions = [];
                     relation.forEach(function(pairs, graph) {
                         for(let i=0; i<pairs.length; i++) {
-                            let pair = pairs[i];
+                            const pair = pairs[i];
                             if((subject.variable == null && !sameNode(pair[0], subject.node)) ||
                                 (object.variable == null && !sameNode(pair[1], object.node)) ||
                                 (sameVariable && !sameNode(pair[0], pair[1]))) {
                                 continue;
                             }
-                            let solution = {};
+                            const solution = {};
                             if(subject.variable != null) {
                                 solution[subject.variable] = pair[0];
                             }

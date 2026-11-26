@@ -1,15 +1,15 @@
 "use strict";
 
-let async = require('./utils');
-let Tree = require('./btree').Tree;
+const async = require('./utils');
+const Tree = require('./btree').Tree;
 
 /**
  * Temporal implementation of the lexicon
  */
 
 
-let Lexicon = function(callback){
-    let that = this;
+const Lexicon = function(callback){
+    const that = this;
     this.defaultGraphOid = 0;
     this.defaultGraphUri = "https://github.com/antoniogarrote/rdfstore-js#default_graph";
     this.defaultGraphUriTerm = {"token":"uri","prefix":null,"suffix":null,"value":this.defaultGraphUri};
@@ -74,7 +74,7 @@ Lexicon.prototype.registerGraph = function(oid, uriToken, callback){
  * @param callback
  */
 Lexicon.prototype.registeredGraphs = function(returnUris, callback) {
-    let graphs = [];
+    const graphs = [];
     this.knownGraphs.walk(function(node){
         if(returnUris === true) {
             graphs.push(node.data);
@@ -94,14 +94,14 @@ Lexicon.prototype.registeredGraphs = function(returnUris, callback) {
  * @returns URI's OID.
  */
 Lexicon.prototype.registerUri = function(uri, callback) {
-    let that = this;
+    const that = this;
     if(uri === this.defaultGraphUri) {
         callback(this.defaultGraphOid);
     } else{
         this.uris.search(uri, function(oidData){
             if(oidData == null){
-                let oid = that.oidCounter;
-                let oidStr = 'u'+oid;
+                const oid = that.oidCounter;
+                const oidStr = 'u'+oid;
                 that.oidCounter++;
 
                 async.seq(function(k){
@@ -117,7 +117,7 @@ Lexicon.prototype.registerUri = function(uri, callback) {
                 });
 
             } else {
-                let oid = oidData[0];
+                const oid = oidData[0];
                 oidData[1] = oidData[1] + 1;
                 callback(oid);
             }
@@ -152,9 +152,9 @@ Lexicon.prototype.resolveUri = function(uri,callback) {
  * @returns {string}
  */
 Lexicon.prototype.registerBlank = function(callback) {
-    let oid = this.oidCounter;
+    const oid = this.oidCounter;
     this.oidCounter++;
-    let oidStr = ""+oid;
+    const oidStr = ""+oid;
     this.oidBlanks.insert(oidStr, oidStr, function(){
         callback(oid);
     })
@@ -167,12 +167,12 @@ Lexicon.prototype.registerBlank = function(callback) {
  * @returns the OID of the newly registered literal
  */
 Lexicon.prototype.registerLiteral = function(literal, callback) {
-    let that = this;
+    const that = this;
 
         this.literals.search(literal, function(oidData){
             if(oidData == null){
-                let oid = that.oidCounter;
-                let oidStr = 'l'+oid;
+                const oid = that.oidCounter;
+                const oidStr = 'l'+oid;
                 that.oidCounter++;
 
                 async.seq(function(k){
@@ -188,7 +188,7 @@ Lexicon.prototype.registerLiteral = function(literal, callback) {
                 });
 
             } else {
-                let oid = oidData[0];
+                const oid = oidData[0];
                 oidData[1] = oidData[1] + 1;
                 callback(oid);
             }
@@ -219,20 +219,20 @@ Lexicon.prototype.resolveLiteral = function (literal,callback) {
 Lexicon.prototype.parseLiteral = function(literalString) {
     let parts = literalString.lastIndexOf("@");
     if(parts!=-1 && literalString[parts-1]==='"' && literalString.substring(parts, literalString.length).match(/^@[a-zA-Z]+(-[a-zA-Z0-9]+)*$/)!=null) {
-        let value = literalString.substring(1,parts-1);
-        let lang = literalString.substring(parts+1, literalString.length).toLowerCase();
+        const value = literalString.substring(1,parts-1);
+        const lang = literalString.substring(parts+1, literalString.length).toLowerCase();
         return {token: "literal", value:value, lang:lang};
     }
 
     parts = literalString.lastIndexOf("^^");
     if(parts!=-1 && literalString[parts-1]==='"' && literalString[parts+2] === '<' && literalString[literalString.length-1] === '>') {
-        let value = literalString.substring(1,parts-1);
-        let type = literalString.substring(parts+3, literalString.length-1);
+        const value = literalString.substring(1,parts-1);
+        const type = literalString.substring(parts+3, literalString.length-1);
 
         return {token: "literal", value:value, type:type};
     }
 
-    let value = literalString.substring(1,literalString.length-1);
+    const value = literalString.substring(1,literalString.length-1);
     return {token:"literal", value:value};
 };
 
@@ -254,7 +254,7 @@ Lexicon.prototype.parseUri = function(uriString) {
  * @returns parsed token or null if not found.
  */
 Lexicon.prototype.retrieve = function(oid, callback) {
-    let that = this;
+    const that = this;
 
     if(oid === this.defaultGraphOid) {
         callback({
@@ -309,7 +309,7 @@ Lexicon.prototype.retrieve = function(oid, callback) {
  * @param callback
  */
 Lexicon.prototype.clear = function(callback) {
-    let that = this;
+    const that = this;
     this.defaultGraphOid = 0;
     this.defaultGraphUri = "https://github.com/antoniogarrote/rdfstore-js#default_graph";
     this.defaultGraphUriTerm = {"token":"uri","prefix":null,"suffix":null,"value":this.defaultGraphUri};
@@ -361,8 +361,8 @@ Lexicon.prototype.clear = function(callback) {
  * @param callback
  */
 Lexicon.prototype.unregister = function (quad, key, callback) {
-    let that = this;
-    let unregisterTerm = function(term, oid, k) {
+    const that = this;
+    const unregisterTerm = function(term, oid, k) {
         if (term == null || term.token === 'blank') {
             k();
         } else {
@@ -399,13 +399,13 @@ Lexicon.prototype.unregisterBlank = function (oid, callback) {
  * @private
  */
 Lexicon.prototype._unregisterTerm = function (kind, oid, callback) {
-    let that = this;
+    const that = this;
     if (kind === 'uri') {
         if (oid != this.defaultGraphOid) {
-            let oidStr = 'u' + oid;
+            const oidStr = 'u' + oid;
             that.oidUris.search(oidStr, function(uri) {
                 that.uris.search(uri, function(oidData){
-                    let counter = oidData[1];
+                    const counter = oidData[1];
                     if ("" + oidData[0] === "" + oid) {
                         if (counter === 0) {
                             async.seq(function(k) {
@@ -441,11 +441,11 @@ Lexicon.prototype._unregisterTerm = function (kind, oid, callback) {
         }
     } else if (kind === 'literal') {
         this.oidCounter++;
-        let oidStr = 'l' + oid;
+        const oidStr = 'l' + oid;
 
         that.oidLiterals.search(oidStr, function(literal) {
             that.literals.search(literal, function(oidData){
-                let counter = oidData[1];
+                const counter = oidData[1];
                 if ("" + oidData[0] === "" + oid) {
                     if (counter === 0) {
                         async.seq(function(k) {

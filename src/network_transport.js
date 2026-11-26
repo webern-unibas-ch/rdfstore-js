@@ -1,14 +1,14 @@
 "use strict";
 
-let utils = require("./utils");
+const utils = require("./utils");
 if(!utils.isWorker()) {
-    let http = require("http");
-    let https = require("https");
+    const http = require("http");
+    const https = require("https");
 
-    let NetworkTransport = {
+    const NetworkTransport = {
 
         load: function (uri, accept, callback, redirect) {
-            let redirection = redirect == null ? 3 : redirect;
+            const redirection = redirect == null ? 3 : redirect;
             let parts;
             try {
                 parts = new URL(uri);
@@ -30,8 +30,8 @@ if(!utils.isWorker()) {
             }
 
             // URL keeps the brackets of an IPv6 hostname, http.request expects it without them
-            let hostname = parts.hostname.replace(/^\[(.*)\]$/, "$1");
-            let params = {
+            const hostname = parts.hostname.replace(/^\[(.*)\]$/, "$1");
+            const params = {
                 'hostname': hostname,
                 'port': parts.port || (client === http ? 80 : 443),
                 'method': 'GET',
@@ -40,9 +40,9 @@ if(!utils.isWorker()) {
             };
 
             // a dropped connection can report through the request, the response or both
-            let done = utils.once(callback);
-            let request = client.request(params, function (response) {
-                let headers = response.headers;
+            const done = utils.once(callback);
+            const request = client.request(params, function (response) {
+                const headers = response.headers;
                 let data = "";
 
                 if (("" + response.statusCode)[0] == '2') {

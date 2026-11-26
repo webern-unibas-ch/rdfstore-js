@@ -1,10 +1,10 @@
 "use strict";
 
 // imports
-let _ = require("./utils");
-let QueryFilters = require("./query_filters").QueryFilters;
+const _ = require("./utils");
+const QueryFilters = require("./query_filters").QueryFilters;
 
-let RDFModel = {};
+const RDFModel = {};
 
 /**
  * Implementation of <http://www.w3.org/TR/rdf-interfaces/>
@@ -39,8 +39,8 @@ RDFModel.UrisMap = function() {
 };
 
 RDFModel.UrisMap.prototype.values = function() {
-    let collected = {};
-    for(let p in this) {
+    const collected = {};
+    for(const p in this) {
 	if(!_.include(this.interfaceProperties,p) &&
 	    typeof(this[p])!=='function' &&
 	    p!=='defaultNs' &&
@@ -83,7 +83,7 @@ RDFModel.UrisMap.prototype.setDefault = function(iri) {
 };
 
 RDFModel.UrisMap.prototype.addAll = function(prefixMap, override) {
-    for(let prefix in prefixMap) {
+    for(const prefix in prefixMap) {
 	if(!_.include(this.interfaceProperties, prefix)) {
 	    if(this[prefix] != null) {
 		if(override === true) {
@@ -99,9 +99,9 @@ RDFModel.UrisMap.prototype.addAll = function(prefixMap, override) {
 };
 
 RDFModel.UrisMap.prototype.resolve = function(curie) {
-    let parts = curie.split(":");
-    let ns = parts[0];
-    let suffix = parts[1];
+    const parts = curie.split(":");
+    const ns = parts[0];
+    const suffix = parts[1];
     if(ns === '') {
 	if(this.defaultNs == null) {
 	    return null;
@@ -116,11 +116,11 @@ RDFModel.UrisMap.prototype.resolve = function(curie) {
 };
 
 RDFModel.UrisMap.prototype.shrink = function(iri) {
-    for(let ns in this) {
-	let prefix = this[ns];
+    for(const ns in this) {
+	const prefix = this[ns];
 	if(iri.indexOf(prefix) === 0) {
 	    if(prefix !== '' && ns != 'defaultNs') {
-		let suffix = iri.split(prefix)[1];
+		const suffix = iri.split(prefix)[1];
 		return ns + ":" + suffix;
 	    }
 	}
@@ -172,7 +172,7 @@ RDFModel.Profile.prototype.setTerm = function(term, iri) {
 RDFModel.RDFEnvironment = function () {
     RDFModel.Profile.call(this);
     this.blankNodeCounter = 0;
-    let that = this;
+    const that = this;
     this.filters = {
 	s:function (s) {
 	    return function (t) {
@@ -215,27 +215,27 @@ RDFModel.RDFEnvironment = function () {
 	    };
 	},
 	type:function (o) {
-	    let type = that.resolve("rdf:type");
+	    const type = that.resolve("rdf:type");
 	    return function (t) {
 		return t.predicate.equals(type) && t.object.equals(o);
 	    };
 	}
     };
 
-    for (let p in RDFModel.defaultContext) {
+    for (const p in RDFModel.defaultContext) {
 	this.prefixes.set(p, RDFModel.defaultContext[p]);
     }
 };
 RDFModel.RDFEnvironment.prototype = _.create(RDFModel.Profile.prototype,{'constructor': RDFModel.RDFEnvironment});
 
 RDFModel.RDFEnvironment.prototype.createBlankNode = function() {
-    let bnode =  new RDFModel.BlankNode(this.blankNodeCounter);
+    const bnode =  new RDFModel.BlankNode(this.blankNodeCounter);
     this.blankNodeCounter++;
     return bnode;
 };
 
 RDFModel.RDFEnvironment.prototype.createNamedNode = function(value) {
-    let resolvedValue = this.resolve(value);
+    const resolvedValue = this.resolve(value);
     if(resolvedValue != null) {
 	return new RDFModel.NamedNode(resolvedValue);
     } else {
@@ -256,7 +256,7 @@ RDFModel.RDFEnvironment.prototype.createTriple = function(subject, predicate, ob
 };
 
 RDFModel.RDFEnvironment.prototype.createGraph = function(triples) {
-    let graph = new RDFModel.Graph();
+    const graph = new RDFModel.Graph();
     if(triples != null) {
 	for(let i=0; i<triples.length; i++) {
 	    graph.add(triples[i]);
@@ -280,7 +280,7 @@ RDFModel.RDFEnvironment.prototype.createProfile = function(empty) {
     if(empty === true) {
 	return new RDFModel.RDFEnvironment.Profile();
     } else {
-	let profile = new RDFModel.RDFEnvironment.Profile();
+	const profile = new RDFModel.RDFEnvironment.Profile();
 	profile.importProfile(this);
 
 	return profile;
@@ -291,10 +291,10 @@ RDFModel.RDFEnvironment.prototype.createTermMap = function(empty) {
     if(empty === true) {
 	return new RDFModel.UrisMap();
     } else {
-	let cloned = this.terms.values();
-	let termMap = new RDFModel.UrisMap();
+	const cloned = this.terms.values();
+	const termMap = new RDFModel.UrisMap();
 
-	for(let p in cloned) {
+	for(const p in cloned) {
 	    termMap[p] = cloned[p];
 	}
 
@@ -306,10 +306,10 @@ RDFModel.RDFEnvironment.prototype.createPrefixMap = function(empty) {
     if(empty === true) {
 	return new RDFModel.UrisMap();
     } else {
-	let cloned = this.prefixes.values();
-	let prefixMap = new RDFModel.UrisMap();
+	const cloned = this.prefixes.values();
+	const prefixMap = new RDFModel.UrisMap();
 
-	for(let p in cloned) {
+	for(const p in cloned) {
 	    prefixMap[p] = cloned[p];
 	}
 
@@ -329,8 +329,8 @@ RDFModel.RDFNode.prototype.equals = function(otherNode) {
 	return this.valueOf() == otherNode;
 
     } else {
-	for(let i in this.attributes) {
-	    let attribute = this.attributes[i];
+	for(const i in this.attributes) {
+	    const attribute = this.attributes[i];
 	    if(this[attribute] != otherNode[attribute]) {
 		return false;
 	    }
@@ -457,7 +457,7 @@ RDFModel.Graph.prototype.add = function(triple) {
 	triple = this.actions[i](triple);
     }
 
-    let id = triple.subject.toString()+triple.predicate.toString()+triple.object.toString();
+    const id = triple.subject.toString()+triple.predicate.toString()+triple.object.toString();
     if(!this.duplicates[id]) {
 	this.duplicates[id] = true;
 	this.triples.push(triple);
@@ -479,7 +479,7 @@ RDFModel.Graph.prototype.addAction = function (tripleAction, run) {
 };
 
 RDFModel.Graph.prototype.addAll = function (graph) {
-    let newTriples = graph.toArray();
+    const newTriples = graph.toArray();
     for (let i = 0; i < newTriples.length; i++) {
 	this.add(newTriples[i]);
     }
@@ -492,7 +492,7 @@ RDFModel.Graph.prototype.remove = function(triple) {
     let toRemove = null;
     for(let i=0; i<this.triples.length; i++) {
 	if(this.triples[i].equals(triple)) {
-	    let id = triple.subject.toString()+triple.predicate.toString()+triple.object.toString();
+	    const id = triple.subject.toString()+triple.predicate.toString()+triple.object.toString();
 	    delete this.duplicates[id];
 	    toRemove = i;
 	    break;
@@ -532,7 +532,7 @@ RDFModel.Graph.prototype.every = function(p) {
 };
 
 RDFModel.Graph.prototype.filter = function(f) {
-    let tmp = new RDFModel.Graph();
+    const tmp = new RDFModel.Graph();
 
     for(let i=0; i<this.triples.length; i++) {
 	if(f(this.triples[i],this) === true) {
@@ -550,7 +550,7 @@ RDFModel.Graph.prototype.forEach = function(f) {
 };
 
 RDFModel.Graph.prototype.merge = function(g) {
-    let newGraph = new RDFModel.Graph();
+    const newGraph = new RDFModel.Graph();
     for(let i=0; i<this.triples.length; i++)
 	newGraph.add(this.triples[i]);
 
@@ -558,11 +558,11 @@ RDFModel.Graph.prototype.merge = function(g) {
 };
 
 RDFModel.Graph.prototype.match = function(subject, predicate, object, limit) {
-    let graph = new RDFModel.Graph();
+    const graph = new RDFModel.Graph();
 
     let matched = 0;
     for(let i=0; i<this.triples.length; i++) {
-	let triple = this.triples[i];
+	const triple = this.triples[i];
 	if(subject == null || (triple.subject.equals(subject))) {
 	    if(predicate == null || (triple.predicate.equals(predicate))) {
 		if(object == null || (triple.object.equals(object))) {
@@ -581,9 +581,9 @@ RDFModel.Graph.prototype.match = function(subject, predicate, object, limit) {
 };
 
 RDFModel.Graph.prototype.removeMatches = function(subject, predicate, object) {
-    let toRemove = [];
+    const toRemove = [];
     for(let i=0; i<this.triples.length; i++) {
-	let triple = this.triples[i];
+	const triple = this.triples[i];
 	if(subject == null || (triple.subject.equals(subject))) {
 	    if(predicate == null || (triple.predicate.equals(predicate))) {
 		if(object == null || (triple.object.equals(object))) {
@@ -620,7 +620,7 @@ RDFModel.buildRDFResource = function(value, bindings, engine, env) {
     } else if(value.token === 'uri') {
 	return RDFModel.buildNamedNode(value, bindings, engine, env);
     } else if(value.token === 'var') {
-	let result = bindings[value.value];
+	const result = bindings[value.value];
 	if(result != null) {
 	    return RDFModel.buildRDFResource(result, bindings, engine, env);
 	} else {
@@ -650,7 +650,7 @@ RDFModel.buildNamedNode = function(value, bindings, engine, env) {
 	return new RDFModel.NamedNode(value);
     } else {
 	if(value.prefix != null) {
-	    let prefix = engine.resolveNsInEnvironment(value.prefix, env);
+	    const prefix = engine.resolveNsInEnvironment(value.prefix, env);
 	    value.value = prefix+value.suffix;
 	    return new RDFModel.NamedNode(value);
 	} else {

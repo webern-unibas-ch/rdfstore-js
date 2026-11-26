@@ -1,13 +1,13 @@
 "use strict";
 
-let _ = require('./utils');
-let async = require('./utils');
+const _ = require('./utils');
+const async = require('./utils');
 
 /**
  * Functions to build and execute query plans for a particular query
  * using a dynamic programming join algorithm.
  */
-let QueryPlanDPSize = {};
+const QueryPlanDPSize = {};
 
 /**
  * Finds variable in a BGP. Variables can be actual variables or blank nodes.
@@ -22,9 +22,9 @@ QueryPlanDPSize.variablesInBGP = function(bgp) {
         return variables;
     }
 
-    let components =  bgp.value || bgp;
+    const components =  bgp.value || bgp;
     variables  = [];
-    for(let comp in components) {
+    for(const comp in components) {
         if(components[comp] && components[comp].token === "var") {
             variables.push(components[comp].value);
         } else if(components[comp] && components[comp].token === "blank" && components[comp].oid == null) {
@@ -44,7 +44,7 @@ QueryPlanDPSize.variablesInBGP = function(bgp) {
  * @returns {boolean}
  */
 QueryPlanDPSize.connected = function(leftPlan, rightPlan) {
-    let varsLeft ="/"+leftPlan.vars.join("/")+"/";
+    const varsLeft ="/"+leftPlan.vars.join("/")+"/";
     for(let i=0; i<rightPlan.vars.length; i++) {
         if(varsLeft.indexOf("/"+rightPlan.vars[i]+"/") != -1) {
             return true;
@@ -54,8 +54,8 @@ QueryPlanDPSize.connected = function(leftPlan, rightPlan) {
     return false;
 };
 
-let intersection = function(arr1,arr2) {
-    let acc = {};
+const intersection = function(arr1,arr2) {
+    const acc = {};
     for(let i=0; i<arr1.lenght; i++) {
         acc[arr1[i]] = 1;
     }
@@ -64,8 +64,8 @@ let intersection = function(arr1,arr2) {
         val++;
         acc[arr2[i]] = val;
     }
-    let intersect = [];
-    for(let p in acc) {
+    const intersect = [];
+    for(const p in acc) {
         if(acc[p] == 2)
         intersect.push(acc[p]);
     }
@@ -98,10 +98,10 @@ QueryPlanDPSize.executeAndBGPsGroups = function(bgps) {
 
     // Returns true if the any of the passed vars are in the vars
     // associated to the group.
-    let detectVarsInGroup = function(vars, groupVars) {
+    const detectVarsInGroup = function(vars, groupVars) {
 
         for(let j=0; j<vars.length; j++) {
-            let thisVar = "/"+vars[j]+"/";
+            const thisVar = "/"+vars[j]+"/";
             if(groupVars.indexOf(thisVar) != -1) {
                 return true;
             }
@@ -111,11 +111,11 @@ QueryPlanDPSize.executeAndBGPsGroups = function(bgps) {
     };
 
     // Creates a new group merging the vars and the groups
-    let mergeGroups = function(bgp, toJoin, newGroups, newGroupVars) {
+    const mergeGroups = function(bgp, toJoin, newGroups, newGroupVars) {
         let acumGroups = [];
         let acumId = "";
         let acumVars = "";
-        for(let gid in toJoin) {
+        for(const gid in toJoin) {
             acumId = acumId+gid; // new group id
             acumGroups = acumGroups.concat(groups[gid]);
             acumVars = acumVars + groupVars[gid]; // @todo bug here? we were not adding...
@@ -129,14 +129,14 @@ QueryPlanDPSize.executeAndBGPsGroups = function(bgps) {
     };
 
     for(let i=0; i<bgps.length; i++) {
-        let bgp = bgps[i];
-        let newGroups = {};
-        let newGroupVars = {};
+        const bgp = bgps[i];
+        const newGroups = {};
+        const newGroupVars = {};
 
         vars = QueryPlanDPSize.variablesInBGP(bgp);
-        let toJoin = {};
+        const toJoin = {};
 
-        for(let nextGroupId in groupVars) {
+        for(const nextGroupId in groupVars) {
             if(detectVarsInGroup(vars, groupVars[nextGroupId])) {
                 // we need to merge this group fo the next iteration
                 toJoin[nextGroupId] = true;
@@ -172,7 +172,7 @@ QueryPlanDPSize.executeAndBGPsGroups = function(bgps) {
  * @returns 0 or 1 if there's an intersection
  */
 QueryPlanDPSize.intersectionSize = function(leftPlan, rightPlan) {
-    let idsRight = rightPlan.i.split("_");
+    const idsRight = rightPlan.i.split("_");
     for(let i=0; i<idsRight.length; i++) {
         if(idsRight[i]=="")
             continue;
@@ -190,10 +190,10 @@ QueryPlanDPSize.intersectionSize = function(leftPlan, rightPlan) {
  * @returns a new query plan object
  */
 QueryPlanDPSize.createJoinTree = function(leftPlan, rightPlan) {
-    let varsLeft ="/"+leftPlan.vars.join("/")+"/";
-    let accumVars = leftPlan.vars.concat([]);
+    const varsLeft ="/"+leftPlan.vars.join("/")+"/";
+    const accumVars = leftPlan.vars.concat([]);
 
-    let join = [];
+    const join = [];
 
     // Search for the join vars trying to find shared vars between
     // the left plan and the right plan.
@@ -207,9 +207,9 @@ QueryPlanDPSize.createJoinTree = function(leftPlan, rightPlan) {
 
     // Creates a new identifier for the join tree using the union
     // of both plans identifiers.
-    let rightIds = rightPlan.i.split("_");
-    let leftIds = leftPlan.i.split("_");
-    let distinct = {};
+    const rightIds = rightPlan.i.split("_");
+    const leftIds = leftPlan.i.split("_");
+    const distinct = {};
     for(let i=0; i<rightIds.length; i++) {
         if(rightIds[i] != "") {
             distinct[rightIds[i]] = true;
@@ -220,7 +220,7 @@ QueryPlanDPSize.createJoinTree = function(leftPlan, rightPlan) {
             distinct[leftIds[i]] = true;
         }
     }
-    let ids = _.keys(distinct);
+    const ids = _.keys(distinct);
 
     // Returns the new join tree
     return {
@@ -266,8 +266,8 @@ QueryPlanDPSize.executeBushyTree = function(queryPlan, dataset, queryEngine, env
 
 QueryPlanDPSize.executeAndBGPsDPSize = function(allBgps, dataset, queryEngine, env, callback) {
 
-    let groups = QueryPlanDPSize.executeAndBGPsGroups(allBgps);
-    let groupResults = [];
+    const groups = QueryPlanDPSize.executeAndBGPsGroups(allBgps);
+    const groupResults = [];
 
     async.eachSeries(groups,function(bgps,k) {
         // @todo
@@ -275,23 +275,23 @@ QueryPlanDPSize.executeAndBGPsDPSize = function(allBgps, dataset, queryEngine, e
 
         // Build bushy tree for this group
         queryEngine.computeCosts(bgps,env,function(bgps) {
-            let bestPlans = {};
-            let plans = {};
-            let sizes = {};
+            const bestPlans = {};
+            const plans = {};
+            const sizes = {};
 
             let maxSize = 1;
             let maxPlan = null;
 
-            let cache = {};
+            const cache = {};
 
             sizes['1'] = [];
 
             // Building plans of size 1
             for(let i=0; i<bgps.length; i++) {
-                let vars = [];
+                const vars = [];
 
                 delete bgps[i]['variables'];
-                for(let comp in bgps[i]) {
+                for(const comp in bgps[i]) {
                     if(comp != '_cost') {
                         if(bgps[i][comp].token === 'var') {
                             vars.push(bgps[i][comp].value);
@@ -303,7 +303,7 @@ QueryPlanDPSize.executeAndBGPsDPSize = function(allBgps, dataset, queryEngine, e
                 }
 
                 plans["_"+i+"_"] = {left: bgps[i], right:null, cost:bgps[i]._cost, i:('_'+i+'_'), vars:vars};
-                let plan = {left: bgps[i], right:null, cost:bgps[i]._cost, i:('_'+i+'_'), vars:vars};
+                const plan = {left: bgps[i], right:null, cost:bgps[i]._cost, i:('_'+i+'_'), vars:vars};
                 bestPlans["_"+i+"_"] = plan;
                 delete bgps[i]['_cost'];
                 cache["_"+i+"_"] = true;
@@ -316,15 +316,15 @@ QueryPlanDPSize.executeAndBGPsDPSize = function(allBgps, dataset, queryEngine, e
             // dynamic programming -> build plans of increasing size
             for(let s=2; s<=bgps.length; s++) { // size
                 for(let sl=1; sl<s; sl++) { // size left plan
-                    let sr = s - sl; // size right plan
-                    let leftPlans = sizes[''+sl] || [];
-                    let rightPlans = sizes[''+sr] || [];
+                    const sr = s - sl; // size right plan
+                    const leftPlans = sizes[''+sl] || [];
+                    const rightPlans = sizes[''+sr] || [];
                     for(let i=0; i<leftPlans.length; i++) {
                         for(let j=0; j<rightPlans.length; j++) {
                             if(leftPlans[i]===rightPlans[j])
                                 continue;
-                            let leftPlan = plans[leftPlans[i]];
-                            let rightPlan = plans[rightPlans[j]];
+                            const leftPlan = plans[leftPlans[i]];
+                            const rightPlan = plans[rightPlans[j]];
 
                             // condition (1)
                             if(QueryPlanDPSize.intersectionSize(leftPlan, rightPlan) == 0) {
@@ -332,10 +332,10 @@ QueryPlanDPSize.executeAndBGPsDPSize = function(allBgps, dataset, queryEngine, e
 
                                 if(QueryPlanDPSize.connected(leftPlan,rightPlan)) {
                                     maxSize = s;
-                                    let p1 = bestPlans[leftPlan.i];  //QueryPlanAsync.bestPlan(leftPlan, bestPlans);
-                                    let p2 = bestPlans[rightPlan.i]; //QueryPlanAsync.bestPlan(rightPlan, bestPlans);
+                                    const p1 = bestPlans[leftPlan.i];  //QueryPlanAsync.bestPlan(leftPlan, bestPlans);
+                                    const p2 = bestPlans[rightPlan.i]; //QueryPlanAsync.bestPlan(rightPlan, bestPlans);
 
-                                    let currPlan = QueryPlanDPSize.createJoinTree(p1,p2);
+                                    const currPlan = QueryPlanDPSize.createJoinTree(p1,p2);
                                     if(!cache[currPlan.i]) {
                                         cache[currPlan.i] = true;
 
@@ -344,7 +344,7 @@ QueryPlanDPSize.executeAndBGPsDPSize = function(allBgps, dataset, queryEngine, e
                                             costUnion = bestPlans[currPlan.i].cost;
                                         }
 
-                                        let acum = sizes[s] || [];
+                                        const acum = sizes[s] || [];
                                         acum.push(currPlan.i);
                                         plans[currPlan.i] = currPlan;
                                         sizes[s] = acum;
@@ -405,11 +405,11 @@ QueryPlanDPSize.executeEmptyJoinBGP = function(bgp, dataset, queryEngine, queryE
 QueryPlanDPSize.executeBGPDatasets = function(bgp, dataset, queryEngine, queryEnv, callback) {
     // avoid duplicate queries in the same graph
     // merge of graphs is not guaranteed here.
-    let duplicates = {};
+    const duplicates = {};
 
     if(bgp.graph == null) {
         //union through all default graph(s)
-        let acum = [];
+        const acum = [];
         async.eachSeries(dataset.implicit,
             function(implicitGraph, k){
                 if(duplicates[implicitGraph.oid] == null) {
@@ -429,7 +429,7 @@ QueryPlanDPSize.executeBGPDatasets = function(bgp, dataset, queryEngine, queryEn
             });
     } else if(bgp.graph.token === 'var') {
         // union through all named datasets
-        let graphVar = bgp.graph.value;
+        const graphVar = bgp.graph.value;
         let acum = [];
 
         async.eachSeries(dataset.named,
@@ -461,13 +461,13 @@ QueryPlanDPSize.executeBGPDatasets = function(bgp, dataset, queryEngine, queryEn
                 if(acum == null) {
                     callback(null);
                 } else {
-                    let acumBindings = QueryPlanDPSize.unionManyBindings(acum);
+                    const acumBindings = QueryPlanDPSize.unionManyBindings(acum);
                     callback(acumBindings);
                 }
             });
     } else {
         // a graph IRI: match it, if the query names named graphs only one of them
-        let match = function() {
+        const match = function() {
             queryEngine.rangeQuery(bgp, queryEnv, function(results){
                 if(results!=null) {
                     results = QueryPlanDPSize.buildBindingsFromRange(results, bgp);
@@ -494,9 +494,9 @@ QueryPlanDPSize.executeBGPDatasets = function(bgp, dataset, queryEngine, queryEn
 QueryPlanDPSize.buildBindingsFromRange = function(results, bgp) {
     QueryPlanDPSize.variablesInBGP(bgp);
 
-    let components =  bgp.value||bgp;
-    let bindings = {};
-    for(let comp in components) {
+    const components =  bgp.value||bgp;
+    const bindings = {};
+    for(const comp in components) {
         if(components[comp] && components[comp].token === "var") {
             bindings[comp] = components[comp].value;
         } else if(components[comp] && components[comp].token === "blank" && components[comp].oid == null) {
@@ -504,15 +504,15 @@ QueryPlanDPSize.buildBindingsFromRange = function(results, bgp) {
         }
     }
 
-    let resultsBindings =[];
+    const resultsBindings =[];
 
     if(results!=null) {
         for(let i=0; i<results.length; i++) {
-            let binding = {};
-            let result  = results[i];
+            const binding = {};
+            const result  = results[i];
             let duplicated = false;
-            for(let comp in bindings) {
-                let value = result[comp];
+            for(const comp in bindings) {
+                const value = result[comp];
                 if(binding[bindings[comp]] == null || binding[bindings[comp]] === value) {
                     binding[bindings[comp]] = value;
                 } else {
@@ -530,7 +530,7 @@ QueryPlanDPSize.buildBindingsFromRange = function(results, bgp) {
 
 
 // Two term objects (no OIDs) for the same RDF term
-let sameTerm = function(a, b) {
+const sameTerm = function(a, b) {
     return typeof(a) === "object" && typeof(b) === "object" && a.token === b.token && a.value == b.value &&
         (a.type || null) === (b.type || null) && (a.lang || null) === (b.lang || null);
 };
@@ -538,9 +538,9 @@ let sameTerm = function(a, b) {
 // Two solutions are compatible if every variable bound in both has the same value: the same OID, or the
 // same RDF term for values that are no OIDs (e.g. BIND results). An unbound (null) variable matches anything.
 QueryPlanDPSize.areCompatibleBindings = function(bindingsA, bindingsB) {
-    for(let variable in bindingsA) {
-        let a = bindingsA[variable];
-        let b = bindingsB[variable];
+    for(const variable in bindingsA) {
+        const a = bindingsA[variable];
+        const b = bindingsB[variable];
         if(a != null && b != null && a !== b && !sameTerm(a, b)) {
             return false;
         }
@@ -565,13 +565,13 @@ QueryPlanDPSize.areCompatibleBindings = function(bindingsA, bindingsB) {
 
 
 QueryPlanDPSize.mergeBindings = function(bindingsA, bindingsB) {
-    let merged = {};
-    for(let variable in bindingsA) {
+    const merged = {};
+    for(const variable in bindingsA) {
         merged[variable] = bindingsA[variable];
     }
 
     // an unbound value on the right doesn't replace a bound one on the left
-    for(let variable in bindingsB) {
+    for(const variable in bindingsB) {
         if(bindingsB[variable] != null || !(variable in merged)) {
             merged[variable] = bindingsB[variable];
         }
@@ -581,9 +581,9 @@ QueryPlanDPSize.mergeBindings = function(bindingsA, bindingsB) {
 };
 
 QueryPlanDPSize.joinBindings2 = function(bindingVars, bindingsA, bindingsB) {
-    let acum = {};
+    const acum = {};
     let bindings, variable, variableValue, values, tmp;
-    let joined = [];
+    const joined = [];
 
     for(let i=0; i<bindingsA.length; i++) {
         bindings = bindingsA[i];
@@ -626,10 +626,10 @@ QueryPlanDPSize.joinBindings2 = function(bindingVars, bindingsA, bindingsB) {
 };
 
 // Key of a solution over the given variables, or null unless all of them are bound to OIDs.
-let oidKey = function(vars, bindings) {
+const oidKey = function(vars, bindings) {
     let key = "";
     for(let i=0; i<vars.length; i++) {
-        let value = bindings[vars[i]];
+        const value = bindings[vars[i]];
         if(typeof(value) !== "number") {
             return null;
         }
@@ -644,9 +644,9 @@ let oidKey = function(vars, bindings) {
 // non-OID value (e.g. a BIND result). A left solution without an OID key is compared with all.
 // An optional leftSolutions Map receives each merged solution -> the left solution it came from.
 QueryPlanDPSize.hashJoinBindings = function(bindingsA, bindingsB, leftOuter, leftSolutions) {
-    let varsA = {};
-    let varsB = {};
-    let sharedVars = [];
+    const varsA = {};
+    const varsB = {};
+    const sharedVars = [];
     let i, p, key;
     for(i=0; i<bindingsA.length; i++) {
         for(p in bindingsA[i]) {
@@ -664,8 +664,8 @@ QueryPlanDPSize.hashJoinBindings = function(bindingsA, bindingsB, leftOuter, lef
         }
     }
 
-    let buckets = {};
-    let wildcards = [];
+    const buckets = {};
+    const wildcards = [];
     for(i=0; i<bindingsB.length; i++) {
         key = oidKey(sharedVars, bindingsB[i]);
         if(key === null) {
@@ -675,12 +675,12 @@ QueryPlanDPSize.hashJoinBindings = function(bindingsA, bindingsB, leftOuter, lef
         }
     }
 
-    let result = [];
+    const result = [];
     let bindingA, matched;
-    let tryJoin = function(j) {
+    const tryJoin = function(j) {
         if(QueryPlanDPSize.areCompatibleBindings(bindingA, bindingsB[j])) {
             matched = true;
-            let merged = QueryPlanDPSize.mergeBindings(bindingA, bindingsB[j]);
+            const merged = QueryPlanDPSize.mergeBindings(bindingA, bindingsB[j]);
             if(leftSolutions != null) {
                 leftSolutions.set(merged, bindingA);
             }
@@ -697,7 +697,7 @@ QueryPlanDPSize.hashJoinBindings = function(bindingsA, bindingsB, leftOuter, lef
             }
         } else {
             // both index lists are ascending: merge them to keep the nested loop's order
-            let bucket = buckets[key] || [];
+            const bucket = buckets[key] || [];
             let b = 0, w = 0;
             while(b < bucket.length || w < wildcards.length) {
                 if(w === wildcards.length || (b < bucket.length && bucket[b] < wildcards[w])) {
@@ -722,7 +722,7 @@ QueryPlanDPSize.joinBindings = function(bindingsA, bindingsB) {
 };
 
 QueryPlanDPSize.augmentMissingBindings = function(bindingA, bindingB) {
-    for(let pb in bindingB) {
+    for(const pb in bindingB) {
         if(bindingA[pb] == null) {
             bindingA[pb] = null;
         }
@@ -762,12 +762,12 @@ QueryPlanDPSize.leftOuterJoinBindings = function(bindingsA, bindingsB, leftSolut
 };
 
 QueryPlanDPSize.crossProductBindings = function(bindingsA, bindingsB) {
-    let result = [];
+    const result = [];
 
     for(let i=0; i< bindingsA.length; i++) {
-        let bindingA = bindingsA[i];
+        const bindingA = bindingsA[i];
         for(let j=0; j<bindingsB.length; j++) {
-            let bindingB = bindingsB[j];
+            const bindingB = bindingsB[j];
             result.push(QueryPlanDPSize.mergeBindings(bindingA, bindingB));
         }
     }
@@ -782,7 +782,7 @@ QueryPlanDPSize.unionBindings = function(bindingsA, bindingsB) {
 QueryPlanDPSize.unionManyBindings = function(bindingLists) {
     let acum = [];
     for(let i=0; i<bindingLists.length; i++) {
-        let bindings = bindingLists[i];
+        const bindings = bindingLists[i];
         acum = QueryPlanDPSize.unionBindings(acum, bindings);
     }
 
@@ -794,12 +794,12 @@ QueryPlanDPSize.unionManyBindings = function(bindingLists) {
  * values of its variables (OIDs) fix the matched triple, so equal bindings mean the same triple.
  */
 QueryPlanDPSize.distinctUnionBindings = function(bindingLists) {
-    let seen = new Set();
-    let acum = [];
+    const seen = new Set();
+    const acum = [];
     for(let i=0; i<bindingLists.length; i++) {
         for(let j=0; j<bindingLists[i].length; j++) {
-            let bindings = bindingLists[i][j];
-            let key = Object.keys(bindings).sort().map(function(name) {
+            const bindings = bindingLists[i][j];
+            const key = Object.keys(bindings).sort().map(function(name) {
                 return name + "=" + bindings[name];
             }).join(" ");
             if(!seen.has(key)) {

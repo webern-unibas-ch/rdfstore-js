@@ -1,12 +1,12 @@
 "use strict";
 
 /* global RDFXMLParser */ // optional, defined by a separately loaded RDF/XML parser
-let NetworkTransport = require("./network_transport").NetworkTransport;
-let RVN3Parser = require("./rvn3_parser").RVN3Parser;
-let JSONLDParser = require("./jsonld_parser").JSONLDParser;
-let Utils = require("./utils");
+const NetworkTransport = require("./network_transport").NetworkTransport;
+const RVN3Parser = require("./rvn3_parser").RVN3Parser;
+const JSONLDParser = require("./jsonld_parser").JSONLDParser;
+const Utils = require("./utils");
 
- let RDFLoader = function (params) {
+ const RDFLoader = function (params) {
 
     // per store, replaced by Store#setNetworkTransport; undefined in a worker
     this.networkTransport = NetworkTransport;
@@ -20,14 +20,14 @@ let Utils = require("./utils");
     }
 
     if (params != null) {
-        for (let mime in params["parsers"]) {
+        for (const mime in params["parsers"]) {
             this.parsers[mime] = params["parsers"][mime];
         }
     }
 
     if (params && params["precedences"] != null) {
         this.precedences = params["precedences"];
-        for (let mime in params["parsers"]) {
+        for (const mime in params["parsers"]) {
             if (!Utils.include(this.precedences, mime)) {
                 this.precedences.push(mime);
             }
@@ -51,7 +51,7 @@ RDFLoader.prototype.registerParser = function(mediaType, parser) {
 
 RDFLoader.prototype.unregisterParser = function(mediaType) {
     delete this.parsers[mediaType];
-    let mediaTypes = [];
+    const mediaTypes = [];
     for(let i=0; i<this.precedences.length; i++) {
         if(this.precedences[i] != mediaType) {
             mediaTypes.push(this.precedences[i]);
@@ -66,7 +66,7 @@ RDFLoader.prototype.setAcceptHeaderPrecedence = function(mediaTypes) {
 };
 
 RDFLoader.prototype.load = function(uri, graph, callback) {
-    let that = this;
+    const that = this;
     if(this.networkTransport == null) {
         return callback(new Error("No network transport to load " + uri + ": set one with store.setNetworkTransport"));
     }
@@ -74,14 +74,14 @@ RDFLoader.prototype.load = function(uri, graph, callback) {
         if(err) {
             callback(err);
         } else {
-            let headers = (results && results["headers"]) || {};
+            const headers = (results && results["headers"]) || {};
             let mime = headers["Content-Type"] || headers["content-type"];
-            let data = results && results['data'];
+            const data = results && results['data'];
             if(mime != null) {
                 mime = mime.split(";")[0];
-                for(let m in that.parsers) {
+                for(const m in that.parsers) {
                     if(m.indexOf("/")!=-1) {
-                        let mimeParts = m.split("/");
+                        const mimeParts = m.split("/");
                         if(mimeParts[1] === '*') {
                             if(mime.indexOf(mimeParts[0])!=-1) {
                                 return that.tryToParse(that.parsers[m], graph, data, {documentURI: uri}, callback);
@@ -108,11 +108,11 @@ RDFLoader.prototype.load = function(uri, graph, callback) {
 
 RDFLoader.prototype.loadFromFile = function(parser, graph, uri, options, callback) {
     try {
-        let that = this;
-        let fs = require('fs');
-        let url = require('url');
-        let parseOptions = {documentURI: uri};
-        for(let option in options) {
+        const that = this;
+        const fs = require('fs');
+        const url = require('url');
+        const parseOptions = {documentURI: uri};
+        for(const option in options) {
             parseOptions[option] = options[option];
         }
         // throws on an invalid file URL, which the catch reports
@@ -130,7 +130,7 @@ RDFLoader.prototype.loadFromFile = function(parser, graph, uri, options, callbac
 };
 
 RDFLoader.prototype.tryToParse = function(parser, graph, input, options, callback) {
-    let done = Utils.once(callback);
+    const done = Utils.once(callback);
     try {
         // no \uXXXX pre-pass as for queries: the parsers decode escapes inside their tokens,
         // decoding them first turns e.g. an escaped quote into syntax

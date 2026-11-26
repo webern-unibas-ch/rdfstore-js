@@ -1,17 +1,17 @@
 "use strict";
 
-let jsonld = require('jsonld');
+const jsonld = require('jsonld');
 
-let toTriples = async function (input, graph) {
+const toTriples = async function (input, graph) {
     let rval = null;
 
     // convert input to normalized RDF
     const normalized = await jsonld.toRDF(input, {})
 
-    let parseTerm = function (term) {
+    const parseTerm = function (term) {
         if (term.termType === 'BlankNode') {
             // Ensure blank node values always start with "_:" prefix
-            let blankValue = term.value.startsWith('_:') ? term.value : '_:' + term.value;
+            const blankValue = term.value.startsWith('_:') ? term.value : '_:' + term.value;
             return {'blank': blankValue};
         } else if (term.termType === 'NamedNode') {
             return {'token': 'uri', 'value': term.value};
@@ -28,7 +28,7 @@ let toTriples = async function (input, graph) {
     };
 
     rval = [];
-    let callback = function (s, p, o) {
+    const callback = function (s, p, o) {
         rval.push({
             'subject': parseTerm(s),
             'predicate': parseTerm(p),
@@ -39,9 +39,9 @@ let toTriples = async function (input, graph) {
 
 
     // generate triples
-    let triples = normalized;
+    const triples = normalized;
     for (let i = 0; i < triples.length; i++) {
-        let triple = triples[i];
+        const triple = triples[i];
         callback(triple.subject, triple.predicate, triple.object);
     }
 
@@ -52,7 +52,7 @@ let toTriples = async function (input, graph) {
 
 // exports
 exports.JSONLDParser = {};
-let JSONLDParser = exports.JSONLDParser;
+const JSONLDParser = exports.JSONLDParser;
 
 JSONLDParser.parser = {
 

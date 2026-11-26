@@ -1,8 +1,8 @@
 "use strict";
 
-let BaseTree = require("./btree").Tree;
-let _ = require('./utils');
-let async = require('./utils');
+const BaseTree = require("./btree").Tree;
+const _ = require('./utils');
+const async = require('./utils');
 
 /**
  * NodeKey
@@ -12,7 +12,7 @@ let async = require('./utils');
  * A Tree node augmented with BPlusTree
  * node structures
  */
-let NodeKey = function(components, order) {
+const NodeKey = function(components, order) {
     this.subject = components.subject;
     this.predicate = components.predicate;
     this.object = components.object;
@@ -28,7 +28,7 @@ let NodeKey = function(components, order) {
  */
 NodeKey.prototype.comparator = function(keyPattern) {
     for(let i=0; i<this.order.length; i++) {
-        let component = this.order[i];
+        const component = this.order[i];
         if(keyPattern[component] == null) {
             return 0;
         } else {
@@ -48,7 +48,7 @@ NodeKey.prototype.comparator = function(keyPattern) {
  *
  * A pattern with some variable components
  */
-let Pattern = function (components) {
+const Pattern = function (components) {
     this.subject = components.subject;
     this.predicate = components.predicate;
     this.object = components.object;
@@ -57,9 +57,9 @@ let Pattern = function (components) {
 
     this.keyComponents = {};
 
-    let order = [];
-    let indiferent = [];
-    let that = this;
+    const order = [];
+    const indiferent = [];
+    const that = this;
 
     // components must have been already normalized and
     // inserted in the lexicon.
@@ -89,7 +89,7 @@ let Pattern = function (components) {
  * @param callback
  * @constructor
  */
-let QuadIndex = function (params, callback) {
+const QuadIndex = function (params, callback) {
     if (arguments != 0) {
         this.componentOrder = params.componentOrder;
 
@@ -98,10 +98,10 @@ let QuadIndex = function (params, callback) {
             // For exact matches. Used by search.
             tree.comparator = function (a, b) {
                 for (let i = 0; i < tree.componentOrder.length; i++) {
-                    let component = tree.componentOrder[i];
+                    const component = tree.componentOrder[i];
 
-                    let vala = a[component];
-                    let valb = b[component];
+                    const vala = a[component];
+                    const valb = b[component];
 
                     if (vala < valb) {
                         return -1;
@@ -116,7 +116,7 @@ let QuadIndex = function (params, callback) {
             // For range matches.
             tree.rangeComparator = function (a, b) {
                 for (let i = 0; i < tree.componentOrder.length; i++) {
-                    let component = tree.componentOrder[i];
+                    const component = tree.componentOrder[i];
                     if (b[component] == null || a[component] == null) {
                         return 0;
                     } else {
@@ -172,15 +172,15 @@ QuadIndex.prototype.range = function (pattern, callback) {
 };
 
 QuadIndex.prototype._rangeTraverse = function(tree,node, pattern, callback) {
-    let patternKey  = pattern.key;
-    let acum = [];
-    let pendingNodes = [node];
+    const patternKey  = pattern.key;
+    const acum = [];
+    const pendingNodes = [node];
 
     async.whilst(function(){
         return pendingNodes.length > 0;
     }, function(k){
         // next node to process
-        let node = pendingNodes.shift();
+        const node = pendingNodes.shift();
         let idxMin = 0;
 
         // move forward in the lower keys not matching the pattern.
