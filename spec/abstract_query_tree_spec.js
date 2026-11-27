@@ -24,7 +24,6 @@ describe("Parser", function () {
 
         query = aqt.parseQueryString(query);
         var result = aqt.parseSelect(query.units[0]);
-        //console.log(sys.inspect(result,true,20));
         expect(result.pattern.kind).toBe("BGP");
         expect(result.pattern.value.length).toBe(2);
     });
@@ -203,7 +202,6 @@ describe("Parser", function () {
 
         var query = aqt.parseQueryString(query);
         var result = aqt.parseSelect(query.units[0]);
-        //console.log(sys.inspect(result,true,10));
 
         expect(result.pattern.kind).toBe("LEFT_JOIN");
         expect(result.pattern.filter.length).toBe(1);
@@ -229,7 +227,6 @@ describe("Parser", function () {
         expect(result.pattern.rvalue.kind).toBe("BGP");
 
         result = aqt.bind(result, { v1: { token: "uri", value: "http://test.com/somevalue" } });
-        //console.log(sys.inspect(result,true,20));
         expect(result.pattern.filter[0].value.operands[0].op1.value.value).toBe("http://test.com/somevalue");
         expect(result.pattern.filter[0].value.operands[1].op1.summand.value.value).toBe("http://test.com/somevalue");
         expect(result.pattern.filter[0].value.operands[1].op1.summands[0].expression.value.value).toBe(
@@ -255,7 +252,6 @@ describe("Parser", function () {
         expect(result.pattern.rvalue.kind).toBe("BGP");
 
         result = aqt.bind(result, { v1: { token: "uri", value: "http://test.com/somevalue" } });
-        //console.log(sys.inspect(result,true,20));
         expect(result.pattern.filter[0].value.operands[0].op1.value.value).toBe("http://test.com/somevalue");
         expect(result.pattern.filter[0].value.operands[1].op1.summand.value.value).toBe("http://test.com/somevalue");
         expect(result.pattern.filter[0].value.operands[1].op1.summands[0].expression.value.value).toBe(

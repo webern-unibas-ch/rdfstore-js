@@ -550,26 +550,6 @@ describe("Store", function () {
         });
     });
 
-    /*
-    it("Should pass integration test Load2", function (done) {
-        Store.create(function (err, store) {
-            store.load('remote', 'http://dbpedia.org/resource/Tim_Berners-Lee', function (err, result) {
-                store.execute("SELECT ?o WHERE { ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?o }", function (err, results) {
-                    expect(err);
-                    expect(results.length > 0);
-                    done();
-                });
-                //store.node('http://dbpedia.org/resource/Tim_Berners-Lee', function(err, graph){
-                //    expect(err);
-                //    var tmp = graph.toArray();
-                //    var results = graph.filter(store.rdf.filters.type(store.rdf.resolve("foaf:Person")));
-                //    expect(results.toArray().length).toBe(1);
-                //    store.close(function(){ done() });
-                //});
-            });
-        });
-    });
-*/
     it("Should pass integration test Load3", function (done) {
         Store.create({ name: "test", overwrite: true }, function (err, store) {
             store.setPrefix("ex", "http://example.org/examples/");
@@ -903,30 +883,6 @@ describe("Store", function () {
             });
         });
     });
-
-    //it("Should pass integration test Export1", function(done) {
-    //    Store.create(function(err,store) {
-    //        store.load('remote', 'http://dbpedia.org/resource/Tim_Berners-Lee', 'http://test.com/graph-to-export', function(err, result) {
-    //            var graph = store.graph('http://test.com/graph-to-export', function(err, graph){
-    //                var n3 = "";
-    //
-    //                graph.forEach(function(triple) {
-    //                    n3 = n3 + triple.toString();
-    //                });
-    //
-    //                N3Parser.parser.parse(n3, function(err, result) {
-    //                    expect(err);
-    //                    expect(result.length > 0);
-    //
-    //                    // an easier way
-    //                    expect(graph.toNT() == n3);
-    //
-    //                    store.close(function(){ done(); });
-    //                });
-    //            });
-    //        });
-    //    });
-    //};
 
     it("Should pass integration test DefaultPrefixes", function (done) {
         new Store.Store({ name: "test", overwrite: true }, function (err, store) {
@@ -1546,42 +1502,3 @@ describe("Store", function () {
         }
     });
 });
-
-/*
- it("Should pass integration test Load5", function(done) {
- Store.create({name:'test', overwrite:true},function(err,store) {
-
- store.setPrefix("ex", "http://example.org/people/");
-
- var graph = store.rdf.createGraph();
- var input = '<?xml version="1.0" encoding="UTF-8"?>\n\
- <rdf:RDF\n\
- xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n\
- <rdf:Description rdf:about="http://purl.bioontology.org/ontology/RXNORM/309054">\n\
- <rdf:type rdf:resource="http://smartplatforms.org/terms#Code"/>\n\
- <rdf:type rdf:resource="http://smartplatforms.org/terms/codes/RxNorm_Semantic"/>\n\
- <title xmlns="http://purl.org/dc/terms/">Cefdinir 25 MG/ML Oral Suspension</title>\n\
- </rdf:Description>\n\
- </rdf:RDF>';
-
- store.load("application/rdf+xml", input, function(err, results){
- console.log("RESULTS...")
- console.log(results);
-
- store.execute("SELECT * { ?s  ?p  ?o }", function(err, results){
- console.log(results);
- done();
- });
-
- //  store.node("http://purl.bioontology.org/ontology/RXNORM/309054",  function(err, graph) {
- //      console.log(graph);
- //      console.log(graph.toArray());
- //      expect(graph.toArray().length).toBe(3);
- //      done();
- //  });
-
- });
- });
- });
-
- */

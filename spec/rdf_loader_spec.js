@@ -97,6 +97,32 @@ describe("RDFLoader", function () {
             });
         });
 
+        it("makes store.load('remote', …) fetch into the default graph, or into the given graph", function (done) {
+            withStore(function (store) {
+                var requests = [];
+                store.setNetworkTransport({
+                    load: function (uri, accept, callback) {
+                        requests.push(uri);
+                        callback(null, { headers: { "content-type": "text/turtle" }, data: TURTLE });
+                    },
+                });
+                store.load("remote", "http://example.org/data", function (err) {
+                    expect(err).toBe(null);
+                    store.load("remote", "http://example.org/data", "http://example.org/g", function (err) {
+                        expect(err).toBe(null);
+                        expect(requests).toEqual(["http://example.org/data", "http://example.org/data"]);
+                        countTriples(store, null, function (count) {
+                            expect(count).toBe(1);
+                            countTriples(store, "http://example.org/g", function (count) {
+                                expect(count).toBe(1);
+                                done();
+                            });
+                        });
+                    });
+                });
+            });
+        });
+
         it("applies to that store only", function (done) {
             withStore(function (store) {
                 store.setNetworkTransport({ load: function () {} });

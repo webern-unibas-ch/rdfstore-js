@@ -18,10 +18,6 @@ var compare = function (compa, compb) {
 };
 
 var compareTriple = function (ta, tb) {
-    //console.log("TA");
-    //console.log(ta);
-    //console.log("TB");
-    //console.log(tb);
     compare(ta.subject, tb.subject);
     compare(ta.predicate, tb.predicate);
     compare(ta.object, tb.object);
@@ -32,12 +28,6 @@ var shouldParse = function (input, output, done, options) {
     options = options || {};
     RVN3Parser.parser.resetBlankNodeIds();
     RVN3Parser.parser.parse(input, options, function (err, result) {
-        //console.log("PARSED? "+success);
-        //console.log("------------");
-        //console.log(input);
-        //console.log("------------");
-        //console.log(result);
-        //console.log("!!!!!!!!!!!!");
         expect(err).toBeNull();
         expect(result.constructor).toBe(output.constructor);
         expect(result.length).toBe(output.length);
