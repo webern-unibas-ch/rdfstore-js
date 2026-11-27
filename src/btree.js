@@ -1,6 +1,6 @@
 "use strict";
 
-const Utils = require('./utils');
+const Utils = require("./utils");
 const nextTick = Utils.nextTick;
 
 const left = -1;
@@ -19,20 +19,20 @@ const right = 1;
  *
  * An implementation of an in memory B-Tree.
  */
-const Tree = function(order,f) {
-    if(arguments.length != 0) {
+const Tree = function (order, f) {
+    if (arguments.length != 0) {
         this.order = order;
         this.root = this._allocateNode();
         this.root.isLeaf = true;
         this.root.level = 0;
         const that = this;
-        this._diskWrite(this.root, function(root){
+        this._diskWrite(this.root, function (root) {
             that.root = root;
-            that._updateRootNode(that.root, function(n){
-                that.comparator = function(a,b) {
-                    if(a < b) {
+            that._updateRootNode(that.root, function (n) {
+                that.comparator = function (a, b) {
+                    if (a < b) {
                         return -1;
-                    } else if(a > b){
+                    } else if (a > b) {
                         return 1;
                     } else {
                         return 0;
@@ -40,10 +40,11 @@ const Tree = function(order,f) {
                 };
                 that.merger = null;
                 // we notify we are ready
-                if(f!=null) {
+                if (f != null) {
                     f(that);
                 }
-            })});
+            });
+        });
     }
 };
 
@@ -55,7 +56,7 @@ const Tree = function(order,f) {
  *
  * @returns the new alloacted node
  */
-Tree.prototype._allocateNode = function() {
+Tree.prototype._allocateNode = function () {
     return new Node();
 };
 
@@ -64,14 +65,13 @@ Tree.prototype._allocateNode = function() {
  *
  * Persists the node to secondary memory.
  */
-Tree.prototype._diskWrite= function(node, f) {
+Tree.prototype._diskWrite = function (node, f) {
     // dummy implementation;
     // no-op
-    nextTick(function(){
+    nextTick(function () {
         f(node);
     });
 };
-
 
 /**
  * _diskRead
@@ -79,34 +79,32 @@ Tree.prototype._diskWrite= function(node, f) {
  * Retrieves a node from secondary memory using the provided
  * pointer
  */
-Tree.prototype._diskRead = function(pointer, f) {
+Tree.prototype._diskRead = function (pointer, f) {
     // dummy implementation;
     // no-op
-    nextTick(function() {
+    nextTick(function () {
         f(pointer);
     });
 };
 
-Tree.prototype._diskDelete= function(node,f) {
+Tree.prototype._diskDelete = function (node, f) {
     // dummy implementation
     // no-op
-    nextTick(function() {
+    nextTick(function () {
         f();
     });
 };
-
 
 /**
  * _updateRootNode
  *
  * Updates the pointer to the root node stored in disk.
  */
-Tree.prototype._updateRootNode = function(node,f) {
+Tree.prototype._updateRootNode = function (node, f) {
     // dummy implementation;
     // no-op
-    f(node)
+    f(node);
 };
-
 
 /**
  * search
@@ -114,10 +112,10 @@ Tree.prototype._updateRootNode = function(node,f) {
  * Retrieves the node matching the given value.
  * If no node is found, null is returned.
  */
-Tree.prototype.search = function(key,f, checkExists) {
+Tree.prototype.search = function (key, f, checkExists) {
     const node = this.root;
     const tree = this;
-    tree.__search(tree,key,node,f, checkExists);
+    tree.__search(tree, key, node, f, checkExists);
 };
 Tree.prototype.__search = function (tree, key, node, f, checkExists) {
     let idx = 0;
@@ -133,106 +131,109 @@ Tree.prototype.__search = function (tree, key, node, f, checkExists) {
         }
     } else {
         if (node.isLeaf === true) {
-            f(null)
+            f(null);
         } else {
             tree._diskRead(node.children[idx], function (node) {
-                tree.__search(tree, key, node, f, checkExists)
+                tree.__search(tree, key, node, f, checkExists);
             });
         }
     }
 };
-
 
 /**
  * walk
  * Applies a function to all the nodes key and data in the the
  * tree in key order.
  */
-Tree.prototype.walk = function(f,e) {
-    this.__walk(this,this.root,f,e);
+Tree.prototype.walk = function (f, e) {
+    this.__walk(this, this.root, f, e);
 };
-Tree.prototype.__walk = function(tree,node,f,callback) {
+Tree.prototype.__walk = function (tree, node, f, callback) {
     const max = node.numberActives;
     let i = 0;
-    if(node.isLeaf) {
-        for(i=0; i<node.numberActives; i++) {
+    if (node.isLeaf) {
+        for (i = 0; i < node.numberActives; i++) {
             f(node.keys[i]);
         }
         return callback();
     } else {
-        Utils.whilst(function(){
-            return i < max;
-        },function(c){
-            tree._diskRead(node.children[i], function(n){
-                tree.__walk(tree,n,f,function(){
-                    tree._diskRead(node.keys[i], function(n){
-                        f(n);
-                        i++;
-                        c();
-                    })
+        Utils.whilst(
+            function () {
+                return i < max;
+            },
+            function (c) {
+                tree._diskRead(node.children[i], function (n) {
+                    tree.__walk(tree, n, f, function () {
+                        tree._diskRead(node.keys[i], function (n) {
+                            f(n);
+                            i++;
+                            c();
+                        });
+                    });
                 });
-            });
-        },function(){
-            tree._diskRead(node.children[max],function(node){
-                tree.__walk(tree,node,f,function(){callback();});
-            });
-        });
+            },
+            function () {
+                tree._diskRead(node.children[max], function (node) {
+                    tree.__walk(tree, node, f, function () {
+                        callback();
+                    });
+                });
+            },
+        );
     }
 };
-
 
 /**
  * _splitChild
  *
  * Split the child node and adjusts the parent.
  */
-Tree.prototype._splitChild = function(parent, index, child, callback) {
+Tree.prototype._splitChild = function (parent, index, child, callback) {
     const newChild = this._allocateNode();
     newChild.isLeaf = child.isLeaf;
     newChild.level = child.level;
     newChild.numberActives = this.order - 1;
 
     // Copy the higher order keys to the new child
-    const newParentChild = child.keys[this.order-1];
-    child.keys[this.order-1] = null;
+    const newParentChild = child.keys[this.order - 1];
+    child.keys[this.order - 1] = null;
 
     let i;
-    for(i=0; i< this.order-1; i++) {
-        newChild.keys[i]=child.keys[i+this.order];
-        child.keys[i+this.order] = null;
-        if(!child.isLeaf) {
-            newChild.children[i] = child.children[i+this.order];
-            child.children[i+this.order] = null;
+    for (i = 0; i < this.order - 1; i++) {
+        newChild.keys[i] = child.keys[i + this.order];
+        child.keys[i + this.order] = null;
+        if (!child.isLeaf) {
+            newChild.children[i] = child.children[i + this.order];
+            child.children[i + this.order] = null;
         }
     }
 
     // Copy the last child pointer
-    if(!child.isLeaf) {
-        newChild.children[i] = child.children[i+this.order];
-        child.children[i+this.order] = null;
+    if (!child.isLeaf) {
+        newChild.children[i] = child.children[i + this.order];
+        child.children[i + this.order] = null;
     }
 
     child.numberActives = this.order - 1;
 
-
-    for(i = parent.numberActives + 1; i>index+1; i--) {
-        parent.children[i] = parent.children[i-1];
+    for (i = parent.numberActives + 1; i > index + 1; i--) {
+        parent.children[i] = parent.children[i - 1];
     }
 
-    parent.children[index+1] = newChild;
+    parent.children[index + 1] = newChild;
 
-    for(i = parent.numberActives; i>index; i--) {
-        parent.keys[i] = parent.keys[i-1];
+    for (i = parent.numberActives; i > index; i--) {
+        parent.keys[i] = parent.keys[i - 1];
     }
 
     parent.keys[index] = newParentChild;
     parent.numberActives++;
 
     const that = this;
-    this._diskWrite(newChild,function(newChild){
-        that._diskWrite(parent,function(parent){
-            parent.children[index+1] = newChild;
-            that._diskWrite(child,function(child){
+    this._diskWrite(newChild, function (newChild) {
+        that._diskWrite(parent, function (parent) {
+            parent.children[index + 1] = newChild;
+            that._diskWrite(child, function (child) {
                 return callback(parent);
             });
         });
@@ -245,9 +246,8 @@ Tree.prototype._splitChild = function(parent, index, child, callback) {
  * Creates a new node with value key and data and inserts it
  * into the tree.
  */
-Tree.prototype.insert = function(key,data,callback) {
-
-    if(this.root.numberActives === (2 * this.order - 1)) {
+Tree.prototype.insert = function (key, data, callback) {
+    if (this.root.numberActives === 2 * this.order - 1) {
         let newRoot = this._allocateNode();
         newRoot.isLeaf = false;
         newRoot.level = this.root.level + 1;
@@ -255,15 +255,15 @@ Tree.prototype.insert = function(key,data,callback) {
         newRoot.children[0] = this.root;
 
         const that = this;
-        this._splitChild(newRoot, 0, this.root, function(updatedParent){
+        this._splitChild(newRoot, 0, this.root, function (updatedParent) {
             newRoot = updatedParent; // @warning tricky!
             that.root = newRoot;
-            that._updateRootNode(newRoot, function(newRoot){
+            that._updateRootNode(newRoot, function (newRoot) {
                 that._insertNonFull(newRoot, key, data, callback);
             });
         });
     } else {
-        this._insertNonFull(this.root, key, data,callback);
+        this._insertNonFull(this.root, key, data, callback);
     }
 };
 
@@ -278,45 +278,44 @@ Tree.prototype._insertNonFull = function (node, key, data, callback) {
     const idx = node.numberActives - 1;
     this.__insertNonFull(this, node, idx, key, data, callback);
 };
-Tree.prototype.__insertNonFull = function(tree,node,idx,key,data,callback) {
-    if(!node.isLeaf) {
-        while(idx>=0 && tree.comparator(key,node.keys[idx].key) === -1) {
+Tree.prototype.__insertNonFull = function (tree, node, idx, key, data, callback) {
+    if (!node.isLeaf) {
+        while (idx >= 0 && tree.comparator(key, node.keys[idx].key) === -1) {
             idx--;
         }
         idx++;
         const that = tree;
-        tree._diskRead(node.children[idx],function(child) {
-            if(child.numberActives === 2*that.order -1) {
-                that._splitChild(node,idx,child,function(){
-                    if(that.comparator(key, node.keys[idx].key)===1) {
+        tree._diskRead(node.children[idx], function (child) {
+            if (child.numberActives === 2 * that.order - 1) {
+                that._splitChild(node, idx, child, function () {
+                    if (that.comparator(key, node.keys[idx].key) === 1) {
                         idx++;
                     }
-                    that._diskRead(node.children[idx], function(node){
-                        idx = node.numberActives -1;
-                        that.__insertNonFull(tree,node,idx,key,data,callback);
+                    that._diskRead(node.children[idx], function (node) {
+                        idx = node.numberActives - 1;
+                        that.__insertNonFull(tree, node, idx, key, data, callback);
                     });
                 });
             } else {
-                that._diskRead(node.children[idx], function(node){
-                    idx = node.numberActives -1;
-                    that.__insertNonFull(tree,node,idx,key,data,callback);
+                that._diskRead(node.children[idx], function (node) {
+                    idx = node.numberActives - 1;
+                    that.__insertNonFull(tree, node, idx, key, data, callback);
                 });
             }
         });
-
     } else {
-        while(idx>=0 && tree.comparator(key,node.keys[idx].key) === -1) {
-            node.keys[idx+1] = node.keys[idx];
+        while (idx >= 0 && tree.comparator(key, node.keys[idx].key) === -1) {
+            node.keys[idx + 1] = node.keys[idx];
             idx--;
         }
 
-        if(idx>=0 && tree.comparator(key,node.keys[idx].key) === 0){
-            node.keys[idx] = {key:key, data:data};
+        if (idx >= 0 && tree.comparator(key, node.keys[idx].key) === 0) {
+            node.keys[idx] = { key: key, data: data };
         } else {
-            node.keys[idx + 1] = {key:key, data:data};
+            node.keys[idx + 1] = { key: key, data: data };
             node.numberActives++;
         }
-        tree._diskWrite(node, function(node){
+        tree._diskWrite(node, function (node) {
             return callback(node);
         });
     }
@@ -331,34 +330,34 @@ Tree.prototype.__insertNonFull = function(tree,node,idx,key,data,callback) {
  * @param key the key to be deleted
  * @returns true if the key is deleted false otherwise
  */
-Tree.prototype.delete = function(key,callback) {
+Tree.prototype.delete = function (key, callback) {
     const node = this.root;
-    Tree.prototype.__deleteSearchNode(this,key,node,callback);
+    Tree.prototype.__deleteSearchNode(this, key, node, callback);
 };
-Tree.prototype.__deleteSearchNode = function(tree,key,node,callback) {
+Tree.prototype.__deleteSearchNode = function (tree, key, node, callback) {
     let i = 0;
 
-    if(node.numberActives === 0) {
+    if (node.numberActives === 0) {
         return callback(false);
     }
 
-    while(i<node.numberActives && tree.comparator(key, node.keys[i].key) === 1) {
+    while (i < node.numberActives && tree.comparator(key, node.keys[i].key) === 1) {
         i++;
     }
 
     const idx = i;
 
-    if(i<node.numberActives && tree.comparator(key, node.keys[i].key) === 0) {
-        return tree.__deleteNodeFound(tree,idx,key,node,callback);
+    if (i < node.numberActives && tree.comparator(key, node.keys[i].key) === 0) {
+        return tree.__deleteNodeFound(tree, idx, key, node, callback);
     }
 
-    if(node.isLeaf === true) {
+    if (node.isLeaf === true) {
         return callback(false);
     }
 
     const parent = node;
-    tree._diskRead(node.children[i], function(node){
-        if(node===null) {
+    tree._diskRead(node.children[i], function (node) {
+        if (node === null) {
             return callback(false);
         }
 
@@ -367,83 +366,81 @@ Tree.prototype.__deleteSearchNode = function(tree,key,node,callback) {
         let rsiblingIndex = null;
         let lsiblingIndex = null;
 
-        if(idx === parent.numberActives) {
+        if (idx === parent.numberActives) {
             isRsiblingNull = true;
             lsiblingIndex = parent.children[idx - 1];
-            rsiblingIndex = parent.children[idx-1]
-        } else if(idx === 0) {
+            rsiblingIndex = parent.children[idx - 1];
+        } else if (idx === 0) {
             isLsiblingNull = true;
             rsiblingIndex = parent.children[1];
             lsiblingIndex = parent.children[1];
         } else {
-            lsiblingIndex = parent.children[idx-1];
-            rsiblingIndex = parent.children[idx+1];
+            lsiblingIndex = parent.children[idx - 1];
+            rsiblingIndex = parent.children[idx + 1];
         }
 
-        tree._diskRead(lsiblingIndex, function(lsibling){
-            tree._diskRead(rsiblingIndex, function(rsibling){
-                if(isRsiblingNull===true) {
+        tree._diskRead(lsiblingIndex, function (lsibling) {
+            tree._diskRead(rsiblingIndex, function (rsibling) {
+                if (isRsiblingNull === true) {
                     rsibling = null;
                 }
-                if(isLsiblingNull===true) {
+                if (isLsiblingNull === true) {
                     lsibling = null;
                 }
 
-                if(node.numberActives === (tree.order-1) && parent != null) {
-                    if(rsibling != null && rsibling.numberActives > (tree.order-1)) {
+                if (node.numberActives === tree.order - 1 && parent != null) {
+                    if (rsibling != null && rsibling.numberActives > tree.order - 1) {
                         // The current node has (t - 1) keys but the right sibling has > (t - 1) keys
-                        tree._moveKey(parent,i,left, function(parent){
-                            tree.__deleteSearchNode(tree,key,node,callback);
+                        tree._moveKey(parent, i, left, function (parent) {
+                            tree.__deleteSearchNode(tree, key, node, callback);
                         });
-                    } else if(lsibling != null && lsibling.numberActives > (tree.order-1)) {
+                    } else if (lsibling != null && lsibling.numberActives > tree.order - 1) {
                         // The current node has (t - 1) keys but the left sibling has > (t - 1) keys
-                        tree._moveKey(parent,i,right, function(parent){
-                            tree.__deleteSearchNode(tree,key,node,callback);
+                        tree._moveKey(parent, i, right, function (parent) {
+                            tree.__deleteSearchNode(tree, key, node, callback);
                         });
-                    } else if(lsibling != null && lsibling.numberActives === (tree.order-1)) {
+                    } else if (lsibling != null && lsibling.numberActives === tree.order - 1) {
                         // The current node has (t - 1) keys but the left sibling has (t - 1) keys
-                        tree._mergeSiblings(parent,i,left,function(node) {
-                            tree.__deleteSearchNode(tree,key,node,callback);
+                        tree._mergeSiblings(parent, i, left, function (node) {
+                            tree.__deleteSearchNode(tree, key, node, callback);
                         });
-                    } else if(rsibling != null && rsibling.numberActives === (tree.order-1)){
+                    } else if (rsibling != null && rsibling.numberActives === tree.order - 1) {
                         // The current node has (t - 1) keys but the left sibling has (t - 1) keys
-                        tree._mergeSiblings(parent,i,right,function(node) {
-                            tree.__deleteSearchNode(tree,key,node,callback);
+                        tree._mergeSiblings(parent, i, right, function (node) {
+                            tree.__deleteSearchNode(tree, key, node, callback);
                         });
                     }
                 } else {
-                    tree.__deleteSearchNode(tree,key,node,callback);
+                    tree.__deleteSearchNode(tree, key, node, callback);
                 }
             });
-        })
+        });
     });
 };
 Tree.prototype.__deleteNodeFound = function (tree, idx, key, node, callback) {
     //Case 1 : The node containing the key is found and is the leaf node.
     //Also the leaf node has keys greater than the minimum required.
     //Simply remove the key
-    if (node.isLeaf && (node.numberActives > (tree.order - 1))) {
+    if (node.isLeaf && node.numberActives > tree.order - 1) {
         tree._deleteKeyFromNode(node, idx, function () {
             callback(true);
         });
         return true;
     }
-
 
     //If the leaf node is the root permit deletion even if the number of keys is
     //less than (t - 1)
-    if (node.isLeaf && (node === tree.root)) {
+    if (node.isLeaf && node === tree.root) {
         tree._deleteKeyFromNode(node, idx, function () {
             callback(true);
         });
         return true;
     }
-
 
     //Case 2: The node containing the key is found and is an internal node
     if (node.isLeaf === false) {
         tree._diskRead(node.children[idx], function (tmpNode) {
-            if (tmpNode.numberActives > (tree.order - 1)) {
+            if (tmpNode.numberActives > tree.order - 1) {
                 tree._getMaxKeyPos(tree, tmpNode, function (subNodeIdx) {
                     key = subNodeIdx.node.keys[subNodeIdx.index];
 
@@ -457,7 +454,7 @@ Tree.prototype.__deleteNodeFound = function (tree, idx, key, node, callback) {
                 });
             } else {
                 tree._diskRead(node.children[idx + 1], function (tmpNode2) {
-                    if (tmpNode2.numberActives > (tree.order - 1)) {
+                    if (tmpNode2.numberActives > tree.order - 1) {
                         tree._getMinKeyPos(tree, tmpNode2, function (subNodeIdx) {
                             key = subNodeIdx.node.keys[subNodeIdx.index];
 
@@ -469,10 +466,8 @@ Tree.prototype.__deleteNodeFound = function (tree, idx, key, node, callback) {
                                 tree.__deleteSearchNode(tree, key, node, callback);
                             });
                         });
-                    } else if (tmpNode.numberActives === (tree.order - 1) && tmpNode2.numberActives === (tree.order - 1)) {
-
+                    } else if (tmpNode.numberActives === tree.order - 1 && tmpNode2.numberActives === tree.order - 1) {
                         tree._mergeNodes(tmpNode, node.keys[idx], tmpNode2, function (combNode) {
-
                             node.children[idx] = combNode;
 
                             idx++;
@@ -505,7 +500,7 @@ Tree.prototype.__deleteNodeFound = function (tree, idx, key, node, callback) {
     // moving to the leaf node making sure that each node that
     // we encounter on the way has atleast 't' (order of the tree)
     // keys
-    if (node.isLeaf && (node.numberActives > tree.order - 1)) {
+    if (node.isLeaf && node.numberActives > tree.order - 1) {
         tree._deleteKeyFromNode(node, idx, function (node) {
             tree.__deleteSearchNode(tree, key, node, callback);
         });
@@ -524,7 +519,6 @@ Tree.prototype.__deleteNodeFound = function (tree, idx, key, node, callback) {
  * @param position left, or right
  */
 Tree.prototype._moveKey = function (parent, i, position, callback) {
-
     if (position === right) {
         i--;
     }
@@ -532,7 +526,6 @@ Tree.prototype._moveKey = function (parent, i, position, callback) {
     const that = this;
     that._diskRead(parent.children[i], function (lchild) {
         that._diskRead(parent.children[i + 1], function (rchild) {
-
             if (position == left) {
                 lchild.keys[lchild.numberActives] = parent.keys[i];
                 lchild.children[lchild.numberActives + 1] = rchild.children[0];
@@ -586,71 +579,70 @@ Tree.prototype._moveKey = function (parent, i, position, callback) {
  * @param parent the node whose children will be merged
  * @param i Index of the key in the parent pointing to the nodes to merge
  */
-Tree.prototype._mergeSiblings = function(parent,index,pos,callback) {
-    let i,j;
+Tree.prototype._mergeSiblings = function (parent, index, pos, callback) {
+    let i, j;
     let tolookn1, tolookn2;
 
-    if (index === (parent.numberActives)) {
+    if (index === parent.numberActives) {
         index--;
         tolookn1 = parent.children[parent.numberActives - 1];
-        tolookn2 = parent.children[parent.numberActives]
+        tolookn2 = parent.children[parent.numberActives];
     } else {
         tolookn1 = parent.children[index];
         tolookn2 = parent.children[index + 1];
     }
 
     const that = this;
-    that._diskRead(tolookn1, function(n1){
-        that._diskRead(tolookn2, function(n2){
-
+    that._diskRead(tolookn1, function (n1) {
+        that._diskRead(tolookn2, function (n2) {
             //Merge the current node with the left node
             const newNode = that._allocateNode();
             newNode.isLeaf = n1.isLeaf;
             newNode.level = n1.level;
 
-            for(j=0; j<that.order-1; j++) {
+            for (j = 0; j < that.order - 1; j++) {
                 newNode.keys[j] = n1.keys[j];
                 newNode.children[j] = n1.children[j];
             }
 
-            newNode.keys[that.order-1] = parent.keys[index];
-            newNode.children[that.order-1] = n1.children[that.order-1];
+            newNode.keys[that.order - 1] = parent.keys[index];
+            newNode.children[that.order - 1] = n1.children[that.order - 1];
 
-            for(j=0; j<that.order-1; j++) {
-                newNode.keys[j+that.order] = n2.keys[j];
-                newNode.children[j+that.order] = n2.children[j];
+            for (j = 0; j < that.order - 1; j++) {
+                newNode.keys[j + that.order] = n2.keys[j];
+                newNode.children[j + that.order] = n2.children[j];
             }
-            newNode.children[2*that.order-1] = n2.children[that.order-1];
+            newNode.children[2 * that.order - 1] = n2.children[that.order - 1];
 
             parent.children[index] = newNode;
 
-            for(j=index; j<parent.numberActives;j++) {
-                parent.keys[j] = parent.keys[j+1];
-                parent.children[j+1] = parent.children[j+2];
+            for (j = index; j < parent.numberActives; j++) {
+                parent.keys[j] = parent.keys[j + 1];
+                parent.children[j + 1] = parent.children[j + 2];
             }
 
-            newNode.numberActives = n1.numberActives + n2.numberActives+1;
+            newNode.numberActives = n1.numberActives + n2.numberActives + 1;
             parent.numberActives--;
 
-            for(i=parent.numberActives; i<2*that.order-1; i++) {
+            for (i = parent.numberActives; i < 2 * that.order - 1; i++) {
                 parent.keys[i] = null;
             }
 
             if (parent.numberActives === 0 && that.root === parent) {
                 that.root = newNode;
-                if(newNode.level) {
+                if (newNode.level) {
                     newNode.isLeaf = false;
                 } else {
                     newNode.isLeaf = true;
                 }
             }
 
-            that._diskWrite(newNode, function(newNode){
-                that._diskWrite(parent,function(parent){
-                    that._diskDelete(n1,function(){
-                        that._diskDelete(n2,function(){
-                            if(that.root === newNode) {
-                                that._updateRootNode(that.root,function(){
+            that._diskWrite(newNode, function (newNode) {
+                that._diskWrite(parent, function (parent) {
+                    that._diskDelete(n1, function () {
+                        that._diskDelete(n2, function () {
+                            if (that.root === newNode) {
+                                that._updateRootNode(that.root, function () {
                                     return callback(newNode);
                                 });
                             } else {
@@ -674,12 +666,10 @@ Tree.prototype._mergeSiblings = function(parent,index,pos,callback) {
  * @return true if the key can be deleted, false otherwise
  */
 Tree.prototype._deleteKeyFromNode = function (node, index, callback) {
-    let keysMax = (2 * this.order) - 1;
+    let keysMax = 2 * this.order - 1;
     if (node.numberActives < keysMax) {
         keysMax = node.numberActives;
     }
-    ;
-
     let i;
 
     if (node.isLeaf === false) {
@@ -700,37 +690,36 @@ Tree.prototype._deleteKeyFromNode = function (node, index, callback) {
     });
 };
 
-Tree.prototype._mergeNodes = function(n1, key, n2, callback) {
+Tree.prototype._mergeNodes = function (n1, key, n2, callback) {
     let i;
 
     const newNode = this._allocateNode();
     newNode.isLeaf = true;
 
-    for(i=0; i<n1.numberActives; i++) {
-        newNode.keys[i]   = n1.keys[i];
-        newNode.children[i]   = n1.children[i];
+    for (i = 0; i < n1.numberActives; i++) {
+        newNode.keys[i] = n1.keys[i];
+        newNode.children[i] = n1.children[i];
     }
     newNode.children[n1.numberActives] = n1.children[n1.numberActives];
     newNode.keys[n1.numberActives] = key;
 
-    for(i=0; i<n2.numberActives; i++) {
-        newNode.keys[i+n1.numberActives+1] = n2.keys[i];
-        newNode.children[i+n1.numberActives+1] = n2.children[i];
+    for (i = 0; i < n2.numberActives; i++) {
+        newNode.keys[i + n1.numberActives + 1] = n2.keys[i];
+        newNode.children[i + n1.numberActives + 1] = n2.children[i];
     }
-    newNode.children[(2*this.order)-1] = n2.children[n2.numberActives];
+    newNode.children[2 * this.order - 1] = n2.children[n2.numberActives];
 
     newNode.numberActives = n1.numberActives + n2.numberActives + 1;
     newNode.isLeaf = n1.isLeaf;
     newNode.level = n1.level;
 
-
     const that = this;
-    this._diskWrite(newNode, function(newNode){
-        that._diskDelete(n1, function(){
-            that._diskDelete(n2, function(){
+    this._diskWrite(newNode, function (newNode) {
+        that._diskDelete(n1, function () {
+            that._diskDelete(n2, function () {
                 return callback(newNode);
             });
-        })
+        });
     });
 };
 
@@ -786,7 +775,6 @@ Tree.prototype._getMinKeyPos = function (tree, node, callback) {
     }
 };
 
-
 /**
  * Node
  *
@@ -795,7 +783,7 @@ Tree.prototype._getMinKeyPos = function (tree, node, callback) {
  * A Tree node augmented with BTree
  * node structures
  */
-const Node = function() {
+const Node = function () {
     this.numberActives = 0;
     this.isLeaf = null;
     this.keys = [];
@@ -805,5 +793,5 @@ const Node = function() {
 
 module.exports = {
     Tree: Tree,
-    Node: Node
+    Node: Node,
 };

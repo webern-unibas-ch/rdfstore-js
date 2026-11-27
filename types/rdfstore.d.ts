@@ -10,12 +10,12 @@ export type Callback<T> = (err: Error | null, result: T) => void;
 // ---------------------------------------------------------------------------
 
 export interface UriValue {
-    token: 'uri';
+    token: "uri";
     value: string;
 }
 
 export interface LiteralValue {
-    token: 'literal';
+    token: "literal";
     value: string;
     /** Datatype IRI, only set for typed literals. */
     type?: string;
@@ -24,7 +24,7 @@ export interface LiteralValue {
 }
 
 export interface BlankValue {
-    token: 'blank';
+    token: "blank";
     value: string;
 }
 
@@ -49,7 +49,7 @@ export type QueryResult = SelectResult | Graph | boolean | number;
 // ---------------------------------------------------------------------------
 
 export interface RDFNode {
-    readonly interfaceName: 'NamedNode' | 'Literal' | 'BlankNode';
+    readonly interfaceName: "NamedNode" | "Literal" | "BlankNode";
     readonly nominalValue: string;
     /** Compares interfaceName and nominalValue; a plain value is compared with `valueOf()`. */
     equals(other: RDFNode | string): boolean;
@@ -58,18 +58,18 @@ export interface RDFNode {
 }
 
 export interface NamedNode extends RDFNode {
-    readonly interfaceName: 'NamedNode';
+    readonly interfaceName: "NamedNode";
     valueOf(): string;
 }
 
 export interface BlankNode extends RDFNode {
-    readonly interfaceName: 'BlankNode';
+    readonly interfaceName: "BlankNode";
     readonly bnodeId: string | number;
     valueOf(): string;
 }
 
 export interface Literal extends RDFNode {
-    readonly interfaceName: 'Literal';
+    readonly interfaceName: "Literal";
     readonly language?: string;
     readonly datatype?: string;
     /** The literal as a native value: number, boolean, Date or string, by datatype. */
@@ -97,13 +97,22 @@ export interface Graph {
     addAll(graph: Graph): this;
     addAction(action: TripleAction, run?: boolean): this;
     remove(triple: Triple): this;
-    removeMatches(subject?: RDFNode | string | null, predicate?: RDFNode | string | null, object?: RDFNode | string | null): this;
+    removeMatches(
+        subject?: RDFNode | string | null,
+        predicate?: RDFNode | string | null,
+        object?: RDFNode | string | null,
+    ): this;
     toArray(): Triple[];
     some(test: (triple: Triple, graph: Graph) => boolean): boolean;
     every(test: (triple: Triple, graph: Graph) => boolean): boolean;
     filter(test: (triple: Triple, graph: Graph) => boolean): Graph;
     forEach(fn: (triple: Triple, graph: Graph) => void): void;
-    match(subject?: RDFNode | string | null, predicate?: RDFNode | string | null, object?: RDFNode | string | null, limit?: number): Graph;
+    match(
+        subject?: RDFNode | string | null,
+        predicate?: RDFNode | string | null,
+        object?: RDFNode | string | null,
+        limit?: number,
+    ): Graph;
     merge(graph: Graph): Graph;
     /** The graph in N-Triples syntax. */
     toNT(): string;
@@ -161,7 +170,7 @@ export interface Parser {
 }
 
 /** Graph modification event passed to `subscribe` listeners. */
-export type GraphEvent = 'added' | 'deleted';
+export type GraphEvent = "added" | "deleted";
 
 /** A custom function for `registerCustomFunction`; receives the query filters engine and the arguments. */
 export type CustomFunction = (engine: any, args: any[]) => any;
@@ -180,8 +189,18 @@ export declare class Store {
     readonly promises: StorePromises;
 
     execute<R = QueryResult>(query: string, callback?: Callback<R>): void;
-    execute<R = QueryResult>(query: string, defaultGraphs: string[], namedGraphs: string[], callback?: Callback<R>): void;
-    executeWithEnvironment<R = QueryResult>(query: string, defaultGraphs: string[], namedGraphs: string[], callback?: Callback<R>): void;
+    execute<R = QueryResult>(
+        query: string,
+        defaultGraphs: string[],
+        namedGraphs: string[],
+        callback?: Callback<R>,
+    ): void;
+    executeWithEnvironment<R = QueryResult>(
+        query: string,
+        defaultGraphs: string[],
+        namedGraphs: string[],
+        callback?: Callback<R>,
+    ): void;
 
     graph(callback: Callback<Graph>): void;
     graph(graphUri: string, callback: Callback<Graph>): void;
@@ -204,10 +223,20 @@ export declare class Store {
     startObservingNode(nodeUri: string, listener: (node: Graph) => void): void;
     startObservingNode(nodeUri: string, graphUri: string, listener: (node: Graph) => void): void;
     stopObservingNode(listener: (node: Graph) => void): void;
-    startObservingQuery(query: string, listener: (bindings: SelectResult) => void, ready?: (err: Error | null) => void): void;
+    startObservingQuery(
+        query: string,
+        listener: (bindings: SelectResult) => void,
+        ready?: (err: Error | null) => void,
+    ): void;
     stopObservingQuery(query: string): void;
-    subscribe(subject: string | null, predicate: string | null, object: string | null, graph: string | null,
-              listener: (event: GraphEvent, triples: Triple[]) => void, ready?: (...args: any[]) => void): void;
+    subscribe(
+        subject: string | null,
+        predicate: string | null,
+        object: string | null,
+        graph: string | null,
+        listener: (event: GraphEvent, triples: Triple[]) => void,
+        ready?: (...args: any[]) => void,
+    ): void;
     unsubscribe(listener: (event: GraphEvent, triples: Triple[]) => void): void;
     setBatchLoadEvents(fireEvents: boolean): void;
 

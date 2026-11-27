@@ -1,12 +1,11 @@
 "use strict";
 
 const Utils = require("./utils");
-if(!Utils.isWorker()) {
+if (!Utils.isWorker()) {
     const http = require("http");
     const https = require("https");
 
     const NetworkTransport = {
-
         load: function (uri, accept, callback, redirect) {
             const redirection = redirect == null ? 3 : redirect;
             let parts;
@@ -17,26 +16,28 @@ if(!Utils.isWorker()) {
             }
 
             let client;
-            if (parts.protocol === 'http:') {
+            if (parts.protocol === "http:") {
                 client = http;
-            } else if (parts.protocol === 'https:') {
+            } else if (parts.protocol === "https:") {
                 client = https;
             } else {
                 return callback(new Error("Unsupported protocol " + parts.protocol + " in URI: " + uri));
             }
             // the browser bundles replace http/https with an empty stub
-            if (typeof client.request !== 'function') {
-                return callback(new Error("No HTTP client to load " + uri + ": set one with store.setNetworkTransport"));
+            if (typeof client.request !== "function") {
+                return callback(
+                    new Error("No HTTP client to load " + uri + ": set one with store.setNetworkTransport"),
+                );
             }
 
             // URL keeps the brackets of an IPv6 hostname, http.request expects it without them
             const hostname = parts.hostname.replace(/^\[(.*)\]$/, "$1");
             const params = {
-                'hostname': hostname,
-                'port': parts.port || (client === http ? 80 : 443),
-                'method': 'GET',
-                'path': parts.pathname + parts.search,
-                'headers': {'host': parts.host, 'Accept': accept}
+                hostname: hostname,
+                port: parts.port || (client === http ? 80 : 443),
+                method: "GET",
+                path: parts.pathname + parts.search,
+                headers: { host: parts.host, Accept: accept },
             };
 
             // a dropped connection can report through the request, the response or both
@@ -45,35 +46,37 @@ if(!Utils.isWorker()) {
                 const headers = response.headers;
                 let data = "";
 
-                if (("" + response.statusCode)[0] == '2') {
+                if (("" + response.statusCode)[0] == "2") {
                     // decodes characters split across chunks
-                    response.setEncoding('utf8');
-                    response.on('data', function (chunk) {
+                    response.setEncoding("utf8");
+                    response.on("data", function (chunk) {
                         data = data + chunk;
                     });
-                    response.on('end', function () {
-                        done(null, {headers: headers, data: data});
+                    response.on("end", function () {
+                        done(null, { headers: headers, data: data });
                     });
-                    response.on('error', done);
-                    response.on('close', function () {
+                    response.on("error", done);
+                    response.on("close", function () {
                         if (!response.complete) {
                             done(new Error("Connection closed before the response was complete: " + uri));
                         }
                     });
-                } else if (("" + response.statusCode)[0] == '3') {
+                } else if (("" + response.statusCode)[0] == "3") {
                     // discard the body so the socket is freed
                     response.resume();
                     if (redirection == 0) {
                         done(new Error("Too many redirections"));
                     } else {
-                        let location = (headers["Location"] || headers["location"]);
+                        let location = headers["Location"] || headers["location"];
                         if (location != null) {
                             // a relative Location is resolved against the requested URI;
                             // an unresolvable one is passed on as is and reported as invalid
                             try {
                                 location = new URL(location, uri).href;
-                            } catch (e) { /* keep the raw Location; load() reports it as invalid */ }
-                            NetworkTransport.load(location, accept, done, (redirection - 1));
+                            } catch (e) {
+                                /* keep the raw Location; load() reports it as invalid */
+                            }
+                            NetworkTransport.load(location, accept, done, redirection - 1);
                         } else {
                             done(new Error("Redirection without location header"));
                         }
@@ -84,14 +87,13 @@ if(!Utils.isWorker()) {
                 }
             });
 
-            request.on('error', done);
+            request.on("error", done);
 
             request.end();
-        }
-
+        },
     };
 
     module.exports = {
-        NetworkTransport: NetworkTransport
+        NetworkTransport: NetworkTransport,
     };
 }

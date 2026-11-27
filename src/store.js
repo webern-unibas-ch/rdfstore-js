@@ -10,7 +10,6 @@ const RDFModel = require("./rdf_model");
 const Utils = require("./utils");
 const createStorePromises = require("./store_promises").createStorePromises;
 
-
 /**
  * Creates a new store.<br/>
  * <br/>
@@ -30,32 +29,32 @@ const createStorePromises = require("./store_promises").createStorePromises;
  *       and GRAPH ?g ranges over all named graphs. Updates are not affected.</li>
  * </ul>
  */
-const Store = function(arg1, arg2) {
+const Store = function (arg1, arg2) {
     let callback = null;
-    let params   = null;
+    let params = null;
 
-    if(arguments.length == 0) {
-		params ={};
-    } else if(arguments.length == 1) {
-		params   = {};
-		callback = arg1;
-    } else if(arguments.length > 1) {
-		// a copy: the store adds treeOrder, backend and lexicon to its params
-		params   = Object.assign({}, arg1);
-		callback = arg2;
+    if (arguments.length == 0) {
+        params = {};
+    } else if (arguments.length == 1) {
+        params = {};
+        callback = arg1;
+    } else if (arguments.length > 1) {
+        // a copy: the store adds treeOrder, backend and lexicon to its params
+        params = Object.assign({}, arg1);
+        callback = arg2;
     } else {
-	throw("An optional argument map and a callback must be provided");
+        throw "An optional argument map and a callback must be provided";
     }
 
-    if(params['treeOrder'] == null) {
-		params['treeOrder'] = 15;
+    if (params["treeOrder"] == null) {
+        params["treeOrder"] = 15;
     }
 
     let Lexicon = InMemoryLexicon;
     let QuadBackend = InMemoryQuadBackend;
-    if(params['persistent'] === true){
-		Lexicon = PersistentLexicon;
-		QuadBackend = PersistentBackend;
+    if (params["persistent"] === true) {
+        Lexicon = PersistentLexicon;
+        QuadBackend = PersistentBackend;
     }
     // subscribe listener -> its adapters (one per subscribe call), keyed by function identity
     // (an object would key by source text)
@@ -63,33 +62,31 @@ const Store = function(arg1, arg2) {
 
     const that = this;
     this.customFns = {};
-    new Lexicon(function(lexicon){
-	const createQuadBackend = function() {
-	    new QuadBackend(params, function (backend) {
-		const createEngine = function() {
-		    params.backend = backend;
-		    params.lexicon = lexicon;
-		    that.engine = new QueryEngine(params);
+    new Lexicon(function (lexicon) {
+        const createQuadBackend = function () {
+            new QuadBackend(params, function (backend) {
+                const createEngine = function () {
+                    params.backend = backend;
+                    params.lexicon = lexicon;
+                    that.engine = new QueryEngine(params);
 
-		    callback(null, that);
-		};
-		if(params['overwrite']) {
-		    backend.clear(createEngine)
-		} else {
-		    createEngine();
-		}
-	    });
-	};
-	if(params['overwrite'] === true) {
-	    // delete lexicon values
-	    lexicon.clear(createQuadBackend);
-	} else {
-	    createQuadBackend();
-	}
-
-    },params['name']);
+                    callback(null, that);
+                };
+                if (params["overwrite"]) {
+                    backend.clear(createEngine);
+                } else {
+                    createEngine();
+                }
+            });
+        };
+        if (params["overwrite"] === true) {
+            // delete lexicon values
+            lexicon.clear(createQuadBackend);
+        } else {
+            createQuadBackend();
+        }
+    }, params["name"]);
 };
-
 
 /**
  * An instance of RDF JS Interface <code>RDFEnvironment</code>
@@ -102,11 +99,11 @@ Store.prototype.rdf = RDFModel.rdf;
  * Built on first access, so stores that only use callbacks don't pay for it.
  */
 Object.defineProperty(Store.prototype, "promises", {
-    get: function() {
-	const promises = createStorePromises(this);
-	Object.defineProperty(this, "promises", {value: promises});
-	return promises;
-    }
+    get: function () {
+        const promises = createStorePromises(this);
+        Object.defineProperty(this, "promises", { value: promises });
+        return promises;
+    },
 });
 Store.prototype.rdf.api = RDFModel;
 
@@ -140,7 +137,7 @@ Store.prototype.rdf.api = RDFModel;
  * @param {String} [name]: name of the custom function, it will be accesible as custom:name in the query
  * @param {Function} [function]: lambda function with the code for the query custom function.
  */
-Store.prototype.registerCustomFunction = function(name, fn) {
+Store.prototype.registerCustomFunction = function (name, fn) {
     this.customFns[name] = fn;
     this.engine.setCustomFunctions(this.customFns);
 };
@@ -173,29 +170,23 @@ Store.prototype.registerCustomFunction = function(name, fn) {
  * @param {String} [namespacesURIs] named namespaces
  * @param {Function} [callback]
  */
-Store.prototype.execute = function() {
-    if(arguments.length === 3) {
-	this.executeWithEnvironment(arguments[0],
-	    arguments[1],
-	    arguments[2]);
-    } else if(arguments.length === 4) {
-	this.executeWithEnvironment(arguments[0],
-	    arguments[1],
-	    arguments[2],
-	    arguments[3]);
+Store.prototype.execute = function () {
+    if (arguments.length === 3) {
+        this.executeWithEnvironment(arguments[0], arguments[1], arguments[2]);
+    } else if (arguments.length === 4) {
+        this.executeWithEnvironment(arguments[0], arguments[1], arguments[2], arguments[3]);
     } else {
+        let queryString;
+        let callback;
 
-	let queryString;
-	let callback;
-
-	if(arguments.length === 1) {
-	    queryString = arguments[0];
-	    callback = function(){};
-	} else if(arguments.length === 2) {
-	    queryString = arguments[0];
-	    callback = arguments [1];
-	}
-	this.engine.execute(queryString, callback);
+        if (arguments.length === 1) {
+            queryString = arguments[0];
+            callback = function () {};
+        } else if (arguments.length === 2) {
+            queryString = arguments[0];
+            callback = arguments[1];
+        }
+        this.engine.execute(queryString, callback);
     }
 };
 
@@ -211,26 +202,26 @@ Store.prototype.execute = function() {
  * @param {String} URIs named namespaces
  * @param {Function} [callback]
  */
-Store.prototype.executeWithEnvironment = function() {
+Store.prototype.executeWithEnvironment = function () {
     let queryString, defaultGraphs, namedGraphs, callback;
 
-    if(arguments.length === 3) {
-	queryString   = arguments[0];
-	callback      = function(){};
-	defaultGraphs = arguments[1];
-	namedGraphs   = arguments[2];
-    } else if(arguments.length === 4) {
-	queryString   = arguments[0];
-	callback      = arguments [3];
-	defaultGraphs = arguments[1];
-	namedGraphs   = arguments[2];
+    if (arguments.length === 3) {
+        queryString = arguments[0];
+        callback = function () {};
+        defaultGraphs = arguments[1];
+        namedGraphs = arguments[2];
+    } else if (arguments.length === 4) {
+        queryString = arguments[0];
+        callback = arguments[3];
+        defaultGraphs = arguments[1];
+        namedGraphs = arguments[2];
     }
 
-    defaultGraphs = Utils.map(defaultGraphs, function(graph){
-	return {'token':'uri','value':graph};
+    defaultGraphs = Utils.map(defaultGraphs, function (graph) {
+        return { token: "uri", value: graph };
     });
-    namedGraphs = Utils.map(namedGraphs, function(graph){
-	return {'token':'uri','value':graph};
+    namedGraphs = Utils.map(namedGraphs, function (graph) {
+        return { token: "uri", value: graph };
     });
 
     this.engine.execute(queryString, callback, defaultGraphs, namedGraphs);
@@ -251,21 +242,21 @@ Store.prototype.executeWithEnvironment = function() {
  * @param {String} [graphURI] If this parameter is missing, the default graph will be returned
  * @param {Functon} callback
  */
-Store.prototype.graph = function() {
+Store.prototype.graph = function () {
     let graphUri = null;
     let callback = null;
-    if(arguments.length === 1) {
-	callback = arguments[0] || function(){};
-	graphUri = this.engine.lexicon.defaultGraphUri;
-    } else if(arguments.length === 2) {
-	callback = arguments[1] || function(){};
-	graphUri = arguments[0];
+    if (arguments.length === 1) {
+        callback = arguments[0] || function () {};
+        graphUri = this.engine.lexicon.defaultGraphUri;
+    } else if (arguments.length === 2) {
+        callback = arguments[1] || function () {};
+        graphUri = arguments[0];
     } else {
-	throw("An optional graph URI and a callback function must be provided");
+        throw "An optional graph URI and a callback function must be provided";
     }
 
-    if(this.rdf.resolve(graphUri) != null) {
-	graphUri = this.rdf.resolve(graphUri);
+    if (this.rdf.resolve(graphUri) != null) {
+        graphUri = this.rdf.resolve(graphUri);
     }
 
     this.engine.execute("CONSTRUCT { ?s ?p ?o } WHERE { GRAPH <" + graphUri + "> { ?s ?p ?o } }", callback);
@@ -291,31 +282,34 @@ Store.prototype.graph = function() {
  * @param {String} [graphURI] If this parameter is missing, the node will be looked into the default graph
  * @param {Function} callback
  */
-Store.prototype.node = function() {
+Store.prototype.node = function () {
     let graphUri = null;
     let callback = null;
-    let nodeUri  = null;
-    if(arguments.length === 2) {
-		nodeUri = arguments[0];
-		callback = arguments[1] || function(){};
-		graphUri = this.engine.lexicon.defaultGraphUri;
-    } else if(arguments.length === 3) {
-		nodeUri = arguments[0];
-		graphUri = arguments[1];
-		callback = arguments[2] || function(){};
+    let nodeUri = null;
+    if (arguments.length === 2) {
+        nodeUri = arguments[0];
+        callback = arguments[1] || function () {};
+        graphUri = this.engine.lexicon.defaultGraphUri;
+    } else if (arguments.length === 3) {
+        nodeUri = arguments[0];
+        graphUri = arguments[1];
+        callback = arguments[2] || function () {};
     } else {
-		throw("An optional graph URI, node URI and a callback function must be provided");
+        throw "An optional graph URI, node URI and a callback function must be provided";
     }
 
-    if(this.rdf.resolve(graphUri) != null) {
-		graphUri = this.rdf.resolve(graphUri);
+    if (this.rdf.resolve(graphUri) != null) {
+        graphUri = this.rdf.resolve(graphUri);
     }
 
-    if(this.rdf.resolve(nodeUri) != null) {
-		nodeUri = this.rdf.resolve(nodeUri);
+    if (this.rdf.resolve(nodeUri) != null) {
+        nodeUri = this.rdf.resolve(nodeUri);
     }
 
-    this.engine.execute("CONSTRUCT { <" + nodeUri + "> ?p ?o } WHERE { GRAPH <" + graphUri + "> { <" + nodeUri + "> ?p ?o } }", callback);
+    this.engine.execute(
+        "CONSTRUCT { <" + nodeUri + "> ?p ?o } WHERE { GRAPH <" + graphUri + "> { <" + nodeUri + "> ?p ?o } }",
+        callback,
+    );
 };
 
 /**
@@ -342,18 +336,18 @@ Store.prototype.node = function() {
  * @param {Function} eventListener Function that will be notified with the events
  * @param {Function} [callback] Function that will be invoked, once the event listener had been correctly set up.
  */
-Store.prototype.startObservingNode = function() {
+Store.prototype.startObservingNode = function () {
     let uri, graphUri, callback;
 
-    if(arguments.length === 2) {
-	uri = arguments[0];
-	callback = arguments[1];
-	this.engine.callbacksBackend.observeNode(uri, callback, function(){});
-    } else if(arguments.length === 3) {
-	uri = arguments[0];
-	graphUri = arguments[1];
-	callback = arguments[2];
-	this.engine.callbacksBackend.observeNode(uri, graphUri, callback, function(){});
+    if (arguments.length === 2) {
+        uri = arguments[0];
+        callback = arguments[1];
+        this.engine.callbacksBackend.observeNode(uri, callback, function () {});
+    } else if (arguments.length === 3) {
+        uri = arguments[0];
+        graphUri = arguments[1];
+        callback = arguments[2];
+        this.engine.callbacksBackend.observeNode(uri, graphUri, callback, function () {});
     }
 };
 
@@ -364,7 +358,7 @@ Store.prototype.startObservingNode = function() {
  * @arguments
  * @param {Function} eventListener The event listener function to remove, the same passed as an argument to startObservingNode
  */
-Store.prototype.stopObservingNode = function(callback) {
+Store.prototype.stopObservingNode = function (callback) {
     this.engine.callbacksBackend.stopObservingNode(callback);
 };
 
@@ -389,14 +383,14 @@ Store.prototype.stopObservingNode = function(callback) {
  * @param {Function} eventListener the function that will receive the notifications
  * @param {Function} [callback] optional function that will be invoked once the event listener is set up and the initial query has run (after the listener received its result), with the query's error or null.
  */
-Store.prototype.startObservingQuery = function() {
+Store.prototype.startObservingQuery = function () {
     const query = arguments[0];
     const callback = arguments[1];
     const endCallback = arguments[2];
-    if(endCallback!=null) {
-	this.engine.callbacksBackend.observeQuery(query, callback, endCallback);
+    if (endCallback != null) {
+        this.engine.callbacksBackend.observeQuery(query, callback, endCallback);
     } else {
-	this.engine.callbacksBackend.observeQuery(query, callback, function(){});
+        this.engine.callbacksBackend.observeQuery(query, callback, function () {});
     }
 };
 
@@ -406,7 +400,7 @@ Store.prototype.startObservingQuery = function() {
  * @arguments
  * @param {String} query The query string, the same passed as an argument to startObservingQuery
  */
-Store.prototype.stopObservingQuery = function(query) {
+Store.prototype.stopObservingQuery = function (query) {
     this.engine.callbacksBackend.stopObservingQuery(query);
 };
 
@@ -434,28 +428,34 @@ Store.prototype.stopObservingQuery = function(query) {
  * @param {Function} event listener function that will be notified when a change occurs
  * @param {Function} [readyCallback] invoked once the subscription has been registered
  */
-Store.prototype.subscribe = function(s, p, o, g, callback, readyCallback) {
+Store.prototype.subscribe = function (s, p, o, g, callback, readyCallback) {
     const that = this;
-    const adapterCb = function(event,triples){
-		const acum = [];
-		const queryEnv = {blanks:{}, outCache:{}};
-		const bindings = [];
+    const adapterCb = function (event, triples) {
+        const acum = [];
+        const queryEnv = { blanks: {}, outCache: {} };
+        const bindings = [];
 
-		Utils.each(triples, function(triple){
-	    	const s = RDFModel.buildRDFResource(triple.subject,bindings,that.engine,queryEnv);
-	    	const p = RDFModel.buildRDFResource(triple.predicate,bindings,that.engine,queryEnv);
-	    	const o = RDFModel.buildRDFResource(triple.object,bindings,that.engine,queryEnv);
-	    	if(s!=null && p!=null && o!=null) {
-				triple = new RDFModel.Triple(s,p,o);
-				acum.push(triple);
-			}
-		});
-		callback(event,acum);
+        Utils.each(triples, function (triple) {
+            const s = RDFModel.buildRDFResource(triple.subject, bindings, that.engine, queryEnv);
+            const p = RDFModel.buildRDFResource(triple.predicate, bindings, that.engine, queryEnv);
+            const o = RDFModel.buildRDFResource(triple.object, bindings, that.engine, queryEnv);
+            if (s != null && p != null && o != null) {
+                triple = new RDFModel.Triple(s, p, o);
+                acum.push(triple);
+            }
+        });
+        callback(event, acum);
     };
 
     this.functionMap.set(callback, (this.functionMap.get(callback) || []).concat(adapterCb));
-	this.engine.callbacksBackend.subscribe(s,p,o,g,adapterCb,
-		typeof readyCallback === 'function' ? readyCallback : function(){});
+    this.engine.callbacksBackend.subscribe(
+        s,
+        p,
+        o,
+        g,
+        adapterCb,
+        typeof readyCallback === "function" ? readyCallback : function () {},
+    );
 };
 
 /**
@@ -466,9 +466,9 @@ Store.prototype.subscribe = function(s, p, o, g, callback, readyCallback) {
  * @arguments
  * @param {Function} callback The event listener to be removed
  */
-Store.prototype.unsubscribe = function(callback) {
+Store.prototype.unsubscribe = function (callback) {
     const adapters = this.functionMap.get(callback) || [];
-    for(let i=0; i<adapters.length; i++) {
+    for (let i = 0; i < adapters.length; i++) {
         this.engine.callbacksBackend.unsubscribe(adapters[i]);
     }
     this.functionMap.delete(callback);
@@ -483,7 +483,7 @@ Store.prototype.unsubscribe = function(callback) {
  * @param {String} prefix The prefix to be associated
  * @param {String} URIFragment URI fragment the provided prefix will be resolved
  */
-Store.prototype.setPrefix = function(prefix, uri) {
+Store.prototype.setPrefix = function (prefix, uri) {
     this.rdf.setPrefix(prefix, uri);
 };
 
@@ -495,7 +495,7 @@ Store.prototype.setPrefix = function(prefix, uri) {
  * @arguments
  * @param {String} URIFragment The URI fragment will be used by default
  */
-Store.prototype.setDefaultPrefix = function(uri) {
+Store.prototype.setDefaultPrefix = function (uri) {
     this.rdf.setDefaultPrefix(uri);
 };
 
@@ -516,49 +516,54 @@ Store.prototype.setDefaultPrefix = function(uri) {
  * @param {String} [graphURI] URI of the graph where the triples will be inserted. If it is missing, triples will be inserted in the default graph
  * @param {String} [callback] A callback function that will be invoked with a success notification and the number of triples inserted
  */
-Store.prototype.insert = function() {
+Store.prototype.insert = function () {
     let graph;
     let triples;
     let callback;
-    if(arguments.length === 1) {
-	triples = arguments[0];
-	callback= function(){};
-    } else if(arguments.length === 2) {
-	triples = arguments[0];
-	callback= arguments[1] || function(){};
-    } else if(arguments.length === 3) {
-	triples = arguments[0];
-	graph = this.rdf.createNamedNode(arguments[1]);
-	callback= arguments[2] || function(){};
+    if (arguments.length === 1) {
+        triples = arguments[0];
+        callback = function () {};
+    } else if (arguments.length === 2) {
+        triples = arguments[0];
+        callback = arguments[1] || function () {};
+    } else if (arguments.length === 3) {
+        triples = arguments[0];
+        graph = this.rdf.createNamedNode(arguments[1]);
+        callback = arguments[2] || function () {};
     } else {
-	throw("The triples to insert, an optional graph and callback must be provided");
+        throw "The triples to insert, an optional graph and callback must be provided";
     }
 
     let query = "";
     const that = this;
-    triples.forEach(function(triple) {
-	query = query + that._nodeToQuery(triple.subject) + that._nodeToQuery(triple.predicate) + that._nodeToQuery(triple.object) + ".";
+    triples.forEach(function (triple) {
+        query =
+            query +
+            that._nodeToQuery(triple.subject) +
+            that._nodeToQuery(triple.predicate) +
+            that._nodeToQuery(triple.object) +
+            ".";
     });
 
-    if(graph != null) {
-	query = "INSERT DATA { GRAPH " + this._nodeToQuery(graph) +" { "+ query + " } }";
+    if (graph != null) {
+        query = "INSERT DATA { GRAPH " + this._nodeToQuery(graph) + " { " + query + " } }";
     } else {
-	query = "INSERT DATA { "+ query + " }";
+        query = "INSERT DATA { " + query + " }";
     }
 
     this.engine.execute(query, callback);
 };
 
-Store.prototype._nodeToQuery = function(term) {
-    if(term.interfaceName === 'NamedNode') {
-	const resolvedUri = this.rdf.resolve(term.valueOf());
-	if(resolvedUri != null) {
-	    return "<" + resolvedUri + ">";
-	} else {
-	    return "<" + term.valueOf() + ">";
-	}
+Store.prototype._nodeToQuery = function (term) {
+    if (term.interfaceName === "NamedNode") {
+        const resolvedUri = this.rdf.resolve(term.valueOf());
+        if (resolvedUri != null) {
+            return "<" + resolvedUri + ">";
+        } else {
+            return "<" + term.valueOf() + ">";
+        }
     } else {
-	return term.toString();
+        return term.toString();
     }
 };
 
@@ -579,35 +584,39 @@ Store.prototype._nodeToQuery = function(term) {
  * @param {String} [graphURI] URI of the graph where the triples will be removed from. If it is missing, triples will be removed from the default graph
  * @param {String} [callback] A callback function that will be invoked with a success notification
  */
-Store.prototype.delete = function() {
-
+Store.prototype.delete = function () {
     let graph;
     let triples;
     let callback;
-    if(arguments.length === 1) {
-	triples = arguments[0];
-	callback= function(){};
-    } else if(arguments.length === 2) {
-	triples = arguments[0];
-	callback= arguments[1] || function(){};
-    } else if(arguments.length === 3) {
-	triples = arguments[0];
-	graph = this.rdf.createNamedNode(arguments[1]);
-	callback= arguments[2] || function(){};
+    if (arguments.length === 1) {
+        triples = arguments[0];
+        callback = function () {};
+    } else if (arguments.length === 2) {
+        triples = arguments[0];
+        callback = arguments[1] || function () {};
+    } else if (arguments.length === 3) {
+        triples = arguments[0];
+        graph = this.rdf.createNamedNode(arguments[1]);
+        callback = arguments[2] || function () {};
     } else {
-	throw("The triples to delete, an optional graph and callback must be provided");
+        throw "The triples to delete, an optional graph and callback must be provided";
     }
 
     let query = "";
     const that = this;
-    triples.forEach(function(triple) {
-	query = query + that._nodeToQuery(triple.subject) + that._nodeToQuery(triple.predicate) + that._nodeToQuery(triple.object) + ".";
+    triples.forEach(function (triple) {
+        query =
+            query +
+            that._nodeToQuery(triple.subject) +
+            that._nodeToQuery(triple.predicate) +
+            that._nodeToQuery(triple.object) +
+            ".";
     });
 
-    if(graph != null) {
-	query = "DELETE DATA { GRAPH " + this._nodeToQuery(graph) +" { "+ query + " } }";
+    if (graph != null) {
+        query = "DELETE DATA { GRAPH " + this._nodeToQuery(graph) + " { " + query + " } }";
     } else {
-	query = "DELETE DATA { "+ query + " }";
+        query = "DELETE DATA { " + query + " }";
     }
 
     this.engine.execute(query, callback);
@@ -626,21 +635,21 @@ Store.prototype.delete = function() {
  * @param {String} [graph] the URI of the graph the triples must be removed from
  * @param {Function} [callback] a function that will be invoked with a success notification
  */
-Store.prototype.clear = function() {
+Store.prototype.clear = function () {
     let graph;
     let callback;
 
-    if(arguments.length === 0) {
-	graph = this.rdf.createNamedNode(this.engine.lexicon.defaultGraphUri);
-	callback= function(){};
-    } else if(arguments.length === 1) {
-	graph = this.rdf.createNamedNode(this.engine.lexicon.defaultGraphUri);
-	callback= arguments[0] || function(){};
-    } else if(arguments.length === 2) {
-	graph = this.rdf.createNamedNode(arguments[0]);
-	callback= arguments[1] || function(){};
+    if (arguments.length === 0) {
+        graph = this.rdf.createNamedNode(this.engine.lexicon.defaultGraphUri);
+        callback = function () {};
+    } else if (arguments.length === 1) {
+        graph = this.rdf.createNamedNode(this.engine.lexicon.defaultGraphUri);
+        callback = arguments[0] || function () {};
+    } else if (arguments.length === 2) {
+        graph = this.rdf.createNamedNode(arguments[0]);
+        callback = arguments[1] || function () {};
     } else {
-	throw("The optional graph and a callback must be provided");
+        throw "The optional graph and a callback must be provided";
     }
 
     const query = "CLEAR GRAPH " + this._nodeToQuery(graph);
@@ -655,7 +664,7 @@ Store.prototype.clear = function() {
  * @arguments
  * @param {boolean} mustFireEvents true/false value.
  */
-Store.prototype.setBatchLoadEvents = function(mustFireEvents){
+Store.prototype.setBatchLoadEvents = function (mustFireEvents) {
     this.engine.eventsOnBatchLoad = mustFireEvents;
 };
 
@@ -670,19 +679,19 @@ Store.prototype.setBatchLoadEvents = function(mustFireEvents){
  * @param {String} ns the name space to be regsitered
  * @param {String} prefix the URI fragment associated to the name space
  */
-Store.prototype.registerDefaultNamespace = function(ns, prefix) {
-    this.rdf.prefixes.set(ns,prefix);
-    this.engine.registerDefaultNamespace(ns,prefix);
+Store.prototype.registerDefaultNamespace = function (ns, prefix) {
+    this.rdf.prefixes.set(ns, prefix);
+    this.engine.registerDefaultNamespace(ns, prefix);
 };
 
 /**
  * Registers the default namespaces declared in the RDF JS Interfaces
  * specification in the default Profile.
  */
-Store.prototype.registerDefaultProfileNamespaces = function() {
+Store.prototype.registerDefaultProfileNamespaces = function () {
     const defaultNsMap = this.rdf.prefixes.values();
     for (const p in defaultNsMap) {
-	this.registerDefaultNamespace(p,defaultNsMap[p]);
+        this.registerDefaultNamespace(p, defaultNsMap[p]);
     }
 };
 
@@ -711,63 +720,62 @@ Store.prototype.registerDefaultProfileNamespaces = function() {
  * @param {String} [graph] Graph where the parsed triples will be inserted. If it is not specified, triples will be loaded in the default graph
  * @param {Function} callback that will be invoked with a success notification and the number of triples loaded.
  */
-Store.prototype.load = function(){
+Store.prototype.load = function () {
     let mediaType;
     let data;
     let graph;
     let callback;
     let options = {};
 
-    if(arguments.length === 3) {
-		graph = this.rdf.createNamedNode(this.engine.lexicon.defaultGraphUri);
-		mediaType = arguments[0];
-		data = arguments[1];
-		callback= arguments[2] || function(){};
-    } else if(arguments.length === 4) {
-		mediaType = arguments[0];
-		data = arguments[1];
-		options = arguments[2];
-		if(typeof(options) === 'string') {
-			graph = this.rdf.createNamedNode(options);
-			options = {};
-		} else {
-			graph = this.rdf.createNamedNode(options.graph || this.engine.lexicon.defaultGraphUri);
-			// a copy without graph: the caller's options stay reusable
-			options = Object.assign({}, options);
-			delete options['graph'];
-		}
-		callback= arguments[3] || function(){};
-    } else if(arguments.length === 2) {
-		throw("The mediaType of the parser, the data a callback and an optional graph must be provided");
+    if (arguments.length === 3) {
+        graph = this.rdf.createNamedNode(this.engine.lexicon.defaultGraphUri);
+        mediaType = arguments[0];
+        data = arguments[1];
+        callback = arguments[2] || function () {};
+    } else if (arguments.length === 4) {
+        mediaType = arguments[0];
+        data = arguments[1];
+        options = arguments[2];
+        if (typeof options === "string") {
+            graph = this.rdf.createNamedNode(options);
+            options = {};
+        } else {
+            graph = this.rdf.createNamedNode(options.graph || this.engine.lexicon.defaultGraphUri);
+            // a copy without graph: the caller's options stay reusable
+            options = Object.assign({}, options);
+            delete options["graph"];
+        }
+        callback = arguments[3] || function () {};
+    } else if (arguments.length === 2) {
+        throw "The mediaType of the parser, the data a callback and an optional graph must be provided";
     }
 
-    if(mediaType === 'remote') {
-		data = this.rdf.createNamedNode(data);
-		const query = "LOAD <"+data.valueOf()+"> INTO GRAPH <"+graph.valueOf()+">";
-		this.engine.execute(query, callback);
+    if (mediaType === "remote") {
+        data = this.rdf.createNamedNode(data);
+        const query = "LOAD <" + data.valueOf() + "> INTO GRAPH <" + graph.valueOf() + ">";
+        this.engine.execute(query, callback);
     } else {
+        const that = this;
 
-		const that = this;
+        const parser = this.engine.rdfLoader.parsers[mediaType];
 
-		const parser = this.engine.rdfLoader.parsers[mediaType];
+        if (!parser) return callback(new Error("Cannot find parser for the provided media type:" + mediaType));
 
-		if (!parser) return callback(new Error("Cannot find parser for the provided media type:"+mediaType));
+        const cb = function (err, quads) {
+            if (err) {
+                callback(err);
+            } else {
+                that.engine.batchLoad(quads, callback);
+            }
+        };
 
-		const cb = function(err, quads) {
-			if(err) {
-				callback(err);
-			} else {
-				that.engine.batchLoad(quads, callback);
-			}
-		};
+        const graphTerm = { token: "uri", value: graph.valueOf() };
 
-		const graphTerm = {'token':'uri', 'value':graph.valueOf()};
-
-		if(data && typeof(data)==='string' && data.indexOf('file://')=== 0) {
-		    this.engine.rdfLoader.loadFromFile(parser, graphTerm, data, options, cb);
-		} else {
-	    	this.engine.rdfLoader.tryToParse(parser, graphTerm, data, options, cb);
-		}
+        if (data && typeof data === "string" && data.indexOf("file://") === 0) {
+            this.engine.rdfLoader.loadFromFile(parser, graphTerm, data, options, cb);
+        } else {
+            this.engine.rdfLoader.tryToParse(parser, graphTerm, data, options, cb);
+        }
     }
 };
 
@@ -795,8 +803,8 @@ Store.prototype.load = function(){
  * @param {String} mediaType the media type for this parser
  * @param {String} parser an object containing the *parse* function with the parser logic
  */
-Store.prototype.registerParser = function(mediaType, parser) {
-    this.engine.rdfLoader.registerParser(mediaType,parser);
+Store.prototype.registerParser = function (mediaType, parser) {
+    this.engine.rdfLoader.registerParser(mediaType, parser);
 };
 
 /**
@@ -806,13 +814,13 @@ Store.prototype.registerParser = function(mediaType, parser) {
  * @arguments:
  * @param {Function} callback function that will receive a success notification and the array of graph URIs
  */
-Store.prototype.registeredGraphs = function(callback) {
-    this.engine.lexicon.registeredGraphs(true, function(graphs){
-	const graphNodes = Utils.map(graphs, function(graph){
-	    return new RDFModel.NamedNode(graph);
-	});
+Store.prototype.registeredGraphs = function (callback) {
+    this.engine.lexicon.registeredGraphs(true, function (graphs) {
+        const graphNodes = Utils.map(graphs, function (graph) {
+            return new RDFModel.NamedNode(graph);
+        });
 
-	callback(null, graphNodes);
+        callback(null, graphNodes);
     });
 };
 
@@ -822,7 +830,7 @@ Store.prototype.registeredGraphs = function(callback) {
  * The default transport uses Node's http/https modules. The browser bundles have no default
  * transport that works: set one with the <code>setNetworkTransport</code> function.
  */
-Store.prototype.getNetworkTransport = function() {
+Store.prototype.getNetworkTransport = function () {
     return this.engine.rdfLoader.networkTransport;
 };
 
@@ -837,22 +845,18 @@ Store.prototype.getNetworkTransport = function() {
  * @arguments
  * @param networkTransportImpl object implementing the transport *load* function.
  */
-Store.prototype.setNetworkTransport = function(networkTransportImpl) {
+Store.prototype.setNetworkTransport = function (networkTransportImpl) {
     this.engine.rdfLoader.networkTransport = networkTransportImpl;
 };
-
 
 /**
  * Clean-up function releasing all temporary resources held by the
  * store instance.
  */
-Store.prototype.close = function(cb) {
-    if(cb == null)
-	cb = function(){};
-    if(this.engine.close)
-	this.engine.close(cb);
-    else
-	cb();
+Store.prototype.close = function (cb) {
+    if (cb == null) cb = function () {};
+    if (this.engine.close) this.engine.close(cb);
+    else cb();
 };
 
 /**
@@ -883,14 +887,14 @@ Store.VERSION = "0.9.18-alpha.25";
  * @param {Object[]} [args] Arguments to be passed to the store that will be created
  * @param {Function} callback Callback function that will be invoked with an error flag and the connection/store object.
  */
-const connect = function() {
+const connect = function () {
     let callback;
-    if(arguments.length == 1) {
-		callback = arguments[0];
-    } else if(arguments.length == 2) {
-		callback = arguments[1];
-	} else {
-	callback = arguments[2];
+    if (arguments.length == 1) {
+        callback = arguments[0];
+    } else if (arguments.length == 2) {
+        callback = arguments[1];
+    } else {
+        callback = arguments[2];
     }
     callback(new Error("Store#connect is not supported in the 0.9.X series of the library"));
 };
@@ -914,17 +918,17 @@ const connect = function() {
  * @param {Object[]} [args] Arguments to be passed to the store that will be created
  * @param {Function} [callback] Callback function that will be invoked with an error flag and the connection/store object.
  */
-const create = function(){
-    if(arguments.length == 1) {
-	return new Store(arguments[0]);
-    } else if(arguments.length == 2) {
-	return new Store(arguments[0], arguments[1]);
+const create = function () {
+    if (arguments.length == 1) {
+        return new Store(arguments[0]);
+    } else if (arguments.length == 2) {
+        return new Store(arguments[0], arguments[1]);
     } else {
-	return new Store();
-    };
+        return new Store();
+    }
 };
 
-Store.yieldFrequency = function(val) {
+Store.yieldFrequency = function (val) {
     Utils.yieldFrequency(val);
 };
 
@@ -935,9 +939,11 @@ Store.yieldFrequency = function(val) {
  * @param {Object} [params] configuration parameters, see the Store constructor
  */
 const promises = {
-    create: function(params) {
-        return Utils.toPromise(function(cb) { new Store(params || {}, cb); });
-    }
+    create: function (params) {
+        return Utils.toPromise(function (cb) {
+            new Store(params || {}, cb);
+        });
+    },
 };
 
 module.exports.Store = Store;

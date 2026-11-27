@@ -1,7 +1,7 @@
 "use strict";
 
 const BaseTree = require("./btree").Tree;
-const Utils = require('./utils');
+const Utils = require("./utils");
 
 /**
  * NodeKey
@@ -11,7 +11,7 @@ const Utils = require('./utils');
  * A Tree node augmented with BPlusTree
  * node structures
  */
-const NodeKey = function(components, order) {
+const NodeKey = function (components, order) {
     this.subject = components.subject;
     this.predicate = components.predicate;
     this.object = components.object;
@@ -25,16 +25,16 @@ const NodeKey = function(components, order) {
  * @param keyPattern
  * @returns {number}
  */
-NodeKey.prototype.comparator = function(keyPattern) {
-    for(let i=0; i<this.order.length; i++) {
+NodeKey.prototype.comparator = function (keyPattern) {
+    for (let i = 0; i < this.order.length; i++) {
         const component = this.order[i];
-        if(keyPattern[component] == null) {
+        if (keyPattern[component] == null) {
             return 0;
         } else {
-            if(this[component] < keyPattern[component] ) {
-                return -1
-            } else if(this[component] > keyPattern[component]) {
-                return 1
+            if (this[component] < keyPattern[component]) {
+                return -1;
+            } else if (this[component] > keyPattern[component]) {
+                return 1;
             }
         }
     }
@@ -64,8 +64,8 @@ const Pattern = function (components) {
     // inserted in the lexicon.
     // OIDs retrieved from the lexicon *are* numbers so
     // they can be told apart from variables (strings)
-    Utils.forEach(['subject', 'predicate', 'object', 'graph'], function(component){
-        if (typeof(that[component]) === 'string') {
+    Utils.forEach(["subject", "predicate", "object", "graph"], function (component) {
+        if (typeof that[component] === "string") {
             indiferent.push(component);
             that.keyComponents[component] = null;
         } else {
@@ -73,13 +73,11 @@ const Pattern = function (components) {
             that.keyComponents[component] = that[component];
             that.indexKey.push(component);
         }
-
     });
 
     this.order = order.concat(indiferent);
     this.key = new NodeKey(this.keyComponents, this.order);
 };
-
 
 /**
  * An index for quads built on top of a BTree implementation.
@@ -93,7 +91,6 @@ const QuadIndex = function (params, callback) {
         this.componentOrder = params.componentOrder;
 
         BaseTree.call(this, params.order, function (tree) {
-
             // For exact matches. Used by search.
             tree.comparator = function (a, b) {
                 for (let i = 0; i < tree.componentOrder.length; i++) {
@@ -120,9 +117,9 @@ const QuadIndex = function (params, callback) {
                         return 0;
                     } else {
                         if (a[component] < b[component]) {
-                            return -1
+                            return -1;
                         } else if (a[component] > b[component]) {
-                            return 1
+                            return 1;
                         }
                     }
                 }
@@ -135,16 +132,15 @@ const QuadIndex = function (params, callback) {
     }
 };
 
-QuadIndex.prototype = Utils.create(BaseTree.prototype, {'constructor':BaseTree});
-
+QuadIndex.prototype = Utils.create(BaseTree.prototype, { constructor: BaseTree });
 
 /**
  * Insert a quad with subject,predicate,object,graph values into the index.
  * @param quad
  * @param callback
  */
-QuadIndex.prototype.insert = function(quad, callback) {
-    BaseTree.prototype.insert.call(this, quad, null, function(result){
+QuadIndex.prototype.insert = function (quad, callback) {
+    BaseTree.prototype.insert.call(this, quad, null, function (result) {
         callback(result);
     });
 };
@@ -154,10 +150,15 @@ QuadIndex.prototype.insert = function(quad, callback) {
  * @param quad
  * @param callback
  */
-QuadIndex.prototype.search = function(quad, callback) {
-    BaseTree.prototype.search.call(this, quad, function(result){
-        callback(result);
-    }, true); // true -> check exists : hack only present in the inMemoryAsyncBTree implementation
+QuadIndex.prototype.search = function (quad, callback) {
+    BaseTree.prototype.search.call(
+        this,
+        quad,
+        function (result) {
+            callback(result);
+        },
+        true,
+    ); // true -> check exists : hack only present in the inMemoryAsyncBTree implementation
 };
 
 /**
@@ -170,71 +171,78 @@ QuadIndex.prototype.range = function (pattern, callback) {
     this._rangeTraverse(this, this.root, pattern, callback);
 };
 
-QuadIndex.prototype._rangeTraverse = function(tree,node, pattern, callback) {
-    const patternKey  = pattern.key;
+QuadIndex.prototype._rangeTraverse = function (tree, node, pattern, callback) {
+    const patternKey = pattern.key;
     const acum = [];
     const pendingNodes = [node];
 
-    Utils.whilst(function(){
-        return pendingNodes.length > 0;
-    }, function(k){
-        // next node to process
-        const node = pendingNodes.shift();
-        let idxMin = 0;
+    Utils.whilst(
+        function () {
+            return pendingNodes.length > 0;
+        },
+        function (k) {
+            // next node to process
+            const node = pendingNodes.shift();
+            let idxMin = 0;
 
-        // move forward in the lower keys not matching the pattern.
-        while(idxMin < node.numberActives && tree.rangeComparator(node.keys[idxMin].key,patternKey) === -1) {
-            idxMin++;
-        }
-
-        // we found a matching or bigger key
-
-        if(node.isLeaf === true) { // the node is a leaf node -> has no nodes to push, only keys to accumulate
-
-            let idxMax = idxMin;
-
-            // we keep on accumulating matching keys in this leaf
-            while(idxMax < node.numberActives && tree.rangeComparator(node.keys[idxMax].key,patternKey) === 0) {
-                acum.push(node.keys[idxMax].key);
-                idxMax++;
+            // move forward in the lower keys not matching the pattern.
+            while (idxMin < node.numberActives && tree.rangeComparator(node.keys[idxMin].key, patternKey) === -1) {
+                idxMin++;
             }
 
-            // next iteration
-            k();
+            // we found a matching or bigger key
 
-        } else { // the node is not a leaf, push potentially matching nodes requiring processing.
-            tree._diskRead(node.children[idxMin], function(childNode){
+            if (node.isLeaf === true) {
+                // the node is a leaf node -> has no nodes to push, only keys to accumulate
 
-                // pushing the found node
-                pendingNodes.push(childNode);
                 let idxMax = idxMin;
 
-                Utils.whilst(function(){
-                    // keep pushing nodes while the key for that nod ematches the pattern
-                    return (idxMax < node.numberActives && tree.rangeComparator(node.keys[idxMax].key,patternKey) === 0);
-
-                },function(kk){
-
+                // we keep on accumulating matching keys in this leaf
+                while (idxMax < node.numberActives && tree.rangeComparator(node.keys[idxMax].key, patternKey) === 0) {
                     acum.push(node.keys[idxMax].key);
                     idxMax++;
-                    tree._diskRead(node.children[idxMax], function(childNode){
-                        pendingNodes.push(childNode);
-                        kk();
-                    })
+                }
 
-                },function(){
-                    k();
+                // next iteration
+                k();
+            } else {
+                // the node is not a leaf, push potentially matching nodes requiring processing.
+                tree._diskRead(node.children[idxMin], function (childNode) {
+                    // pushing the found node
+                    pendingNodes.push(childNode);
+                    let idxMax = idxMin;
+
+                    Utils.whilst(
+                        function () {
+                            // keep pushing nodes while the key for that nod ematches the pattern
+                            return (
+                                idxMax < node.numberActives &&
+                                tree.rangeComparator(node.keys[idxMax].key, patternKey) === 0
+                            );
+                        },
+                        function (kk) {
+                            acum.push(node.keys[idxMax].key);
+                            idxMax++;
+                            tree._diskRead(node.children[idxMax], function (childNode) {
+                                pendingNodes.push(childNode);
+                                kk();
+                            });
+                        },
+                        function () {
+                            k();
+                        },
+                    );
                 });
-            });
-        }
-    }, function(){
-        callback(acum);
-    });
+            }
+        },
+        function () {
+            callback(acum);
+        },
+    );
 };
 
 module.exports = {
     QuadIndex: QuadIndex,
     Pattern: Pattern,
-    NodeKey: NodeKey
+    NodeKey: NodeKey,
 };
-

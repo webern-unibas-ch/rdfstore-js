@@ -1,7 +1,6 @@
 var rdfstore = require("../src/store");
 
 describe("Default graph", function () {
-
     var prefixes = "PREFIX : <http://example/> ";
 
     var load = function (store, turtle, graph) {
@@ -10,12 +9,17 @@ describe("Default graph", function () {
 
     // the solutions as sorted "var=localName" strings
     var rows = function (results) {
-        return results.map(function (solution) {
-            return Object.keys(solution).sort().map(function (name) {
-                var term = solution[name];
-                return name + "=" + (term == null ? "" : String(term.value).replace("http://example/", ""));
-            }).join(" ");
-        }).sort();
+        return results
+            .map(function (solution) {
+                return Object.keys(solution)
+                    .sort()
+                    .map(function (name) {
+                        var term = solution[name];
+                        return name + "=" + (term == null ? "" : String(term.value).replace("http://example/", ""));
+                    })
+                    .join(" ");
+            })
+            .sort();
     };
 
     var select = async function (store, query, defaultGraphs, namedGraphs) {
@@ -37,11 +41,14 @@ describe("Default graph", function () {
     describe("from several graphs", function () {
         it("is their merge: a triple in several of them comes back once", async function () {
             var store = await layers();
-            expect(await select(store, "SELECT * FROM :g1 FROM :g2 { ?s :p ?o }")).toEqual(
-                ["o=o1 s=w1", "o=y s=shared"]);
+            expect(await select(store, "SELECT * FROM :g1 FROM :g2 { ?s :p ?o }")).toEqual([
+                "o=o1 s=w1",
+                "o=y s=shared",
+            ]);
             expect(await select(store, "SELECT (COUNT(*) AS ?n) FROM :g1 FROM :g2 { ?s ?p ?o }")).toEqual(["n=3"]);
-            expect(await select(store, "SELECT * { ?s :p ?o }", ["http://example/g1", "http://example/g2"], [])).toEqual(
-                ["o=o1 s=w1", "o=y s=shared"]);
+            expect(
+                await select(store, "SELECT * { ?s :p ?o }", ["http://example/g1", "http://example/g2"], []),
+            ).toEqual(["o=o1 s=w1", "o=y s=shared"]);
         });
 
         it("joins across the graphs", async function () {
@@ -52,9 +59,13 @@ describe("Default graph", function () {
         it("applies to ASK", async function () {
             var store = await layers();
             expect(await store.promises.execute(prefixes + "ASK FROM :g1 { :w1 a :Work }")).toBe(true);
-            expect(await store.promises.execute(prefixes + "ASK FROM :g1 FROM :g2 { :w1 a :Work ; :p :o1 }")).toBe(true);
+            expect(await store.promises.execute(prefixes + "ASK FROM :g1 FROM :g2 { :w1 a :Work ; :p :o1 }")).toBe(
+                true,
+            );
             expect(await store.promises.execute(prefixes + "ASK FROM :g1 { :d :p :x }")).toBe(false);
-            expect(await store.promises.execute(prefixes + "ASK FROM NAMED :g1 { GRAPH ?g { :w1 a :Work } }")).toBe(true);
+            expect(await store.promises.execute(prefixes + "ASK FROM NAMED :g1 { GRAPH ?g { :w1 a :Work } }")).toBe(
+                true,
+            );
         });
 
         it("keeps the triples of a single graph", async function () {
@@ -73,7 +84,7 @@ describe("Default graph", function () {
 
     describe("with unionDefaultGraph", function () {
         var union = function () {
-            return layers({unionDefaultGraph: true});
+            return layers({ unionDefaultGraph: true });
         };
 
         it("is the merge of all graphs in a query without a dataset", async function () {
@@ -94,14 +105,21 @@ describe("Default graph", function () {
             await load(store, ":q <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> :p .", "http://example/g2");
             await load(store, ":w1 :q :o3 .");
             expect(await select(store, "SELECT ?o { :w1 :p+ ?o }")).toEqual(["o=o1", "o=o2"]);
-            expect(await select(store, "SELECT ?o { ?sub <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> :p . :w1 ?sub ?o }"))
-                .toEqual(["o=o3"]);
+            expect(
+                await select(
+                    store,
+                    "SELECT ?o { ?sub <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> :p . :w1 ?sub ?o }",
+                ),
+            ).toEqual(["o=o3"]);
         });
 
         it("sees every named graph in GRAPH without FROM NAMED", async function () {
             var store = await union();
             expect(await select(store, "SELECT ?g { GRAPH ?g {} }")).toEqual(["g=g1", "g=g2"]);
-            expect(await select(store, "SELECT ?g ?s { GRAPH ?g { ?s :p :y } }")).toEqual(["g=g1 s=shared", "g=g2 s=shared"]);
+            expect(await select(store, "SELECT ?g ?s { GRAPH ?g { ?s :p :y } }")).toEqual([
+                "g=g1 s=shared",
+                "g=g2 s=shared",
+            ]);
             expect(await select(store, "SELECT ?s { GRAPH :g2 { ?s :p ?o } }")).toEqual(["s=shared", "s=w1"]);
             expect(await select(store, "SELECT ?s { GRAPH :g3 { ?s :p ?o } }")).toEqual([]);
         });
@@ -113,8 +131,12 @@ describe("Default graph", function () {
             expect(await select(store, "SELECT * FROM NAMED :g1 { ?s :p ?o }")).toEqual([]);
             expect(await select(store, "SELECT ?g FROM NAMED :g1 { GRAPH ?g {} }")).toEqual(["g=g1"]);
             expect(await select(store, "SELECT * { ?s :p ?o }", ["http://example/g1"], [])).toEqual(["o=y s=shared"]);
-            expect(await select(store, "SELECT * FROM <https://github.com/antoniogarrote/rdfstore-js#default_graph> { ?s :p ?o }"))
-                .toEqual(["o=x s=d"]);
+            expect(
+                await select(
+                    store,
+                    "SELECT * FROM <https://github.com/antoniogarrote/rdfstore-js#default_graph> { ?s :p ?o }",
+                ),
+            ).toEqual(["o=x s=d"]);
         });
 
         it("keeps store.graph() and store.node() on the store's default graph", async function () {
@@ -165,14 +187,20 @@ describe("Default graph", function () {
             union().then(function (store) {
                 var query = prefixes + "SELECT ?o FROM :g2 { :w1 :p ?o }";
                 var calls = 0;
-                store.startObservingQuery(query, function () { calls++; }, function () {
-                    store.execute(prefixes + "INSERT DATA { GRAPH :g1 { :w1 :p :o4 } }", function (err) {
-                        expect(err).toBe(null);
-                        expect(calls).toBe(1);
-                        store.stopObservingQuery(query);
-                        done();
-                    });
-                });
+                store.startObservingQuery(
+                    query,
+                    function () {
+                        calls++;
+                    },
+                    function () {
+                        store.execute(prefixes + "INSERT DATA { GRAPH :g1 { :w1 :p :o4 } }", function (err) {
+                            expect(err).toBe(null);
+                            expect(calls).toBe(1);
+                            store.stopObservingQuery(query);
+                            done();
+                        });
+                    },
+                );
             });
         });
     });

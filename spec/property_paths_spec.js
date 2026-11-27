@@ -1,7 +1,6 @@
 var rdfstore = require("../src/store");
 
 describe("Property paths", function () {
-
     var prefixes = "PREFIX : <http://example/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> ";
     var chain = ":x1 :p :x2 . :x2 :p :x3 . :x3 :p :x4 . ";
 
@@ -14,18 +13,26 @@ describe("Property paths", function () {
     };
 
     var load = function (store, turtle, graph) {
-        return store.promises.load("text/turtle", "@prefix : <http://example/> . " +
-            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> . " + turtle, graph);
+        return store.promises.load(
+            "text/turtle",
+            "@prefix : <http://example/> . " + "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> . " + turtle,
+            graph,
+        );
     };
 
     // the solutions as sorted "var=localName" strings
     var rows = function (results) {
-        return results.map(function (solution) {
-            return Object.keys(solution).sort().map(function (name) {
-                var term = solution[name];
-                return name + "=" + (term == null ? "" : String(term.value).replace("http://example/", ""));
-            }).join(" ");
-        }).sort();
+        return results
+            .map(function (solution) {
+                return Object.keys(solution)
+                    .sort()
+                    .map(function (name) {
+                        var term = solution[name];
+                        return name + "=" + (term == null ? "" : String(term.value).replace("http://example/", ""));
+                    })
+                    .join(" ");
+            })
+            .sort();
     };
 
     var select = async function (store, query) {
@@ -64,8 +71,14 @@ describe("Property paths", function () {
     describe("one or more (+)", function () {
         it("follows a predicate any number of steps", async function () {
             var store = await storeWith(chain);
-            expect(await select(store, "SELECT * { ?a :p+ ?b }")).toEqual(
-                ["a=x1 b=x2", "a=x1 b=x3", "a=x1 b=x4", "a=x2 b=x3", "a=x2 b=x4", "a=x3 b=x4"]);
+            expect(await select(store, "SELECT * { ?a :p+ ?b }")).toEqual([
+                "a=x1 b=x2",
+                "a=x1 b=x3",
+                "a=x1 b=x4",
+                "a=x2 b=x3",
+                "a=x2 b=x4",
+                "a=x3 b=x4",
+            ]);
             expect(await select(store, "SELECT * { :x1 :p+ ?b }")).toEqual(["b=x2", "b=x3", "b=x4"]);
             expect(await select(store, "SELECT * { ?a :p+ :x4 }")).toEqual(["a=x1", "a=x2", "a=x3"]);
             expect(await ask(store, "ASK { :x1 :p+ :x4 }")).toBe(true);
@@ -82,7 +95,9 @@ describe("Property paths", function () {
         });
 
         it("walks a class hierarchy", async function () {
-            var store = await storeWith(":A rdfs:subClassOf :Root . :B rdfs:subClassOf :A . :C rdfs:subClassOf :Other . :i a :B .");
+            var store = await storeWith(
+                ":A rdfs:subClassOf :Root . :B rdfs:subClassOf :A . :C rdfs:subClassOf :Other . :i a :B .",
+            );
             expect(await select(store, "SELECT ?c { ?c rdfs:subClassOf+ :Root }")).toEqual(["c=A", "c=B"]);
             expect(await select(store, "SELECT ?c { :i a/rdfs:subClassOf* ?c }")).toEqual(["c=A", "c=B", "c=Root"]);
             expect(await select(store, "SELECT ?i { ?i a/rdfs:subClassOf* :Root }")).toEqual(["i=i"]);
@@ -91,7 +106,13 @@ describe("Property paths", function () {
         it("applies to groups", async function () {
             var store = await storeWith(chain + ":x4 :p :x5 .");
             expect(await select(store, "SELECT * { :x1 (:p/:p)+ ?b }")).toEqual(["b=x3", "b=x5"]);
-            expect(await select(store, "SELECT * { :x3 (:p|^:p)+ ?b }")).toEqual(["b=x1", "b=x2", "b=x3", "b=x4", "b=x5"]);
+            expect(await select(store, "SELECT * { :x3 (:p|^:p)+ ?b }")).toEqual([
+                "b=x1",
+                "b=x2",
+                "b=x3",
+                "b=x4",
+                "b=x5",
+            ]);
         });
 
         it("keeps a modifier inside brackets", async function () {
@@ -113,11 +134,21 @@ describe("Property paths", function () {
         });
 
         it("pairs every node of the graph with itself if both ends are variables", async function () {
-            var store = await storeWith(":x1 :p :x2 . :y :q \"lit\" .");
-            expect(await select(store, "SELECT * { ?a :p* ?b }")).toEqual(
-                ["a=lit b=lit", "a=x1 b=x1", "a=x1 b=x2", "a=x2 b=x2", "a=y b=y"]);
-            expect(await select(store, "SELECT * { ?a :p? ?b }")).toEqual(
-                ["a=lit b=lit", "a=x1 b=x1", "a=x1 b=x2", "a=x2 b=x2", "a=y b=y"]);
+            var store = await storeWith(':x1 :p :x2 . :y :q "lit" .');
+            expect(await select(store, "SELECT * { ?a :p* ?b }")).toEqual([
+                "a=lit b=lit",
+                "a=x1 b=x1",
+                "a=x1 b=x2",
+                "a=x2 b=x2",
+                "a=y b=y",
+            ]);
+            expect(await select(store, "SELECT * { ?a :p? ?b }")).toEqual([
+                "a=lit b=lit",
+                "a=x1 b=x1",
+                "a=x1 b=x2",
+                "a=x2 b=x2",
+                "a=y b=y",
+            ]);
         });
 
         it("reaches a constant that is not in the store", async function () {
@@ -126,7 +157,7 @@ describe("Property paths", function () {
             expect(rows(results)).toEqual(["b=nowhere"]);
             expect(results[0].b.token).toBe("uri");
             expect(await select(store, "SELECT * { :nowhere :p+ ?b }")).toEqual([]);
-            expect(await select(store, "SELECT * { \"x\" :p* ?b }")).toEqual(["b=x"]);
+            expect(await select(store, 'SELECT * { "x" :p* ?b }')).toEqual(["b=x"]);
             // also through a zero-length step inside |, / or a modifier
             expect(await select(store, "SELECT * { :nowhere (:p?|:q) ?b }")).toEqual(["b=nowhere"]);
             expect(await select(store, "SELECT * { :nowhere :p?/:q* ?b }")).toEqual(["b=nowhere"]);
@@ -141,8 +172,7 @@ describe("Property paths", function () {
             expect(await select(store, "SELECT * { :x2 ^:p ?a }")).toEqual(["a=x1"]);
             expect(await select(store, "SELECT * { :x4 ^:p+ ?a }")).toEqual(["a=x1", "a=x2", "a=x3"]);
             expect(await select(store, "SELECT * { :x4 (^:p)* ?a }")).toEqual(["a=x1", "a=x2", "a=x3", "a=x4"]);
-            expect(await select(store, "SELECT * { ?a :p/^:p ?b }")).toEqual(
-                ["a=x1 b=x1", "a=x2 b=x2", "a=x3 b=x3"]);
+            expect(await select(store, "SELECT * { ?a :p/^:p ?b }")).toEqual(["a=x1 b=x1", "a=x2 b=x2", "a=x3 b=x3"]);
         });
 
         it("matches relations stored in one direction from both sides", async function () {
@@ -161,14 +191,25 @@ describe("Property paths", function () {
 
     describe("in a query", function () {
         it("joins with the other patterns and filters", async function () {
-            var store = await storeWith(chain + ":x1 a :Work . :x3 a :Work . :x4 :label \"end\" .");
-            expect(await select(store, "SELECT ?w ?v { ?w a :Work . ?w :p+ ?v . ?v :label ?l }")).toEqual(
-                ["v=x4 w=x1", "v=x4 w=x3"]);
+            var store = await storeWith(chain + ':x1 a :Work . :x3 a :Work . :x4 :label "end" .');
+            expect(await select(store, "SELECT ?w ?v { ?w a :Work . ?w :p+ ?v . ?v :label ?l }")).toEqual([
+                "v=x4 w=x1",
+                "v=x4 w=x3",
+            ]);
             expect(await select(store, "SELECT ?b { :x1 :p+ ?b FILTER(?b != :x3) }")).toEqual(["b=x2", "b=x4"]);
-            expect(await select(store, "SELECT ?w ?b { ?w a :Work OPTIONAL { ?w :p/:p ?b } }")).toEqual(["b= w=x3", "b=x3 w=x1"]);
-            expect(await select(store, "SELECT ?w { ?w a :Work FILTER EXISTS { ?w :p+ :x4 } }")).toEqual(["w=x1", "w=x3"]);
+            expect(await select(store, "SELECT ?w ?b { ?w a :Work OPTIONAL { ?w :p/:p ?b } }")).toEqual([
+                "b= w=x3",
+                "b=x3 w=x1",
+            ]);
+            expect(await select(store, "SELECT ?w { ?w a :Work FILTER EXISTS { ?w :p+ :x4 } }")).toEqual([
+                "w=x1",
+                "w=x3",
+            ]);
             expect(await select(store, "SELECT ?w { ?w a :Work FILTER NOT EXISTS { ?w :p+ :x3 } }")).toEqual(["w=x3"]);
-            expect(await select(store, "SELECT ?w { ?w a :Work { ?w :p* :x1 } UNION { ?w :p :x4 } }")).toEqual(["w=x1", "w=x3"]);
+            expect(await select(store, "SELECT ?w { ?w a :Work { ?w :p* :x1 } UNION { ?w :p :x4 } }")).toEqual([
+                "w=x1",
+                "w=x3",
+            ]);
         });
 
         it("scopes blank nodes and internal variables to the basic graph pattern", async function () {
@@ -177,7 +218,10 @@ describe("Property paths", function () {
             expect(await select(store, "SELECT ?x { ?x :p+ [ a :C ] }")).toEqual(["x=x1", "x=x2"]);
             expect(await select(store, "SELECT * { ?s :p/:p ?o }")).toEqual(["o=x3 s=x1", "o=x4 s=x2"]);
             expect(await select(store, "SELECT * { ?s :p/:p+ ?o . ?o a ?c }")).toEqual(["c=C o=x3 s=x1"]);
-            expect(await select(store, "SELECT * { ?s :p/:p* ?o . ?o a ?c }")).toEqual(["c=C o=x3 s=x1", "c=C o=x3 s=x2"]);
+            expect(await select(store, "SELECT * { ?s :p/:p* ?o . ?o a ?c }")).toEqual([
+                "c=C o=x3 s=x1",
+                "c=C o=x3 s=x2",
+            ]);
             var counted = await store.promises.execute(prefixes + "SELECT (COUNT(DISTINCT *) AS ?n) { ?s :p/:p ?o }");
             expect(counted[0].n.value).toBe("2");
         });
@@ -220,17 +264,25 @@ describe("Property paths", function () {
         it("evaluates several default graphs as one", async function () {
             var store = await namedChain();
             expect(await select(store, "SELECT * { ?a :p+ ?b }")).toEqual([]);
-            expect(await select(store, "SELECT * FROM :g1 FROM :g2 { ?a :p+ ?b }")).toEqual(
-                ["a=x1 b=x2", "a=x1 b=x3", "a=x2 b=x3"]);
+            expect(await select(store, "SELECT * FROM :g1 FROM :g2 { ?a :p+ ?b }")).toEqual([
+                "a=x1 b=x2",
+                "a=x1 b=x3",
+                "a=x2 b=x3",
+            ]);
         });
 
         it("evaluates each named graph on its own", async function () {
             var store = await namedChain();
             var named = "FROM NAMED :g1 FROM NAMED :g2 ";
-            expect(await select(store, "SELECT * " + named + "{ GRAPH ?g { ?a :p+ ?b } }")).toEqual(
-                ["a=x1 b=x2 g=g1", "a=x2 b=x3 g=g2"]);
-            expect(await select(store, "SELECT * " + named + "{ GRAPH ?g { :x1 :p* ?y } }")).toEqual(
-                ["g=g1 y=x1", "g=g1 y=x2", "g=g2 y=x1"]);
+            expect(await select(store, "SELECT * " + named + "{ GRAPH ?g { ?a :p+ ?b } }")).toEqual([
+                "a=x1 b=x2 g=g1",
+                "a=x2 b=x3 g=g2",
+            ]);
+            expect(await select(store, "SELECT * " + named + "{ GRAPH ?g { :x1 :p* ?y } }")).toEqual([
+                "g=g1 y=x1",
+                "g=g1 y=x2",
+                "g=g2 y=x1",
+            ]);
             expect(await select(store, "SELECT * " + named + "{ GRAPH ?g { :x1 :p* :x1 } }")).toEqual(["g=g1", "g=g2"]);
             expect(await select(store, "SELECT * { GRAPH :g2 { ?a :p* :x3 } }")).toEqual(["a=x2", "a=x3"]);
             expect(await select(store, "SELECT * { GRAPH :g3 { :x1 :p* ?y } }")).toEqual([]);
@@ -240,8 +292,10 @@ describe("Property paths", function () {
             var store = await namedChain();
             await load(store, ":s :q :x1 .", "http://example/g1");
             var named = "FROM NAMED :g1 FROM NAMED :g2 ";
-            expect(await select(store, "SELECT * " + named + "{ GRAPH ?g { ?s :q ?m . ?m :p* ?o } }")).toEqual(
-                ["g=g1 m=x1 o=x1 s=s", "g=g1 m=x1 o=x2 s=s"]);
+            expect(await select(store, "SELECT * " + named + "{ GRAPH ?g { ?s :q ?m . ?m :p* ?o } }")).toEqual([
+                "g=g1 m=x1 o=x1 s=s",
+                "g=g1 m=x1 o=x2 s=s",
+            ]);
         });
     });
 

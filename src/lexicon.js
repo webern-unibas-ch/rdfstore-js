@@ -1,54 +1,58 @@
 "use strict";
 
-const Utils = require('./utils');
-const Tree = require('./btree').Tree;
+const Utils = require("./utils");
+const Tree = require("./btree").Tree;
 
 /**
  * Temporal implementation of the lexicon
  */
 
-
-const Lexicon = function(callback){
+const Lexicon = function (callback) {
     const that = this;
     this.defaultGraphOid = 0;
     this.defaultGraphUri = "https://github.com/antoniogarrote/rdfstore-js#default_graph";
-    this.defaultGraphUriTerm = {"token":"uri","prefix":null,"suffix":null,"value":this.defaultGraphUri};
+    this.defaultGraphUriTerm = { token: "uri", prefix: null, suffix: null, value: this.defaultGraphUri };
     this.oidCounter = 1;
 
-    Utils.seq(function(k){
-        new Tree(2,function(tree){
-            that.uris = tree;
-            k();
-        })
-    }, function(k){
-        new Tree(2, function(tree){
-            that.literals = tree;
-            k();
-        })
-    }, function(k){
-        new Tree(2, function(tree){
-            that.knownGraphs = tree;
-            k();
-        })
-    },function(k){
-        new Tree(2,function(tree){
-            that.oidUris = tree;
-            k();
-        })
-    }, function(k){
-        new Tree(2, function(tree){
-            that.oidLiterals = tree;
-            k();
-        })
-    }, function(k){
-        new Tree(2, function(tree){
-            that.oidBlanks = tree;
-            k();
-        })
-    })(function(){
-        if(callback != null)
-            callback(that);
-
+    Utils.seq(
+        function (k) {
+            new Tree(2, function (tree) {
+                that.uris = tree;
+                k();
+            });
+        },
+        function (k) {
+            new Tree(2, function (tree) {
+                that.literals = tree;
+                k();
+            });
+        },
+        function (k) {
+            new Tree(2, function (tree) {
+                that.knownGraphs = tree;
+                k();
+            });
+        },
+        function (k) {
+            new Tree(2, function (tree) {
+                that.oidUris = tree;
+                k();
+            });
+        },
+        function (k) {
+            new Tree(2, function (tree) {
+                that.oidLiterals = tree;
+                k();
+            });
+        },
+        function (k) {
+            new Tree(2, function (tree) {
+                that.oidBlanks = tree;
+                k();
+            });
+        },
+    )(function () {
+        if (callback != null) callback(that);
     });
 };
 
@@ -58,10 +62,10 @@ const Lexicon = function(callback){
  * @param uriToken
  * @param callback
  */
-Lexicon.prototype.registerGraph = function(oid, uriToken, callback){
-    if(oid != this.defaultGraphOid) {
-        this.knownGraphs.insert(oid, uriToken, function(){
-           callback();
+Lexicon.prototype.registerGraph = function (oid, uriToken, callback) {
+    if (oid != this.defaultGraphOid) {
+        this.knownGraphs.insert(oid, uriToken, function () {
+            callback();
         });
     } else {
         callback();
@@ -73,17 +77,20 @@ Lexicon.prototype.registerGraph = function(oid, uriToken, callback){
  * @param returnUris
  * @param callback
  */
-Lexicon.prototype.registeredGraphs = function(returnUris, callback) {
+Lexicon.prototype.registeredGraphs = function (returnUris, callback) {
     const graphs = [];
-    this.knownGraphs.walk(function(node){
-        if(returnUris === true) {
-            graphs.push(node.data);
-        } else {
-            graphs.push(node.key);
-        }
-    },function(){
-        callback(graphs);
-    });
+    this.knownGraphs.walk(
+        function (node) {
+            if (returnUris === true) {
+                graphs.push(node.data);
+            } else {
+                graphs.push(node.key);
+            }
+        },
+        function () {
+            callback(graphs);
+        },
+    );
 };
 
 /**
@@ -93,29 +100,31 @@ Lexicon.prototype.registeredGraphs = function(returnUris, callback) {
  * @param callback
  * @returns URI's OID.
  */
-Lexicon.prototype.registerUri = function(uri, callback) {
+Lexicon.prototype.registerUri = function (uri, callback) {
     const that = this;
-    if(uri === this.defaultGraphUri) {
+    if (uri === this.defaultGraphUri) {
         callback(this.defaultGraphOid);
-    } else{
-        this.uris.search(uri, function(oidData){
-            if(oidData == null){
+    } else {
+        this.uris.search(uri, function (oidData) {
+            if (oidData == null) {
                 const oid = that.oidCounter;
-                const oidStr = 'u'+oid;
+                const oidStr = "u" + oid;
                 that.oidCounter++;
 
-                Utils.seq(function(k){
-                    that.uris.insert(uri, [oid,0], function(){
-                        k();
-                    })
-                }, function(k){
-                    that.oidUris.insert(oidStr, uri, function(){
-                        k();
-                    })
-                })(function(){
+                Utils.seq(
+                    function (k) {
+                        that.uris.insert(uri, [oid, 0], function () {
+                            k();
+                        });
+                    },
+                    function (k) {
+                        that.oidUris.insert(oidStr, uri, function () {
+                            k();
+                        });
+                    },
+                )(function () {
                     callback(oid);
                 });
-
             } else {
                 const oid = oidData[0];
                 oidData[1] = oidData[1] + 1;
@@ -131,12 +140,12 @@ Lexicon.prototype.registerUri = function(uri, callback) {
  * @param uri
  * @param callback
  */
-Lexicon.prototype.resolveUri = function(uri,callback) {
-    if(uri === this.defaultGraphUri) {
+Lexicon.prototype.resolveUri = function (uri, callback) {
+    if (uri === this.defaultGraphUri) {
         callback(this.defaultGraphOid);
     } else {
-        this.uris.search(uri, function(oidData){
-            if(oidData != null) {
+        this.uris.search(uri, function (oidData) {
+            if (oidData != null) {
                 callback(oidData[0]);
             } else {
                 callback(-1);
@@ -145,19 +154,18 @@ Lexicon.prototype.resolveUri = function(uri,callback) {
     }
 };
 
-
 /**
  * Register a new blank node in the lexicon.
  * @param label
  * @returns {string}
  */
-Lexicon.prototype.registerBlank = function(callback) {
+Lexicon.prototype.registerBlank = function (callback) {
     const oid = this.oidCounter;
     this.oidCounter++;
-    const oidStr = ""+oid;
-    this.oidBlanks.insert(oidStr, oidStr, function(){
+    const oidStr = "" + oid;
+    this.oidBlanks.insert(oidStr, oidStr, function () {
         callback(oid);
-    })
+    });
 };
 
 /**
@@ -166,33 +174,35 @@ Lexicon.prototype.registerBlank = function(callback) {
  * @param callback
  * @returns the OID of the newly registered literal
  */
-Lexicon.prototype.registerLiteral = function(literal, callback) {
+Lexicon.prototype.registerLiteral = function (literal, callback) {
     const that = this;
 
-        this.literals.search(literal, function(oidData){
-            if(oidData == null){
-                const oid = that.oidCounter;
-                const oidStr = 'l'+oid;
-                that.oidCounter++;
+    this.literals.search(literal, function (oidData) {
+        if (oidData == null) {
+            const oid = that.oidCounter;
+            const oidStr = "l" + oid;
+            that.oidCounter++;
 
-                Utils.seq(function(k){
-                    that.literals.insert(literal, [oid,0], function(){
+            Utils.seq(
+                function (k) {
+                    that.literals.insert(literal, [oid, 0], function () {
                         k();
-                    })
-                }, function(k){
-                    that.oidLiterals.insert(oidStr, literal, function(){
+                    });
+                },
+                function (k) {
+                    that.oidLiterals.insert(oidStr, literal, function () {
                         k();
-                    })
-                })(function(){
-                    callback(oid);
-                });
-
-            } else {
-                const oid = oidData[0];
-                oidData[1] = oidData[1] + 1;
+                    });
+                },
+            )(function () {
                 callback(oid);
-            }
-        });
+            });
+        } else {
+            const oid = oidData[0];
+            oidData[1] = oidData[1] + 1;
+            callback(oid);
+        }
+    });
 };
 
 /**
@@ -200,9 +210,9 @@ Lexicon.prototype.registerLiteral = function(literal, callback) {
  * @param literal
  * @param callback
  */
-Lexicon.prototype.resolveLiteral = function (literal,callback) {
-    this.literals.search(literal, function(oidData){
-        if(oidData != null) {
+Lexicon.prototype.resolveLiteral = function (literal, callback) {
+    this.literals.search(literal, function (oidData) {
+        if (oidData != null) {
             callback(oidData[0]);
         } else {
             callback(-1);
@@ -210,30 +220,38 @@ Lexicon.prototype.resolveLiteral = function (literal,callback) {
     });
 };
 
-
 /**
  * Transforms a literal string into a token object.
  * @param literalString
  * @returns A token object with the parsed literal.
  */
-Lexicon.prototype.parseLiteral = function(literalString) {
+Lexicon.prototype.parseLiteral = function (literalString) {
     let parts = literalString.lastIndexOf("@");
-    if(parts!=-1 && literalString[parts-1]==='"' && literalString.substring(parts, literalString.length).match(/^@[a-zA-Z]+(-[a-zA-Z0-9]+)*$/)!=null) {
-        const value = literalString.substring(1,parts-1);
-        const lang = literalString.substring(parts+1, literalString.length).toLowerCase();
-        return {token: "literal", value:value, lang:lang};
+    if (
+        parts != -1 &&
+        literalString[parts - 1] === '"' &&
+        literalString.substring(parts, literalString.length).match(/^@[a-zA-Z]+(-[a-zA-Z0-9]+)*$/) != null
+    ) {
+        const value = literalString.substring(1, parts - 1);
+        const lang = literalString.substring(parts + 1, literalString.length).toLowerCase();
+        return { token: "literal", value: value, lang: lang };
     }
 
     parts = literalString.lastIndexOf("^^");
-    if(parts!=-1 && literalString[parts-1]==='"' && literalString[parts+2] === '<' && literalString[literalString.length-1] === '>') {
-        const value = literalString.substring(1,parts-1);
-        const type = literalString.substring(parts+3, literalString.length-1);
+    if (
+        parts != -1 &&
+        literalString[parts - 1] === '"' &&
+        literalString[parts + 2] === "<" &&
+        literalString[literalString.length - 1] === ">"
+    ) {
+        const value = literalString.substring(1, parts - 1);
+        const type = literalString.substring(parts + 3, literalString.length - 1);
 
-        return {token: "literal", value:value, type:type};
+        return { token: "literal", value: value, type: type };
     }
 
-    const value = literalString.substring(1,literalString.length-1);
-    return {token:"literal", value:value};
+    const value = literalString.substring(1, literalString.length - 1);
+    return { token: "literal", value: value };
 };
 
 /**
@@ -241,8 +259,8 @@ Lexicon.prototype.parseLiteral = function(literalString) {
  * @param uriString
  * @returns A token object with the parsed URI.
  */
-Lexicon.prototype.parseUri = function(uriString) {
-    return {token: "uri", value:uriString};
+Lexicon.prototype.parseUri = function (uriString) {
+    return { token: "uri", value: uriString };
 };
 
 /**
@@ -253,52 +271,55 @@ Lexicon.prototype.parseUri = function(uriString) {
  * @param callback
  * @returns parsed token or null if not found.
  */
-Lexicon.prototype.retrieve = function(oid, callback) {
+Lexicon.prototype.retrieve = function (oid, callback) {
     const that = this;
 
-    if(oid === this.defaultGraphOid) {
+    if (oid === this.defaultGraphOid) {
         callback({
             token: "uri",
-            value:this.defaultGraphUri,
+            value: this.defaultGraphUri,
             prefix: null,
             suffix: null,
-            defaultGraph: true
+            defaultGraph: true,
         });
     } else {
-
-        Utils.seq(function(found,k){
-            that.oidUris.search('u'+oid, function(maybeUri) {
-                if(maybeUri != null) {
-                    k(null,that.parseUri(maybeUri));
+        Utils.seq(
+            function (found, k) {
+                that.oidUris.search("u" + oid, function (maybeUri) {
+                    if (maybeUri != null) {
+                        k(null, that.parseUri(maybeUri));
+                    } else {
+                        k(null, null);
+                    }
+                });
+            },
+            function (found, k) {
+                if (found == null) {
+                    that.oidLiterals.search("l" + oid, function (maybeLiteral) {
+                        if (maybeLiteral != null) {
+                            k(null, that.parseLiteral(maybeLiteral));
+                        } else {
+                            k(null, null);
+                        }
+                    });
                 } else {
-                    k(null,null);
+                    k(null, found);
                 }
-            })
-        }, function(found,k){
-            if(found == null) {
-                that.oidLiterals.search('l'+oid, function(maybeLiteral) {
-                    if (maybeLiteral != null) {
-                        k(null,that.parseLiteral(maybeLiteral));
-                    } else {
-                        k(null,null);
-                    }
-                });
-            } else {
-                k(null,found);
-            }
-        }, function(found,k){
-            if(found == null) {
-                that.oidBlanks.search(''+oid, function(maybeBlank) {
-                    if (maybeBlank != null) {
-                        k(null,{token:"blank", value:"_:"+oid});
-                    } else {
-                        k(null,null);
-                    }
-                });
-            } else {
-                k(null,found);
-            }
-        })(null,function(_,found){
+            },
+            function (found, k) {
+                if (found == null) {
+                    that.oidBlanks.search("" + oid, function (maybeBlank) {
+                        if (maybeBlank != null) {
+                            k(null, { token: "blank", value: "_:" + oid });
+                        } else {
+                            k(null, null);
+                        }
+                    });
+                } else {
+                    k(null, found);
+                }
+            },
+        )(null, function (_, found) {
             callback(found);
         });
     }
@@ -308,47 +329,52 @@ Lexicon.prototype.retrieve = function(oid, callback) {
  * Empties the lexicon and restarts the counters.
  * @param callback
  */
-Lexicon.prototype.clear = function(callback) {
+Lexicon.prototype.clear = function (callback) {
     const that = this;
     this.defaultGraphOid = 0;
     this.defaultGraphUri = "https://github.com/antoniogarrote/rdfstore-js#default_graph";
-    this.defaultGraphUriTerm = {"token":"uri","prefix":null,"suffix":null,"value":this.defaultGraphUri};
+    this.defaultGraphUriTerm = { token: "uri", prefix: null, suffix: null, value: this.defaultGraphUri };
     this.oidCounter = 1;
 
-    Utils.seq(function(k){
-        new Tree(2,function(tree){
-            that.uris = tree;
-            k();
-        })
-    }, function(k){
-        new Tree(2, function(tree){
-            that.literals = tree;
-            k();
-        })
-    }, function(k){
-        new Tree(2, function(tree){
-            that.knownGraphs = tree;
-            k();
-        })
-    },function(k){
-        new Tree(2,function(tree){
-            that.oidUris = tree;
-            k();
-        })
-    }, function(k){
-        new Tree(2, function(tree){
-            that.oidLiterals = tree;
-            k();
-        })
-    }, function(k){
-        new Tree(2, function(tree){
-            that.oidBlanks = tree;
-            k();
-        })
-    })(function(){
-        if(callback != null)
-            callback();
-
+    Utils.seq(
+        function (k) {
+            new Tree(2, function (tree) {
+                that.uris = tree;
+                k();
+            });
+        },
+        function (k) {
+            new Tree(2, function (tree) {
+                that.literals = tree;
+                k();
+            });
+        },
+        function (k) {
+            new Tree(2, function (tree) {
+                that.knownGraphs = tree;
+                k();
+            });
+        },
+        function (k) {
+            new Tree(2, function (tree) {
+                that.oidUris = tree;
+                k();
+            });
+        },
+        function (k) {
+            new Tree(2, function (tree) {
+                that.oidLiterals = tree;
+                k();
+            });
+        },
+        function (k) {
+            new Tree(2, function (tree) {
+                that.oidBlanks = tree;
+                k();
+            });
+        },
+    )(function () {
+        if (callback != null) callback();
     });
 };
 
@@ -362,22 +388,27 @@ Lexicon.prototype.clear = function(callback) {
  */
 Lexicon.prototype.unregister = function (quad, key, callback) {
     const that = this;
-    const unregisterTerm = function(term, oid, k) {
-        if (term == null || term.token === 'blank') {
+    const unregisterTerm = function (term, oid, k) {
+        if (term == null || term.token === "blank") {
             k();
         } else {
             that._unregisterTerm(term.token, oid, k);
         }
     };
-    Utils.seq(function(k){
-        unregisterTerm(quad.subject, key.subject, k);
-    }, function(k){
-        unregisterTerm(quad.predicate, key.predicate, k);
-    }, function(k){
-        unregisterTerm(quad.object, key.object, k);
-    }, function(k){
-        unregisterTerm(quad.graph, key.graph, k);
-    })(function(){
+    Utils.seq(
+        function (k) {
+            unregisterTerm(quad.subject, key.subject, k);
+        },
+        function (k) {
+            unregisterTerm(quad.predicate, key.predicate, k);
+        },
+        function (k) {
+            unregisterTerm(quad.object, key.object, k);
+        },
+        function (k) {
+            unregisterTerm(quad.graph, key.graph, k);
+        },
+    )(function () {
         callback(true);
     });
 };
@@ -388,7 +419,7 @@ Lexicon.prototype.unregister = function (quad, key, callback) {
  * @param callback
  */
 Lexicon.prototype.unregisterBlank = function (oid, callback) {
-    this._unregisterTerm('blank', oid, callback);
+    this._unregisterTerm("blank", oid, callback);
 };
 
 /**
@@ -400,33 +431,37 @@ Lexicon.prototype.unregisterBlank = function (oid, callback) {
  */
 Lexicon.prototype._unregisterTerm = function (kind, oid, callback) {
     const that = this;
-    if (kind === 'uri') {
+    if (kind === "uri") {
         if (oid != this.defaultGraphOid) {
-            const oidStr = 'u' + oid;
-            that.oidUris.search(oidStr, function(uri) {
-                that.uris.search(uri, function(oidData){
+            const oidStr = "u" + oid;
+            that.oidUris.search(oidStr, function (uri) {
+                that.uris.search(uri, function (oidData) {
                     const counter = oidData[1];
                     if ("" + oidData[0] === "" + oid) {
                         if (counter === 0) {
-                            Utils.seq(function(k) {
-                                that.oidUris.delete(oidStr, function () {
-                                    k();
-                                });
-                            }, function(k){
-                                that.uris.delete(uri, function(){
-                                    k();
-                                });
-                            }, function(k){
-                                // delete the graph oid from known graphs
-                                // in case this URI is a graph identifier
-                                that.knownGraphs.delete(oid, function(){
-                                   k();
-                                }) ;
-                            })(function(){
+                            Utils.seq(
+                                function (k) {
+                                    that.oidUris.delete(oidStr, function () {
+                                        k();
+                                    });
+                                },
+                                function (k) {
+                                    that.uris.delete(uri, function () {
+                                        k();
+                                    });
+                                },
+                                function (k) {
+                                    // delete the graph oid from known graphs
+                                    // in case this URI is a graph identifier
+                                    that.knownGraphs.delete(oid, function () {
+                                        k();
+                                    });
+                                },
+                            )(function () {
                                 callback();
                             });
                         } else {
-                            that.uris.insert(uri,[oid, counter - 1], function(){
+                            that.uris.insert(uri, [oid, counter - 1], function () {
                                 callback();
                             });
                         }
@@ -435,32 +470,34 @@ Lexicon.prototype._unregisterTerm = function (kind, oid, callback) {
                     }
                 });
             });
-
         } else {
             callback();
         }
-    } else if (kind === 'literal') {
+    } else if (kind === "literal") {
         this.oidCounter++;
-        const oidStr = 'l' + oid;
+        const oidStr = "l" + oid;
 
-        that.oidLiterals.search(oidStr, function(literal) {
-            that.literals.search(literal, function(oidData){
+        that.oidLiterals.search(oidStr, function (literal) {
+            that.literals.search(literal, function (oidData) {
                 const counter = oidData[1];
                 if ("" + oidData[0] === "" + oid) {
                     if (counter === 0) {
-                        Utils.seq(function(k) {
-                            that.oidLiterals.delete(oidStr, function () {
-                                k();
-                            });
-                        }, function(k){
-                            that.literals.delete(literal, function(){
-                                k();
-                            });
-                        })(function(){
+                        Utils.seq(
+                            function (k) {
+                                that.oidLiterals.delete(oidStr, function () {
+                                    k();
+                                });
+                            },
+                            function (k) {
+                                that.literals.delete(literal, function () {
+                                    k();
+                                });
+                            },
+                        )(function () {
                             callback();
-                        })
+                        });
                     } else {
-                        that.literals.insert(literal,[oid, counter - 1], function(){
+                        that.literals.insert(literal, [oid, counter - 1], function () {
                             callback();
                         });
                     }
@@ -469,16 +506,15 @@ Lexicon.prototype._unregisterTerm = function (kind, oid, callback) {
                 }
             });
         });
-
-    } else if (kind === 'blank') {
-        that.oidBlanks.delete("" + oid, function(){
+    } else if (kind === "blank") {
+        that.oidBlanks.delete("" + oid, function () {
             callback();
-        })
+        });
     } else {
         callback();
     }
 };
 
 module.exports = {
-    Lexicon: Lexicon
+    Lexicon: Lexicon,
 };

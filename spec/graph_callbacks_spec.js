@@ -4,64 +4,78 @@ var Store = require("../src/store");
 // apart by identity: closures with the same source text (from a factory, or the store's own
 // adapters and node observers) must not collide.
 
-var withStore = function(cb) {
-    new Store.Store(function(err, store) {
+var withStore = function (cb) {
+    new Store.Store(function (err, store) {
         expect(err).toBe(null);
         cb(store);
     });
 };
 
-var insertAB = function(store, cb) {
-    store.execute("INSERT DATA { <http://a> <http://p> <http://o1> . <http://b> <http://p> <http://o2> }", function(err) {
-        expect(err).toBe(null);
-        cb();
-    });
+var insertAB = function (store, cb) {
+    store.execute(
+        "INSERT DATA { <http://a> <http://p> <http://o1> . <http://b> <http://p> <http://o2> }",
+        function (err) {
+            expect(err).toBe(null);
+            cb();
+        },
+    );
 };
 
-describe("Events API unsubscribing", function() {
-
-    it("keeps notifying the other queries after stopObservingQuery", function(done) {
-        withStore(function(store) {
+describe("Events API unsubscribing", function () {
+    it("keeps notifying the other queries after stopObservingQuery", function (done) {
+        withStore(function (store) {
             var queryA = "SELECT ?o { <http://a> <http://p> ?o }";
             var queryB = "SELECT ?o { <http://b> <http://p> ?o }";
             var resultsA = [];
             var resultsB = [];
-            store.startObservingQuery(queryA, function(results) { resultsA.push(results); }, function() {
-                store.startObservingQuery(queryB, function(results) { resultsB.push(results); }, function() {
-                    store.stopObservingQuery(queryA);
-                    resultsA = [];
-                    resultsB = [];
-                    insertAB(store, function() {
-                        expect(resultsA.length).toBe(0);
-                        expect(resultsB.length).toBe(1);
-                        expect(resultsB[0].length).toBe(1);
-                        expect(resultsB[0][0].o.value).toBe("http://o2");
-                        done();
-                    });
-                });
-            });
+            store.startObservingQuery(
+                queryA,
+                function (results) {
+                    resultsA.push(results);
+                },
+                function () {
+                    store.startObservingQuery(
+                        queryB,
+                        function (results) {
+                            resultsB.push(results);
+                        },
+                        function () {
+                            store.stopObservingQuery(queryA);
+                            resultsA = [];
+                            resultsB = [];
+                            insertAB(store, function () {
+                                expect(resultsA.length).toBe(0);
+                                expect(resultsB.length).toBe(1);
+                                expect(resultsB[0].length).toBe(1);
+                                expect(resultsB[0][0].o.value).toBe("http://o2");
+                                done();
+                            });
+                        },
+                    );
+                },
+            );
         });
     });
 
-    it("keeps notifying the other nodes after stopObservingNode", function(done) {
-        withStore(function(store) {
+    it("keeps notifying the other nodes after stopObservingNode", function (done) {
+        withStore(function (store) {
             var nodesA = [];
             var nodesB = [];
             var started = false;
             // each observer is first called with the current node, once it is registered
-            var listenerA = function(node) {
+            var listenerA = function (node) {
                 nodesA.push(node);
-                if(!started) {
+                if (!started) {
                     started = true;
                     store.startObservingNode("http://b", listenerB);
                 }
             };
-            var listenerB = function(node) {
+            var listenerB = function (node) {
                 nodesB.push(node);
-                if(nodesB.length === 1) {
+                if (nodesB.length === 1) {
                     store.stopObservingNode(listenerA);
                     nodesA = [];
-                    insertAB(store, function() {
+                    insertAB(store, function () {
                         expect(nodesA.length).toBe(0);
                         expect(nodesB.length).toBe(2);
                         expect(nodesB[1].toArray().length).toBe(1);
@@ -73,19 +87,21 @@ describe("Events API unsubscribing", function() {
         });
     });
 
-    it("removes only the given listener when listeners share their source text", function(done) {
-        withStore(function(store) {
-            var makeListener = function(log) {
-                return function(event, triples) { log.push(event); };
+    it("removes only the given listener when listeners share their source text", function (done) {
+        withStore(function (store) {
+            var makeListener = function (log) {
+                return function (event, triples) {
+                    log.push(event);
+                };
             };
             var eventsA = [];
             var eventsB = [];
             var listenerA = makeListener(eventsA);
             var listenerB = makeListener(eventsB);
-            store.subscribe("http://a", null, null, null, listenerA, function() {
-                store.subscribe("http://b", null, null, null, listenerB, function() {
+            store.subscribe("http://a", null, null, null, listenerA, function () {
+                store.subscribe("http://b", null, null, null, listenerB, function () {
                     store.unsubscribe(listenerA);
-                    insertAB(store, function() {
+                    insertAB(store, function () {
                         expect(eventsA).toEqual([]);
                         expect(eventsB).toEqual(["added"]);
                         done();
@@ -95,16 +111,17 @@ describe("Events API unsubscribing", function() {
         });
     });
 
-    describe("a listener registered more than once", function() {
-
-        it("unsubscribe removes it from every pattern", function(done) {
-            withStore(function(store) {
+    describe("a listener registered more than once", function () {
+        it("unsubscribe removes it from every pattern", function (done) {
+            withStore(function (store) {
                 var events = [];
-                var listener = function(event) { events.push(event); };
-                store.subscribe("http://a", null, null, null, listener, function() {
-                    store.subscribe("http://b", null, null, null, listener, function() {
+                var listener = function (event) {
+                    events.push(event);
+                };
+                store.subscribe("http://a", null, null, null, listener, function () {
+                    store.subscribe("http://b", null, null, null, listener, function () {
                         store.unsubscribe(listener);
-                        insertAB(store, function() {
+                        insertAB(store, function () {
                             expect(events).toEqual([]);
                             done();
                         });
@@ -113,16 +130,16 @@ describe("Events API unsubscribing", function() {
             });
         });
 
-        it("stopObservingNode removes it from every node", function(done) {
-            withStore(function(store) {
+        it("stopObservingNode removes it from every node", function (done) {
+            withStore(function (store) {
                 var calls = 0;
-                var listener = function() {
+                var listener = function () {
                     calls++;
-                    if(calls === 1) {
+                    if (calls === 1) {
                         store.startObservingNode("http://b", listener);
-                    } else if(calls === 2) {
+                    } else if (calls === 2) {
                         store.stopObservingNode(listener);
-                        insertAB(store, function() {
+                        insertAB(store, function () {
                             expect(calls).toBe(2);
                             done();
                         });
@@ -132,115 +149,163 @@ describe("Events API unsubscribing", function() {
             });
         });
 
-        it("stopObservingQuery removes every callback of the query", function(done) {
-            withStore(function(store) {
+        it("stopObservingQuery removes every callback of the query", function (done) {
+            withStore(function (store) {
                 var query = "SELECT ?o { <http://a> <http://p> ?o }";
                 var calls = [];
-                store.startObservingQuery(query, function() { calls.push(1); }, function() {
-                    store.startObservingQuery(query, function() { calls.push(2); }, function() {
-                        store.stopObservingQuery(query);
-                        calls = [];
-                        insertAB(store, function() {
-                            expect(calls).toEqual([]);
-                            done();
-                        });
-                    });
-                });
+                store.startObservingQuery(
+                    query,
+                    function () {
+                        calls.push(1);
+                    },
+                    function () {
+                        store.startObservingQuery(
+                            query,
+                            function () {
+                                calls.push(2);
+                            },
+                            function () {
+                                store.stopObservingQuery(query);
+                                calls = [];
+                                insertAB(store, function () {
+                                    expect(calls).toEqual([]);
+                                    done();
+                                });
+                            },
+                        );
+                    },
+                );
             });
         });
     });
 });
 
-describe("Events API deleted events", function() {
-
-    it("reports only quads the store had", function(done) {
-        withStore(function(store) {
+describe("Events API deleted events", function () {
+    it("reports only quads the store had", function (done) {
+        withStore(function (store) {
             var events = [];
-            insertAB(store, function() {
-                store.subscribe("http://a", null, null, null, function(event, triples) {
-                    events.push(event + " " + triples.length);
-                }, function() {
-                    store.execute("DELETE DATA { <http://a> <http://p> <http://none> }", function(err) {
-                        expect(err).toBe(null);
-                        store.execute("DELETE { ?s <http://p> <http://o1> . ?s <http://p> <http://none> } WHERE { ?s <http://p> ?o }", function(err) {
+            insertAB(store, function () {
+                store.subscribe(
+                    "http://a",
+                    null,
+                    null,
+                    null,
+                    function (event, triples) {
+                        events.push(event + " " + triples.length);
+                    },
+                    function () {
+                        store.execute("DELETE DATA { <http://a> <http://p> <http://none> }", function (err) {
                             expect(err).toBe(null);
-                            expect(events).toEqual(["deleted 1"]);
-                            done();
+                            store.execute(
+                                "DELETE { ?s <http://p> <http://o1> . ?s <http://p> <http://none> } WHERE { ?s <http://p> ?o }",
+                                function (err) {
+                                    expect(err).toBe(null);
+                                    expect(events).toEqual(["deleted 1"]);
+                                    done();
+                                },
+                            );
                         });
-                    });
-                });
+                    },
+                );
             });
         });
     });
 });
 
-describe("Events API observed queries", function() {
-
-    it("calls the ready callback after the initial result", function(done) {
-        withStore(function(store) {
+describe("Events API observed queries", function () {
+    it("calls the ready callback after the initial result", function (done) {
+        withStore(function (store) {
             // more solutions than the iteration helpers handle without yielding
             var triples = [];
-            for(var i = 0; i < 300; i++) {
+            for (var i = 0; i < 300; i++) {
                 triples.push("<http://a> <http://p> <http://o" + i + "> .");
             }
-            store.execute("INSERT DATA { " + triples.join(" ") + " }", function(err) {
+            store.execute("INSERT DATA { " + triples.join(" ") + " }", function (err) {
                 expect(err).toBe(null);
                 var calls = [];
-                store.startObservingQuery("SELECT ?o { <http://a> <http://p> ?o }", function(results) {
-                    calls.push(results.length);
-                }, function() {
-                    expect(calls).toEqual([300]);
-                    done();
-                });
+                store.startObservingQuery(
+                    "SELECT ?o { <http://a> <http://p> ?o }",
+                    function (results) {
+                        calls.push(results.length);
+                    },
+                    function () {
+                        expect(calls).toEqual([300]);
+                        done();
+                    },
+                );
             });
         });
     });
 
-    it("calls the ready callback when the listener throws on the initial result", async function() {
+    it("calls the ready callback when the listener throws on the initial result", async function () {
         var store = await new Promise(withStore);
-        await jasmine.spyOnGlobalErrorsAsync(async function(globalErrorSpy) {
+        await jasmine.spyOnGlobalErrorsAsync(async function (globalErrorSpy) {
             var sentinel = new Error("thrown by the listener");
             var ready = 0;
             try {
-                store.startObservingQuery("SELECT ?o { <http://a> <http://p> ?o }", function() {
-                    throw sentinel;
-                }, function() { ready++; });
-            } catch(e) {
+                store.startObservingQuery(
+                    "SELECT ?o { <http://a> <http://p> ?o }",
+                    function () {
+                        throw sentinel;
+                    },
+                    function () {
+                        ready++;
+                    },
+                );
+            } catch (e) {
                 expect(e).toBe(sentinel);
             }
-            await new Promise(function(resolve) { setTimeout(resolve, 50); });
+            await new Promise(function (resolve) {
+                setTimeout(resolve, 50);
+            });
             expect(ready).toBe(1);
         });
     });
 
-    it("passes the error of the initial query to the ready callback", function(done) {
-        withStore(function(store) {
-            insertAB(store, function() {
+    it("passes the error of the initial query to the ready callback", function (done) {
+        withStore(function (store) {
+            insertAB(store, function () {
                 var calls = 0;
-                store.startObservingQuery("SELECT ?o { ?s ?p ?o FILTER(COALESCE(?o)) }", function() { calls++; }, function(err) {
-                    expect(err instanceof Error).toBe(true);
-                    expect(err.name).toBe("NonSupportedSparqlFeatureError");
-                    expect(calls).toBe(0);
-                    store.startObservingQuery("SELECT ?o { ?s ?p ?o }", function() { calls++; }, function(err) {
-                        expect(err).toBe(null);
-                        expect(calls).toBe(1);
-                        done();
-                    });
-                });
+                store.startObservingQuery(
+                    "SELECT ?o { ?s ?p ?o FILTER(COALESCE(?o)) }",
+                    function () {
+                        calls++;
+                    },
+                    function (err) {
+                        expect(err instanceof Error).toBe(true);
+                        expect(err.name).toBe("NonSupportedSparqlFeatureError");
+                        expect(calls).toBe(0);
+                        store.startObservingQuery(
+                            "SELECT ?o { ?s ?p ?o }",
+                            function () {
+                                calls++;
+                            },
+                            function (err) {
+                                expect(err).toBe(null);
+                                expect(calls).toBe(1);
+                                done();
+                            },
+                        );
+                    },
+                );
             });
         });
     });
 
-    it("notifies a query with PREFIX and BASE declarations", function(done) {
-        withStore(function(store) {
+    it("notifies a query with PREFIX and BASE declarations", function (done) {
+        withStore(function (store) {
             var query = "BASE <http://a/dir/> PREFIX ex: <http://example/> SELECT ?o { <s> ex:p ?o }";
             var calls = [];
-            store.startObservingQuery(query, function(results) {
-                calls.push(results.map(function(solution) { return solution.o.value; }));
-                if(calls.length === 1) {
+            store.startObservingQuery(query, function (results) {
+                calls.push(
+                    results.map(function (solution) {
+                        return solution.o.value;
+                    }),
+                );
+                if (calls.length === 1) {
                     // insert only after the first call, or the two calls may swap
                     expect(calls[0]).toEqual([]);
-                    store.execute("INSERT DATA { <http://a/dir/s> <http://example/p> <http://o1> }", function(err) {
+                    store.execute("INSERT DATA { <http://a/dir/s> <http://example/p> <http://o1> }", function (err) {
                         expect(err).toBe(null);
                     });
                 } else {
