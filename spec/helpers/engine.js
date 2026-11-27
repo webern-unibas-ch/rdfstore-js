@@ -22,4 +22,24 @@ function newEngine(options, callback) {
     });
 }
 
-module.exports = { newEngine };
+/**
+ * Counts the entries of the in-memory lexicon's term maps (URI and literal, both directions)
+ * and hands the sum to the callback. A fully released term set counts 0.
+ */
+function countLexiconTerms(lexicon, callback) {
+    const trees = [lexicon.uris, lexicon.oidUris, lexicon.literals, lexicon.oidLiterals];
+    let count = 0;
+    (function next(i) {
+        if (i === trees.length) return callback(count);
+        trees[i].walk(
+            function () {
+                count++;
+            },
+            function () {
+                next(i + 1);
+            },
+        );
+    })(0);
+}
+
+module.exports = { newEngine, countLexiconTerms };

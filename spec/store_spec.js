@@ -4,7 +4,7 @@ var N3Parser = require("../src/rvn3_parser").RVN3Parser;
 describe("Store", function () {
     it("Should pass integration test #1", function (done) {
         new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-            expect(err == null);
+            expect(err).toBeNull();
             store.execute(
                 "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
                 function (err, result) {
@@ -582,7 +582,7 @@ describe("Store", function () {
                 store.execute(
                     "select ?s { GRAPH <http://example.org/examples/test> { ?s ?p ?o } }",
                     function (err, results) {
-                        expect(err);
+                        expect(err).toBeNull();
 
                         var blankIds = {};
 
@@ -1022,7 +1022,7 @@ describe("Store", function () {
                          }";
 
                 store.execute(query, function (err, graph) {
-                    expect(err);
+                    expect(err).toBeNull();
                     var numBlankSubjects = 0;
                     var distinctBlankSubjects = {};
                     var foundUris = false;
@@ -1137,13 +1137,13 @@ describe("Store", function () {
             store.load("application/ld+json", input, function (err) {
                 store.execute("SELECT * { ?s ?p ?o }", function (err, results) {
                     jsonmedia = results.length;
-                    expect(jsonmedia > 0);
+                    expect(jsonmedia).toBeGreaterThan(0);
 
                     new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                         store.load("application/json", input, function (err) {
                             store.execute("SELECT * { ?s ?p ?o }", function (err, results) {
                                 jsonldmedia = results.length;
-                                expect(jsonldmedia > 0);
+                                expect(jsonldmedia).toBeGreaterThan(0);
 
                                 expect(jsonldmedia).toBe(jsonmedia);
                                 done();
@@ -1176,7 +1176,7 @@ describe("Store", function () {
                         function (err, results) {
                             expect(results.length).toBe(3);
                             for (var i = 0; i < results.length; i++) {
-                                expect(parseInt(results[i].v1.value) + parseInt(results[i].v2.value) < 5);
+                                expect(parseInt(results[i].v1.value) + parseInt(results[i].v2.value)).toBeLessThan(5);
                             }
                             done();
                         },
@@ -1207,7 +1207,7 @@ describe("Store", function () {
                         function (err, results) {
                             expect(results.length).toBe(3);
                             for (var i = 0; i < results.length; i++) {
-                                expect(parseInt(results[i].v1.value) + parseInt(results[i].v2.value) < 5);
+                                expect(parseInt(results[i].v1.value) + parseInt(results[i].v2.value)).toBeLessThan(5);
                             }
                             done();
                         },
@@ -1238,7 +1238,7 @@ describe("Store", function () {
                         function (err, results) {
                             expect(results.length).toBe(3);
                             for (var i = 0; i < results.length; i++) {
-                                expect(parseInt(results[i].v1.value) + parseInt(results[i].v2.value) < 5);
+                                expect(parseInt(results[i].v1.value) + parseInt(results[i].v2.value)).toBeLessThan(5);
                             }
                             done();
                         },

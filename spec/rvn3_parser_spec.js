@@ -4,7 +4,7 @@ var path = require("path");
 // Auxiliary functions
 var compare = function (compa, compb) {
     if (compa == null) {
-        expect(compb == null);
+        expect(compb == null).toBe(true);
     } else if (compa.token && compa.token === "uri") {
         expect(compa.token).toBe(compb.token);
         expect(compa.value).toBe(compb.value);
@@ -13,7 +13,7 @@ var compare = function (compa, compb) {
     } else if (compa.blank) {
         expect(compa.blank).toBe(compb.blank);
     } else {
-        expect(false);
+        fail("unexpected term " + JSON.stringify(compa));
     }
 };
 
@@ -38,7 +38,7 @@ var shouldParse = function (input, output, done, options) {
         //console.log("------------");
         //console.log(result);
         //console.log("!!!!!!!!!!!!");
-        expect(err != true);
+        expect(err).toBeNull();
         expect(result.constructor).toBe(output.constructor);
         expect(result.length).toBe(output.length);
         for (var i = 0; i < result.length; i++) {
@@ -55,7 +55,7 @@ describe("RVN3Parser#parse", function () {
             if (err) throw err;
             data = data.toString("utf8");
             RVN3Parser.parser.parse(data, "http://test.com/graph1", {}, function (err, result) {
-                expect(err == null);
+                expect(err).toBeNull();
                 expect(result.length).toBe(43);
 
                 for (var i = 0; i < result.length; i++) {
@@ -72,7 +72,7 @@ describe("RVN3Parser#parse", function () {
             if (err) throw err;
             data = data.toString("utf8");
             RVN3Parser.parser.parse(data, {}, function (err, result) {
-                expect(err == null);
+                expect(err).toBeNull();
                 expect(result.length).toBe(43);
 
                 for (var i = 0; i < result.length; i++) {

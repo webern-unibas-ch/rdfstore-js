@@ -42,6 +42,8 @@ describe("JSONLDParser#parse", function () {
     it("Should parse JSON-LD json objects - 2", function (done) {
         var input = {
             "@context": {
+                foaf: "http://xmlns.com/foaf/0.1/",
+                sioc: "http://rdfs.org/sioc/ns#",
                 myvocab: "http://example.org/myvocab#",
                 "sioc:avatar": {
                     "@type": "@id",
@@ -63,19 +65,19 @@ describe("JSONLDParser#parse", function () {
             for (var i = 0; i < result.length; i++) {
                 var triple = result[i];
                 expect(triple.subject.blank.indexOf("_:")).toBe(0);
-                if (triple.predicate.uri === "http://www.w3.org/1999/02/22-rdf-syntax-ns#type") {
-                    expect(triple.object.uri).toBe("http://xmlns.com/foaf/0.1/Person");
-                } else if (triple.predicate.uri === "http://xmlns.com/foaf/0.1/name") {
-                    expect(triple.object.literal).toBe('"Manu Sporny"');
-                } else if (triple.predicate.uri === "http://xmlns.com/foaf/0.1/homepage") {
-                    // uri because of default context coercion
-                    expect(triple.object.uri).toBe("http://manu.sporny.org/");
-                } else if (triple.predicate.uri === "http://rdfs.org/sioc/ns#avatar") {
-                    expect(triple.object.uri).toBe("http://twitter.com/account/profile_image/manusporny");
-                } else if (triple.predicate.uri === "http://example.org/myvocab#personality") {
-                    expect(triple.object.literal).toBe('"friendly"');
+                if (triple.predicate.value === "http://www.w3.org/1999/02/22-rdf-syntax-ns#type") {
+                    expect(triple.object.value).toBe("http://xmlns.com/foaf/0.1/Person");
+                } else if (triple.predicate.value === "http://xmlns.com/foaf/0.1/name") {
+                    expect(triple.object.literal).toBe('"Manu Sporny"^^<http://www.w3.org/2001/XMLSchema#string>');
+                } else if (triple.predicate.value === "http://xmlns.com/foaf/0.1/homepage") {
+                    // uri because of the context's @id coercion
+                    expect(triple.object.value).toBe("http://manu.sporny.org/");
+                } else if (triple.predicate.value === "http://rdfs.org/sioc/ns#avatar") {
+                    expect(triple.object.value).toBe("http://twitter.com/account/profile_image/manusporny");
+                } else if (triple.predicate.value === "http://example.org/myvocab#personality") {
+                    expect(triple.object.literal).toBe('"friendly"^^<http://www.w3.org/2001/XMLSchema#string>');
                 } else {
-                    expect(false);
+                    fail("unexpected predicate " + triple.predicate.value);
                 }
             }
 
@@ -108,20 +110,20 @@ describe("JSONLDParser#parse", function () {
         JSONLDParser.parser.parse(input, null, {}, function (err, result) {
             expect(result.length).toBe(9);
 
+            // blank node labels are relabeled, and without a context foaf: stays a compact IRI
+            var names = {};
             for (var i = 0; i < result.length; i++) {
                 var triple = result[i];
-                if (triple.predicate.uri === "http://xmlns.com/foaf/0.1/name") {
-                    if (triple.subject.blank === "_:bnode1") {
-                        expect(triple.object.literal).toBe('"Bob"');
-                    } else if (triple.subject.blank === "_:bnode2") {
-                        expect(triple.object.literal).toBe('"Eve"');
-                    } else if (triple.subject.blank === "_:bnode3") {
-                        expect(triple.object.literal).toBe('"Manu"');
-                    }
-                } else {
-                    expect(triple.predicate.literal == null);
+                if (triple.predicate.value === "foaf:name") {
+                    names[triple.subject.blank] = triple.object.literal;
                 }
             }
+            expect(Object.keys(names).length).toBe(3);
+            expect(Object.values(names).sort()).toEqual([
+                '"Bob"^^<http://www.w3.org/2001/XMLSchema#string>',
+                '"Eve"^^<http://www.w3.org/2001/XMLSchema#string>',
+                '"Manu"^^<http://www.w3.org/2001/XMLSchema#string>',
+            ]);
 
             done();
         });
@@ -145,10 +147,10 @@ describe("JSONLDParser#parse", function () {
 
             for (var i = 0; i < result.length; i++) {
                 expect(result[i].subject.blank[0]).toBe("_");
-                if (result[i].predicate.uri === "http://microformats.org/profile/hcard#url") {
-                    expect(result[i].object.uri).toBe("http://tantek.com/");
-                } else if (result[i].predicate.uri === "http://www.w3.org/1999/02/22-rdf-syntax-ns#type") {
-                    expect(result[i].object.uri).toBe("http://microformats.org/profile/hcard#vcard");
+                if (result[i].predicate.value === "http://microformats.org/profile/hcard#url") {
+                    expect(result[i].object.value).toBe("http://tantek.com/");
+                } else if (result[i].predicate.value === "http://www.w3.org/1999/02/22-rdf-syntax-ns#type") {
+                    expect(result[i].object.value).toBe("http://microformats.org/profile/hcard#vcard");
                 }
             }
 
@@ -196,7 +198,7 @@ describe("JSONLDParser#parse", function () {
                         triple.object.value === "http://purl.oreilly.com/products/9780596007683.BOOK" ||
                             triple.object.value === "http://purl.oreilly.com/products/9780596802189.EBOOK",
                     ).toBe(true);
-                    expect(previous !== triple.object.value);
+                    expect(triple.object.value).not.toBe(previous);
                     previous = triple.object.value;
                 }
             }
