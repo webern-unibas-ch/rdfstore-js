@@ -1,7 +1,6 @@
 var engineHelper = require("./helpers/engine");
 var newEngine = engineHelper.newEngine;
 var countLexiconTerms = engineHelper.countLexiconTerms;
-var NonSupportedSparqlFeatureError = require("../src/abstract_query_tree").NonSupportedSparqlFeatureError;
 var fs = require("fs");
 var _ = require("lodash");
 var async = require("async");
@@ -397,7 +396,6 @@ describe("QueryEngine", function () {
                                                      OPTIONAL { ?y foaf:nick ?nickY }\
                                                    }",
                         function (err, results) {
-                            var result = results.length > 0;
                             expect(results.length === 2).toBe(true);
                             done();
                         },

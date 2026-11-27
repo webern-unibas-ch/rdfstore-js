@@ -1,4 +1,5 @@
 var RVN3Parser = require("../src/rvn3_parser").RVN3Parser;
+var fs = require("fs");
 var path = require("path");
 
 // Auxiliary functions
@@ -40,7 +41,6 @@ var shouldParse = function (input, output, done, options) {
 
 describe("RVN3Parser#parse", function () {
     it("Should be able to parse N3 data with a provided graph", function (done) {
-        fs = require("fs");
         fs.readFile(path.resolve(__dirname, "data/sp2b_10k.n3"), function (err, data) {
             if (err) return done.fail(err);
             data = data.toString("utf8");
@@ -57,7 +57,6 @@ describe("RVN3Parser#parse", function () {
     });
 
     it("Should be able to parse N3 data with a null graph", function (done) {
-        fs = require("fs");
         fs.readFile(path.resolve(__dirname, "data/sp2b_10k.n3"), function (err, data) {
             if (err) return done.fail(err);
             data = data.toString("utf8");
@@ -74,11 +73,10 @@ describe("RVN3Parser#parse", function () {
     });
 
     it("Should parse N3 data with comments", function (done) {
-        fs = require("fs");
         fs.readFile(path.resolve(__dirname, "./data/with_comments.n3"), function (err, data) {
             if (err) return done.fail(err);
             data = data.toString("utf8");
-            var result = RVN3Parser.parser.parse(data, {}, function (err, result) {
+            RVN3Parser.parser.parse(data, {}, function (err, result) {
                 expect(result.length).toBe(9);
                 done();
             });

@@ -9,12 +9,12 @@ describe("Lexicon", function () {
             expect(parsed.value).toBe("this is a test");
 
             var literal2 = '"this is another test"@en';
-            var parsed = lexicon.parseLiteral(literal2);
+            parsed = lexicon.parseLiteral(literal2);
             expect(parsed.value).toBe("this is another test");
             expect(parsed.lang).toBe("en");
 
             var literal3 = '"this is another test"^^<http://sometypehere.org>';
-            var parsed = lexicon.parseLiteral(literal3);
+            parsed = lexicon.parseLiteral(literal3);
             expect(parsed.value).toBe("this is another test");
             expect(parsed.type).toBe("http://sometypehere.org");
 
@@ -69,7 +69,6 @@ describe("Lexicon", function () {
         new Lexicon(function (lexicon) {
             var oid1;
             var uri = "http://test.com/1";
-            var literal = '"this is a literal"';
 
             async.seq(
                 function (k) {

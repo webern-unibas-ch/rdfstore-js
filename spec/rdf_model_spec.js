@@ -73,7 +73,7 @@ describe("RDFModel", function () {
         graph.addAction(
             rdf.createAction(rdf.filters.p(rdf.resolve("foaf:name")), function (triple) {
                 var name = triple.object.valueOf();
-                var name = name.slice(0, 1).toUpperCase() + name.slice(1, name.length);
+                name = name.slice(0, 1).toUpperCase() + name.slice(1, name.length);
                 triple.object = rdf.createNamedNode(name);
                 return triple;
             }),
@@ -101,7 +101,7 @@ describe("RDFModel", function () {
         expect(triples.length).toBe(1);
         expect(triples[0].object.valueOf()).toBe("Alice");
 
-        var triples = graph.match(null, rdf.createNamedNode(rdf.resolve("foaf:knows")), null).toArray();
+        triples = graph.match(null, rdf.createNamedNode(rdf.resolve("foaf:knows")), null).toArray();
 
         expect(triples.length).toBe(1);
         expect(triples[0].object.valueOf()).toBe("http://example.org/people/Bob");

@@ -1,5 +1,4 @@
 var Store = require("../src/store");
-var N3Parser = require("../src/rvn3_parser").RVN3Parser;
 
 describe("Store", function () {
     it("Should pass integration test #1", function (done) {
@@ -524,7 +523,6 @@ describe("Store", function () {
         Store.create({ name: "test", overwrite: true }, function (err, store) {
             store.setPrefix("ex", "http://example.org/people/");
 
-            var graph = store.rdf.createGraph();
             var input = {
                 "@context": {
                     rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
@@ -554,9 +552,7 @@ describe("Store", function () {
         Store.create({ name: "test", overwrite: true }, function (err, store) {
             store.setPrefix("ex", "http://example.org/examples/");
 
-            var graph = store.rdf.createGraph();
-
-            input =
+            var input =
                 '_:a <http://test.com/p1> "test". _:a <http://test.com/p2> "test2". _:b <http://test.com/p1> "test" .';
             store.load("text/n3", input, "ex:test", function (err, results) {
                 store.execute(
@@ -570,10 +566,7 @@ describe("Store", function () {
                             var blankId = results[i].s.value;
                             blankIds[blankId] = true;
                         }
-                        var counter = 0;
-                        for (var p in blankIds) {
-                            counter++;
-                        }
+                        var counter = Object.keys(blankIds).length;
 
                         expect(counter).toBe(2);
                         store.close(function () {
@@ -589,9 +582,7 @@ describe("Store", function () {
         Store.create({ name: "test", overwrite: true }, function (err, store) {
             store.setPrefix("ex", "http://example.org/examples/");
 
-            var graph = store.rdf.createGraph();
-
-            input =
+            var input =
                 '_:a <http://test.com/p1> "test". _:a <http://test.com/p2> "test2". _:b <http://test.com/p1> "test" .';
             store.load("text/n3", input, { graph: "ex:test" }, function (err, results) {
                 store.execute(
@@ -605,10 +596,7 @@ describe("Store", function () {
                             var blankId = results[i].s.value;
                             blankIds[blankId] = true;
                         }
-                        var counter = 0;
-                        for (var p in blankIds) {
-                            counter++;
-                        }
+                        var counter = Object.keys(blankIds).length;
 
                         expect(counter).toBe(2);
                         store.close(function () {
@@ -624,9 +612,7 @@ describe("Store", function () {
         Store.create({ name: "test", overwrite: true }, function (err, store) {
             store.setPrefix("ex", "http://example.org/examples/");
 
-            var graph = store.rdf.createGraph();
-
-            input =
+            var input =
                 '<#me> <http://test.com/p1> "test". <http://test.com/something#me> <http://test.com/p2> "test2". _:b <http://test.com/p1> "test" .';
             store.load("text/n3", input, { baseURI: "http://test.com/something" }, function (err, results) {
                 store.execute("select ?s { ?s ?p ?o }", function (err, results) {
@@ -637,10 +623,7 @@ describe("Store", function () {
                         var blankId = results[i].s.value;
                         blankIds[blankId] = true;
                     }
-                    var counter = 0;
-                    for (var p in blankIds) {
-                        counter++;
-                    }
+                    var counter = Object.keys(blankIds).length;
 
                     expect(counter).toBe(2);
                     store.close(function () {
@@ -655,9 +638,7 @@ describe("Store", function () {
         Store.create({ name: "test", overwrite: true }, function (err, store) {
             store.setPrefix("ex", "http://example.org/examples/");
 
-            var graph = store.rdf.createGraph();
-
-            input =
+            var input =
                 '<#me> <http://test.com/p1> "test". <http://test.com/something#me> <http://test.com/p2> "test2". _:b <http://test.com/p1> "test" .';
             store.load(
                 "text/n3",
@@ -678,10 +659,7 @@ describe("Store", function () {
                                 var blankId = results[i].s.value;
                                 blankIds[blankId] = true;
                             }
-                            var counter = 0;
-                            for (var p in blankIds) {
-                                counter++;
-                            }
+                            var counter = Object.keys(blankIds).length;
 
                             expect(counter).toBe(2);
                             store.close(function () {
@@ -979,16 +957,13 @@ describe("Store", function () {
 
                 store.execute(query, function (err, graph) {
                     expect(err).toBeNull();
-                    var numBlankSubjects = 0;
                     var distinctBlankSubjects = {};
-                    var foundUris = false;
                     var triples = graph.toArray();
                     var triple;
                     expect(triples.length).toBe(4);
                     for (var i = 0; i < triples.length; i++) {
                         triple = triples[i];
                         if (triple.subject.interfaceName === "BlankNode") {
-                            numBlankSubjects++;
                             distinctBlankSubjects[triple.subject.bnodeId] = true;
                         } else {
                             expect(triple.subject.valueOf()).toBe("http://www.example.com/resource/12645");
@@ -997,10 +972,7 @@ describe("Store", function () {
                         }
                     }
 
-                    var numDistinctBlankSujects = 0;
-                    for (var p in distinctBlankSubjects) {
-                        numDistinctBlankSujects++;
-                    }
+                    var numDistinctBlankSujects = Object.keys(distinctBlankSubjects).length;
 
                     expect(numDistinctBlankSujects).toBe(1);
                     store.close(function () {
@@ -1121,7 +1093,6 @@ describe("Store", function () {
                  test:C test:prop 1.\
                  test:D test:prop 3.",
                 function (err) {
-                    var invoked = false;
                     store.registerCustomFunction("my_addition", function (engine, args) {
                         var v1 = engine.effectiveTypeValue(args[0]);
                         var v2 = engine.effectiveTypeValue(args[1]);
@@ -1152,7 +1123,6 @@ describe("Store", function () {
                  test:C test:prop 1.\
                  test:D test:prop 3.",
                 function (err) {
-                    var invoked = false;
                     store.registerCustomFunction("http://test.com/my_addition", function (engine, args) {
                         var v1 = engine.effectiveTypeValue(args[0]);
                         var v2 = engine.effectiveTypeValue(args[1]);
@@ -1183,7 +1153,6 @@ describe("Store", function () {
                  test:C test:prop 1.\
                  test:D test:prop 3.",
                 function (err) {
-                    var invoked = false;
                     store.registerCustomFunction("http://test.com/my_addition2", function (engine, args) {
                         var v1 = engine.effectiveTypeValue(args[0]);
                         var v2 = engine.effectiveTypeValue(args[1]);
@@ -1445,9 +1414,7 @@ describe("Store", function () {
                  test:C test:prop 1.\
                  test:D test:prop 3.",
                 function (err) {
-                    var invoked = false;
                     store.registerCustomFunction("http://test.com/my_default_value", function (engine, args) {
-                        var v1 = engine.effectiveTypeValue(args[0]);
                         return {
                             token: "literal",
                             value: "test_value",

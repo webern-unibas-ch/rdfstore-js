@@ -186,7 +186,6 @@ describe("BTree", function () {
                 cb(null, i < max);
             },
             function (c) {
-                var next = (i * 100) / max;
                 async.seq(
                     function (_, c) {
                         new btree.Tree(2, function (tree) {

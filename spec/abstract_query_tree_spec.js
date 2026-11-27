@@ -1,12 +1,4 @@
 var AbstractQueryTree = require("../src/abstract_query_tree").AbstractQueryTree;
-var Lexicon = require("../src/lexicon").Lexicon;
-
-var sys = null;
-try {
-    sys = require("util");
-} catch (e) {
-    sys = require("sys");
-}
 var aqt = new AbstractQueryTree();
 
 describe("Parser", function () {
@@ -31,7 +23,7 @@ describe("Parser", function () {
     it("Should be possible to parse 'SELECT * { { ?s :p1 ?v1 } UNION {?s :p2 ?v2 } }'.", function () {
         var query = "SELECT * { { ?s :p1 ?v1 } UNION {?s :p2 ?v2 } }";
 
-        var query = aqt.parseQueryString(query);
+        query = aqt.parseQueryString(query);
         var result = aqt.parseSelect(query.units[0]);
         expect(result.pattern.kind).toBe("UNION");
         expect(result.pattern.value.length).toBe(2);
@@ -44,7 +36,7 @@ describe("Parser", function () {
     it("Should be possible to parse 'SELECT * { { ?s :p1 ?v1 } UNION {?s :p2 ?v2 } UNION {?s :p3 ?v3 } }'.", function () {
         var query = "SELECT * { { ?s :p1 ?v1 } UNION {?s :p2 ?v2 } UNION {?s :p3 ?v3 } }";
 
-        var query = aqt.parseQueryString(query);
+        query = aqt.parseQueryString(query);
         var result = aqt.parseSelect(query.units[0]);
 
         expect(result.pattern.kind).toBe("UNION");
@@ -69,7 +61,7 @@ describe("Parser", function () {
     it("Should be possible to parse 'SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 } }'.", function () {
         var query = "SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 } }";
 
-        var query = aqt.parseQueryString(query);
+        query = aqt.parseQueryString(query);
         var result = aqt.parseSelect(query.units[0]);
 
         expect(result.pattern.kind).toBe("LEFT_JOIN");
@@ -83,7 +75,7 @@ describe("Parser", function () {
     it("Should be possible to parse 'SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 } OPTIONAL { ?s :p3 ?v3 } }'.", function () {
         var query = "SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 } OPTIONAL { ?s :p3 ?v3 } }";
 
-        var query = aqt.parseQueryString(query);
+        query = aqt.parseQueryString(query);
         var result = aqt.parseSelect(query.units[0]);
 
         expect(result.pattern.kind).toBe("LEFT_JOIN");
@@ -96,7 +88,7 @@ describe("Parser", function () {
     it("Should be possible to parse 'SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 FILTER(?v1<3) } }'.", function () {
         var query = "SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 FILTER(?v1<3) } }";
 
-        var query = aqt.parseQueryString(query);
+        query = aqt.parseQueryString(query);
         var result = aqt.parseSelect(query.units[0]);
         expect(result.pattern.kind).toBe("LEFT_JOIN");
         expect(result.pattern.filter.length).toBe(1);
@@ -108,7 +100,7 @@ describe("Parser", function () {
     it("Should be possible to parse 'SELECT * { {?s :p1 ?v1} UNION {?s :p2 ?v2} OPTIONAL {?s :p3 ?v3} }'.", function () {
         var query = "SELECT * { {?s :p1 ?v1} UNION {?s :p2 ?v2} OPTIONAL {?s :p3 ?v3} }";
 
-        var query = aqt.parseQueryString(query);
+        query = aqt.parseQueryString(query);
         var result = aqt.parseSelect(query.units[0]);
 
         expect(result.pattern.kind).toBe("LEFT_JOIN");
@@ -125,7 +117,7 @@ describe("Parser", function () {
                    foaf:name ?nameX .\
                    ?y foaf:name ?nameY .\
                    OPTIONAL { ?y foaf:nick ?nickY }  }";
-        var query = aqt.parseQueryString(query);
+        query = aqt.parseQueryString(query);
         var result = aqt.parseSelect(query.units[0]);
 
         expect(result.pattern.kind).toBe("LEFT_JOIN");
@@ -136,7 +128,7 @@ describe("Parser", function () {
     it("Should be possible to collect triples for 'SELECT * { ?s ?p ?o }'", function () {
         var query = "SELECT * { ?s ?p ?o }";
 
-        var query = aqt.parseQueryString(query);
+        query = aqt.parseQueryString(query);
         var parsed = aqt.parseExecutableUnit(query.units[0]);
         var patterns = aqt.collectBasicTriples(parsed);
 
@@ -146,7 +138,7 @@ describe("Parser", function () {
     it("Should be possible to collect triples for 'SELECT * { ?s :p1 ?v1 ; :p2 ?v2 }'", function () {
         var query = "SELECT * { ?s :p1 ?v1 ; :p2 ?v2 }";
 
-        var query = aqt.parseQueryString(query);
+        query = aqt.parseQueryString(query);
         var parsed = aqt.parseSelect(query.units[0]);
 
         var patterns = aqt.collectBasicTriples(parsed);
@@ -163,7 +155,7 @@ describe("Parser", function () {
                    foaf:name ?nameX .\
                    ?y foaf:name ?nameY .\
                    OPTIONAL { ?y foaf:nick ?nickY }  }";
-        var query = aqt.parseQueryString(query);
+        query = aqt.parseQueryString(query);
         var parsed = aqt.parseSelect(query.units[0]);
 
         var patterns = aqt.collectBasicTriples(parsed);
@@ -175,7 +167,7 @@ describe("Parser", function () {
         var query =
             "PREFIX : <http://example/>\
                  SELECT * { GRAPH ?g { ?s ?p ?o } }";
-        var query = aqt.parseQueryString(query);
+        query = aqt.parseQueryString(query);
         var parsed = aqt.parseSelect(query.units[0]);
 
         var patterns = aqt.collectBasicTriples(parsed);
@@ -188,7 +180,7 @@ describe("Parser", function () {
         var query =
             "PREFIX : <http://example/>\
                  SELECT * { GRAPH <http://test.com/graph1> { ?s ?p ?o } }";
-        var query = aqt.parseQueryString(query);
+        query = aqt.parseQueryString(query);
         var parsed = aqt.parseSelect(query.units[0]);
 
         var patterns = aqt.collectBasicTriples(parsed);
@@ -200,7 +192,7 @@ describe("Parser", function () {
     it("Should be possible to bind variables in a result example 1", function () {
         var query = "SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 FILTER(?v1<3) } }";
 
-        var query = aqt.parseQueryString(query);
+        query = aqt.parseQueryString(query);
         var result = aqt.parseSelect(query.units[0]);
 
         expect(result.pattern.kind).toBe("LEFT_JOIN");
@@ -217,7 +209,7 @@ describe("Parser", function () {
     it("Should be possible to bind variables in a result example with complex filter expressions", function () {
         var query = "SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 FILTER(?v1<3 && (?v1+?v1) < (5*?v1) && STR(?v1)) } }";
 
-        var query = aqt.parseQueryString(query);
+        query = aqt.parseQueryString(query);
         var result = aqt.parseSelect(query.units[0]);
 
         expect(result.pattern.kind).toBe("LEFT_JOIN");
@@ -242,7 +234,7 @@ describe("Parser", function () {
         var query =
             "SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 <http://prauw.cs.vu.nl/foaf/Jan Top.rdf> FILTER(?v1<3 && (?v1+?v1) < (5*?v1) && STR(?v1)) } }";
 
-        var query = aqt.parseQueryString(query);
+        query = aqt.parseQueryString(query);
         var result = aqt.parseSelect(query.units[0]);
 
         expect(result.pattern.kind).toBe("LEFT_JOIN");
@@ -266,7 +258,7 @@ describe("Parser", function () {
     it("Should be possible to parse a simple path expression", function () {
         var query = "SELECT * { ?s :p1/:p2/:p3 ?v1 }";
 
-        var query = aqt.parseQueryString(query);
+        query = aqt.parseQueryString(query);
         var result = aqt.parseSelect(query.units[0]);
 
         expect(result.pattern.kind).toBe("BGP");
@@ -300,7 +292,7 @@ describe("Parser", function () {
             var query3 = "SELECT ?givenName WHERE { ?x foaf:givenName  ?givenName . filter(ISURI(?x)) }";
             var queries = [query1, query2, query3];
             for (var i = 0; i < queries.length; i++) {
-                var parsed = aqt.parseQueryString(queries[i]);
+                aqt.parseQueryString(queries[i]);
             }
         }).not.toThrow();
     });

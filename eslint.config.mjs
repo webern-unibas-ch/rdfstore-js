@@ -30,4 +30,22 @@ export default [
             "no-empty": "error",
         },
     },
+    {
+        // The specs get the same checks except no-var and prefer-const.
+        files: ["spec/**/*.js"],
+        languageOptions: {
+            ecmaVersion: 2022,
+            sourceType: "commonjs",
+            globals: {
+                ...globals.node,
+                ...globals.jasmine,
+            },
+        },
+        rules: {
+            "no-undef": "error",
+            "no-redeclare": "error",
+            "no-unused-vars": ["error", { args: "none", caughtErrors: "none" }],
+            "no-empty": "error",
+        },
+    },
 ];

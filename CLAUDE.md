@@ -16,7 +16,7 @@ yarn e2e                     # all e2e scripts in e2e/ (basic, comprehensive, re
 yarn test                    # parse-grammar + specs + e2e
 yarn build                   # parse-grammar + esbuild bundles -> dist/rdfstore{,_min}.js (IIFE) + dist/rdfstore{,_min}.mjs (ESM)
 yarn parse-grammar           # regenerate src/parser.js from grammar/sparql_query.grammar
-yarn lint                    # ESLint (no-undef, no-redeclare, no-var, prefer-const, no-unused-vars, no-empty) over src/, without parser.js and perftest/
+yarn lint                    # ESLint (no-undef, no-redeclare, no-var, prefer-const, no-unused-vars, no-empty) over src/ (without parser.js and perftest/) and spec/ (without no-var, prefer-const)
 yarn format                  # Prettier --write over all JS/TS files (see .prettierignore)
 yarn format:check            # Prettier --check (not run in CI; the pre-commit hook formats)
 yarn husky:prepare           # once per clone: install the pre-commit hook (.husky/)
@@ -50,7 +50,7 @@ Every error reaches the caller's callback exactly once, as `callback(err)` ([spe
 
 `store.promises` and `rdfstore.promises.create` ([src/store_promises.js](src/store_promises.js)) wrap the callback API with `Utils.toPromise`. Each wrapper calls the store method with the exact argument count of the intended form, because the methods dispatch on `arguments.length`. The core stays callback-based.
 
-**Every `src/` module is strict mode** (`"use strict";` at the top), so the CommonJS entry behaves like the ES module bundle. Declare every name with `const`, or `let` if it is reassigned (`var` is not allowed): an implicit global throws in strict mode. [eslint.config.mjs](eslint.config.mjs) enables `no-undef` to catch this statically, including on paths the specs never run, plus `no-redeclare`, `no-var`, `prefer-const`, `no-unused-vars` (skips parameters and `catch` bindings) and `no-empty` (an intentionally empty block gets a comment). ESLint cannot see `this` inside plain callbacks, which is `undefined` in strict mode: capture `const that = this;` in the method instead.
+**Every `src/` module is strict mode** (`"use strict";` at the top), so the CommonJS entry behaves like the ES module bundle. Declare every name with `const`, or `let` if it is reassigned (`var` is not allowed): an implicit global throws in strict mode. [eslint.config.mjs](eslint.config.mjs) enables `no-undef` to catch this statically, including on paths the specs never run, plus `no-redeclare`, `no-var`, `prefer-const`, `no-unused-vars` (skips parameters and `catch` bindings) and `no-empty` (an intentionally empty block gets a comment). The specs are linted with the same rules except `no-var` and `prefer-const`, and with the Jasmine globals. ESLint cannot see `this` inside plain callbacks, which is `undefined` in strict mode: capture `const that = this;` in the method instead.
 
 **Layering** (from the public API down to storage):
 

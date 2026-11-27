@@ -44,7 +44,7 @@
     "specs": "jasmine ./spec/*.js",
     "\n---MAIN---": "",
     "build": "yarn parse-grammar && yarn build:browser",
-    "lint": "eslint src",
+    "lint": "eslint src spec",
     "format": "prettier --write \"**/*.{js,mjs,cjs,ts,mts,cts}\"",
     "format:check": "prettier --check \"**/*.{js,mjs,cjs,ts,mts,cts}\"",
     "types": "tsc -p types",

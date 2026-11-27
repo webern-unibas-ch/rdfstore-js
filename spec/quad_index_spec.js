@@ -92,20 +92,6 @@ describe("QuadIndex", function () {
         return new Pattern({ subject: s, predicate: p, object: o });
     };
 
-    var repeat = function (c, max, floop, fend, env) {
-        if (arguments.length === 4) {
-            env = {};
-        }
-        if (c < max) {
-            env._i = c;
-            floop(function (floop, env) {
-                repeat(c + 1, max, floop, fend, env);
-            }, env);
-        } else {
-            fend(env);
-        }
-    };
-
     it("Should be possible to run range queries over the QuadIndex", function (done) {
         new QuadIndex({ order: 2, componentOrder: ["subject", "predicate", "object"] }, function (index) {
             async.timesSeries(
