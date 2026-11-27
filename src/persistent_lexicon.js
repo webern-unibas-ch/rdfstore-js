@@ -299,7 +299,10 @@ PersistentLexicon.prototype.retrieve = function(oid, callback) {
                 } else if(event.target.result.literal != null) {
                     callback(that.parseLiteral(event.target.result.value.slice(3,event.target.result.value.length)));
                 } else {
-                    callback(null,new Error("Unknown type of component "+event.target.result));
+                    const error = new Error("Unknown type of component " + JSON.stringify(event.target.result));
+                    // the callers take one argument, so this warning is the only trace of the error
+                    console.warn(error.message);
+                    callback(null, error);
                 }
             } else {
                 callback(null,null);
