@@ -43,11 +43,15 @@ Callbacks.CallbacksBackend = function () {
     this.callbackCounter = 0;
     this.callbacksMap = {};
     this.callbacksInverseMap = new Map();
+    // per subscription id: the pattern and its OIDs, whose lexicon references unsubscribe releases
+    this.callbackTerms = {};
 
     this.queryCounter = 0;
     this.queriesMap = {};
     this.queriesCallbacksMap = {};
     this.queriesInverseMap = {};
+    // per observed query id: the patterns and their OIDs, whose lexicon references stopObservingQuery releases
+    this.queriesTerms = {};
 
     for (let i = 0; i < this.indices.length; i++) {
         const indexKey = this.indices[i];
@@ -223,6 +227,7 @@ Callbacks.CallbacksBackend.prototype.subscribe = function (s, p, o, g, callback,
                 index["_"].push(that.callbackCounter);
                 that.callbacksMap[that.callbackCounter] = callback;
                 that.callbacksInverseMap.set(callback, that.callbackCounter);
+                that.callbackTerms[that.callbackCounter] = { quad: quad, key: normalized };
                 break;
             } else {
                 if (i === indexOrder.length - 1) {
@@ -231,6 +236,7 @@ Callbacks.CallbacksBackend.prototype.subscribe = function (s, p, o, g, callback,
                     index[quadValue]["_"].push(that.callbackCounter);
                     that.callbacksMap[that.callbackCounter] = callback;
                     that.callbacksInverseMap.set(callback, that.callbackCounter);
+                    that.callbackTerms[that.callbackCounter] = { quad: quad, key: normalized };
                 } else {
                     index[quadValue] = index[quadValue] || {};
                     index = index[quadValue];
@@ -241,12 +247,39 @@ Callbacks.CallbacksBackend.prototype.subscribe = function (s, p, o, g, callback,
     });
 };
 
-Callbacks.CallbacksBackend.prototype.unsubscribe = function (callback) {
-    const id = this.callbacksInverseMap.get(callback);
-    if (id != null) {
-        this.callbacksInverseMap.delete(callback);
-        delete this.callbacksMap[id];
+Callbacks.CallbacksBackend.prototype.unsubscribe = function (callback, done) {
+    this.unsubscribeAll([callback], done);
+};
+
+// Removes the listeners at once; done (optional) runs once the lexicon references of their patterns are released.
+Callbacks.CallbacksBackend.prototype.unsubscribeAll = function (callbacks, done) {
+    const terms = [];
+    for (let i = 0; i < callbacks.length; i++) {
+        const id = this.callbacksInverseMap.get(callbacks[i]);
+        if (id != null) {
+            this.callbacksInverseMap.delete(callbacks[i]);
+            delete this.callbacksMap[id];
+            if (this.callbackTerms[id] != null) terms.push(this.callbackTerms[id]);
+            delete this.callbackTerms[id];
+        }
     }
+    this._releaseTerms(terms, done);
+};
+
+// Releases the lexicon references that normalizing these patterns added, then calls done (optional).
+Callbacks.CallbacksBackend.prototype._releaseTerms = function (terms, done) {
+    const lexicon = this.engine.lexicon;
+    Utils.eachSeries(
+        terms,
+        function (entry, k) {
+            lexicon.release(entry.quad, entry.key, function () {
+                k();
+            });
+        },
+        function () {
+            if (done != null) done();
+        },
+    );
 };
 
 Callbacks.CallbacksBackend.prototype._tokenizeComponents = function (s, p, o, g) {
@@ -369,16 +402,17 @@ Callbacks.CallbacksBackend.prototype.observeNode = function () {
     });
 };
 
-Callbacks.CallbacksBackend.prototype.stopObservingNode = function (callback) {
+Callbacks.CallbacksBackend.prototype.stopObservingNode = function (callback, done) {
     const observers = this.observersMap.get(callback);
     if (observers) {
         this.observersMap.delete(callback);
         for (let i = 0; i < observers.length; i++) {
-            this.unsubscribe(observers[i]);
             this.unsubscribeEmpty(Callbacks["eventsFlushed"], observers[i]);
         }
+        this.unsubscribeAll(observers, done);
         return true;
     } else {
+        if (done != null) done();
         return false;
     }
 };
@@ -413,6 +447,15 @@ Callbacks.CallbacksBackend.prototype.observeQuery = function (query, callback, e
             }
 
             that.engine.normalizeQuad(quad, queryEnv, true, function (normalized) {
+                if (that.queriesMap[counter] != null) {
+                    (that.queriesTerms[counter] = that.queriesTerms[counter] || []).push({
+                        quad: quad,
+                        key: normalized,
+                    });
+                } else {
+                    // stopped while its patterns were still being registered
+                    that._releaseTerms([{ quad: quad, key: normalized }]);
+                }
                 const pattern = new Pattern(normalized);
                 const indexKey = that._indexForPattern(pattern);
                 const indexOrder = that.componentOrders[indexKey];
@@ -456,18 +499,23 @@ Callbacks.CallbacksBackend.prototype.observeQuery = function (query, callback, e
     );
 };
 
-Callbacks.CallbacksBackend.prototype.stopObservingQuery = function (query) {
+// Stops every observer of the query at once; done (optional) runs once their lexicon references are released.
+Callbacks.CallbacksBackend.prototype.stopObservingQuery = function (query, done) {
     const ids = this.queriesInverseMap[query];
+    let terms = [];
     if (ids != null) {
         delete this.queriesInverseMap[query];
         for (let i = 0; i < ids.length; i++) {
             delete this.queriesMap[ids[i]];
             delete this.queriesCallbacksMap[ids[i]];
+            terms = terms.concat(this.queriesTerms[ids[i]] || []);
+            delete this.queriesTerms[ids[i]];
         }
         this.queriesList = Utils.reject(this.queriesList, function (queryId) {
             return Utils.include(ids, queryId);
         });
     }
+    this._releaseTerms(terms, done);
 };
 
 Callbacks.CallbacksBackend.prototype._searchQueriesInIndex = function (index, order, quadPair) {

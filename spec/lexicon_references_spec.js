@@ -28,6 +28,39 @@ var triples = function (n) {
     return lines.join("\n");
 };
 
+var subscribe = function (store, s, listener) {
+    return new Promise(function (resolve) {
+        store.subscribe(s, null, null, null, listener, resolve);
+    });
+};
+
+var observeQuery = function (store, query, listener) {
+    return new Promise(function (resolve) {
+        store.startObservingQuery(query, listener || function () {}, resolve);
+    });
+};
+
+// resolves with the function registered as the node's listener, for stopObservingNode
+var observeNode = function (store, uri) {
+    return new Promise(function (resolve) {
+        var listener = function () {
+            if (first) {
+                first = false;
+                resolve(listener);
+            }
+        };
+        var first = true;
+        store.startObservingNode(uri, listener);
+    });
+};
+
+// calls store[method](arg, done) and resolves once done runs
+var released = function (store, method, arg) {
+    return new Promise(function (resolve) {
+        store[method](arg, resolve);
+    });
+};
+
 describe("Lexicon references", function () {
     it("removes the terms of many deleted triples, also those in inner B-tree nodes", async function () {
         var store = await newStore();
@@ -161,6 +194,81 @@ describe("Lexicon references", function () {
             await store.promises.execute("DELETE DATA { <http://s> <http://p> <http://o> }");
             await store.promises.execute("INSERT DATA { <http://s> <http://p> <http://o> }");
             expect(results[results.length - 1]).toBe(1);
+        });
+
+        it("releases a subscribed IRI on unsubscribe", async function () {
+            var store = await newStore();
+            var listener = function () {};
+            await subscribe(store, "http://s", listener);
+            expect(await termCount(store)).toBeGreaterThan(0);
+            await released(store, "unsubscribe", listener);
+            expect(await termCount(store)).toBe(0);
+        });
+
+        it("keeps an IRI another listener still subscribes to", async function () {
+            var store = await newStore();
+            var events = [];
+            var first = function () {};
+            var second = function (event) {
+                events.push(event);
+            };
+            await subscribe(store, "http://s", first);
+            await subscribe(store, "http://s", second);
+            await released(store, "unsubscribe", first);
+            await store.promises.execute("INSERT DATA { <http://s> <http://p> <http://o> }");
+            expect(events).toEqual(["added"]);
+            await store.promises.execute("DELETE DATA { <http://s> <http://p> <http://o> }");
+            expect(await termCount(store)).toBeGreaterThan(0);
+            await released(store, "unsubscribe", second);
+            expect(await termCount(store)).toBe(0);
+        });
+
+        it("keeps the terms of a stored triple after unsubscribe", async function () {
+            var store = await newStore();
+            var listener = function () {};
+            await subscribe(store, "http://s", listener);
+            await store.promises.execute("INSERT DATA { <http://s> <http://p> <http://o> }");
+            await released(store, "unsubscribe", listener);
+            var results = await store.promises.execute("SELECT ?o { <http://s> <http://p> ?o }");
+            expect(results.length).toBe(1);
+            await store.promises.execute("DELETE DATA { <http://s> <http://p> <http://o> }");
+            expect(await termCount(store)).toBe(0);
+        });
+
+        it("releases the terms of an observed query, also when it is observed twice", async function () {
+            var store = await newStore();
+            var query = 'SELECT ?s { ?s <http://p> "a" . ?s <http://q> <http://o> }';
+            await observeQuery(store, query);
+            await observeQuery(store, query);
+            expect(await termCount(store)).toBeGreaterThan(0);
+            await released(store, "stopObservingQuery", query);
+            expect(await termCount(store)).toBe(0);
+        });
+
+        it("releases the IRI of an observed node", async function () {
+            var store = await newStore();
+            var listener = await observeNode(store, "http://s");
+            expect(await termCount(store)).toBeGreaterThan(0);
+            await released(store, "stopObservingNode", listener);
+            expect(await termCount(store)).toBe(0);
+        });
+
+        it("releases nothing more when a listener is removed twice", async function () {
+            var store = await newStore();
+            var listener = function () {};
+            var query = "SELECT ?o { <http://s> <http://p> ?o }";
+            await store.promises.execute("INSERT DATA { <http://s> <http://p> <http://o> }");
+            await subscribe(store, "http://s", listener);
+            await observeQuery(store, query);
+            await released(store, "unsubscribe", listener);
+            await released(store, "unsubscribe", listener);
+            await released(store, "stopObservingQuery", query);
+            await released(store, "stopObservingQuery", query);
+            await released(store, "stopObservingNode", listener);
+            var results = await store.promises.execute("SELECT ?o { <http://s> <http://p> ?o }");
+            expect(results.length).toBe(1);
+            await store.promises.execute("DELETE DATA { <http://s> <http://p> <http://o> }");
+            expect(await termCount(store)).toBe(0);
         });
     });
 });

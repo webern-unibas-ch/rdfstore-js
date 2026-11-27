@@ -52,9 +52,14 @@ function useCallbacks(): void {
         store.load("text/turtle", '<http://a> <http://p> "1" .', function (err, count) {
             if (!err) console.log(count + 1);
         });
-        store.subscribe("http://a", null, null, null, function (event, triples) {
+        const listener = function (event: string, triples: Triple[]) {
             console.log(event === "added", triples.length);
+        };
+        store.subscribe("http://a", null, null, null, listener);
+        store.unsubscribe(listener, function () {
+            store.stopObservingQuery("SELECT * { ?s ?p ?o }", () => console.log("released"));
         });
+        store.unsubscribe(listener);
         store.startObservingQuery(
             "SELECT * { ?s ?p ?o }",
             function (rows) {

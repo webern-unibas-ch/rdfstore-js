@@ -357,9 +357,10 @@ Store.prototype.startObservingNode = function () {
  *
  * @arguments
  * @param {Function} eventListener The event listener function to remove, the same passed as an argument to startObservingNode
+ * @param {Function} [done] optional function invoked once the store has released the node's terms
  */
-Store.prototype.stopObservingNode = function (callback) {
-    this.engine.callbacksBackend.stopObservingNode(callback);
+Store.prototype.stopObservingNode = function (callback, done) {
+    this.engine.callbacksBackend.stopObservingNode(callback, done);
 };
 
 /**
@@ -399,9 +400,10 @@ Store.prototype.startObservingQuery = function () {
  *
  * @arguments
  * @param {String} query The query string, the same passed as an argument to startObservingQuery
+ * @param {Function} [done] optional function invoked once the store has released the query's terms
  */
-Store.prototype.stopObservingQuery = function (query) {
-    this.engine.callbacksBackend.stopObservingQuery(query);
+Store.prototype.stopObservingQuery = function (query, done) {
+    this.engine.callbacksBackend.stopObservingQuery(query, done);
 };
 
 /**
@@ -465,13 +467,12 @@ Store.prototype.subscribe = function (s, p, o, g, callback, readyCallback) {
  *
  * @arguments
  * @param {Function} callback The event listener to be removed
+ * @param {Function} [done] optional function invoked once the store has released the terms of its patterns
  */
-Store.prototype.unsubscribe = function (callback) {
+Store.prototype.unsubscribe = function (callback, done) {
     const adapters = this.functionMap.get(callback) || [];
-    for (let i = 0; i < adapters.length; i++) {
-        this.engine.callbacksBackend.unsubscribe(adapters[i]);
-    }
     this.functionMap.delete(callback);
+    this.engine.callbacksBackend.unsubscribeAll(adapters, done);
 };
 
 /**
