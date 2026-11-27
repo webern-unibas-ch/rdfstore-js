@@ -366,6 +366,17 @@ PersistentLexicon.prototype.unregister = function (quad, key, callback) {
 };
 
 /**
+ * A no-op: _unregisterTerm here ignores the reference counter and deletes the term, so releasing
+ * the references of a duplicate would remove terms that stored quads still use.
+ * @param quad
+ * @param key
+ * @param callback
+ */
+PersistentLexicon.prototype.release = function (quad, key, callback) {
+    callback(true);
+};
+
+/**
  * Removes a blank node that no quad uses anymore.
  * @param oid
  * @param callback

@@ -283,11 +283,21 @@ Tree.prototype.__insertNonFull = function (tree, node, idx, key, data, callback)
         while (idx >= 0 && tree.comparator(key, node.keys[idx].key) === -1) {
             idx--;
         }
+        // the key is in this inner node: replace its data, as a leaf does, instead of adding a duplicate below
+        if (idx >= 0 && tree.comparator(key, node.keys[idx].key) === 0) {
+            node.keys[idx].data = data;
+            return tree._diskWrite(node, callback);
+        }
         idx++;
         const that = tree;
         tree._diskRead(node.children[idx], function (child) {
             if (child.numberActives === 2 * that.order - 1) {
                 that._splitChild(node, idx, child, function () {
+                    // the split may have moved the key itself up into this node
+                    if (that.comparator(key, node.keys[idx].key) === 0) {
+                        node.keys[idx].data = data;
+                        return that._diskWrite(node, callback);
+                    }
                     if (that.comparator(key, node.keys[idx].key) === 1) {
                         idx++;
                     }
@@ -304,15 +314,20 @@ Tree.prototype.__insertNonFull = function (tree, node, idx, key, data, callback)
             }
         });
     } else {
-        while (idx >= 0 && tree.comparator(key, node.keys[idx].key) === -1) {
-            node.keys[idx + 1] = node.keys[idx];
-            idx--;
+        let pos = idx;
+        while (pos >= 0 && tree.comparator(key, node.keys[pos].key) === -1) {
+            pos--;
         }
 
-        if (idx >= 0 && tree.comparator(key, node.keys[idx].key) === 0) {
-            node.keys[idx] = { key: key, data: data };
+        if (pos >= 0 && tree.comparator(key, node.keys[pos].key) === 0) {
+            // an equal key: replace it, before shifting anything
+            node.keys[pos] = { key: key, data: data };
         } else {
-            node.keys[idx + 1] = { key: key, data: data };
+            while (idx > pos) {
+                node.keys[idx + 1] = node.keys[idx];
+                idx--;
+            }
+            node.keys[pos + 1] = { key: key, data: data };
             node.numberActives++;
         }
         tree._diskWrite(node, function (node) {

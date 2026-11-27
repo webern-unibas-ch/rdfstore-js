@@ -414,6 +414,17 @@ Lexicon.prototype.unregister = function (quad, key, callback) {
 };
 
 /**
+ * Releases the references to a quad's terms that registering it just added, when no quad was added
+ * (a duplicate) or one more after a quad was removed.
+ * @param quad
+ * @param key
+ * @param callback
+ */
+Lexicon.prototype.release = function (quad, key, callback) {
+    this.unregister(quad, key, callback);
+};
+
+/**
  * Removes a blank node that no quad uses anymore.
  * @param oid
  * @param callback
@@ -461,9 +472,8 @@ Lexicon.prototype._unregisterTerm = function (kind, oid, callback) {
                                 callback();
                             });
                         } else {
-                            that.uris.insert(uri, [oid, counter - 1], function () {
-                                callback();
-                            });
+                            oidData[1] = counter - 1;
+                            callback();
                         }
                     } else {
                         callback();
@@ -474,7 +484,6 @@ Lexicon.prototype._unregisterTerm = function (kind, oid, callback) {
             callback();
         }
     } else if (kind === "literal") {
-        this.oidCounter++;
         const oidStr = "l" + oid;
 
         that.oidLiterals.search(oidStr, function (literal) {
@@ -497,9 +506,8 @@ Lexicon.prototype._unregisterTerm = function (kind, oid, callback) {
                             callback();
                         });
                     } else {
-                        that.literals.insert(literal, [oid, counter - 1], function () {
-                            callback();
-                        });
+                        oidData[1] = counter - 1;
+                        callback();
                     }
                 } else {
                     callback();

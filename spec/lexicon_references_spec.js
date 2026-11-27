@@ -1,0 +1,166 @@
+var rdfstore = require("../src/store");
+var countLexiconTerms = require("./helpers/engine").countLexiconTerms;
+
+// The lexicon counts how many quads (and subscriptions) use each URI and literal, and removes a term
+// once nothing uses it anymore. Its B-trees have order 2, so after a few inserts most terms sit in inner nodes.
+
+var newStore = function (options) {
+    return rdfstore.promises.create(Object.assign({ treeOrder: 2 }, options));
+};
+
+var termCount = function (store) {
+    return new Promise(function (resolve) {
+        countLexiconTerms(store.engine.lexicon, resolve);
+    });
+};
+
+var registeredGraphs = function (store) {
+    return new Promise(function (resolve) {
+        store.engine.lexicon.registeredGraphs(true, resolve);
+    });
+};
+
+var triples = function (n) {
+    var lines = [];
+    for (var i = 0; i < n; i++) {
+        lines.push("<http://s" + i + '> <http://p> "literal ' + i + '" .');
+    }
+    return lines.join("\n");
+};
+
+describe("Lexicon references", function () {
+    it("removes the terms of many deleted triples, also those in inner B-tree nodes", async function () {
+        var store = await newStore();
+        await store.promises.execute("INSERT DATA { " + triples(20) + " }");
+        expect(await termCount(store)).toBeGreaterThan(0);
+        await store.promises.execute("DELETE DATA { " + triples(20) + " }");
+        expect(await termCount(store)).toBe(0);
+    });
+
+    it("does not count a duplicate INSERT DATA as a reference", async function () {
+        var store = await newStore();
+        await store.promises.execute("INSERT DATA { <http://s> <http://p> <http://o> }");
+        await store.promises.execute("INSERT DATA { <http://s> <http://p> <http://o> }");
+        await store.promises.execute("DELETE DATA { <http://s> <http://p> <http://o> }");
+        expect(await termCount(store)).toBe(0);
+    });
+
+    it("does not count a duplicate loaded triple as a reference", async function () {
+        var store = await newStore();
+        var data = '<http://s> <http://p> "o" .\n<http://s> <http://p> "o" .';
+        await store.promises.load("text/turtle", data);
+        await store.promises.load("text/turtle", data);
+        await store.promises.execute('DELETE DATA { <http://s> <http://p> "o" }');
+        expect(await termCount(store)).toBe(0);
+    });
+
+    it("keeps the terms another triple still uses", async function () {
+        var store = await newStore();
+        await store.promises.execute('INSERT DATA { <http://s> <http://p> "a" . <http://s> <http://p> "b" }');
+        await store.promises.execute('DELETE DATA { <http://s> <http://p> "a" }');
+        var results = await store.promises.execute("SELECT ?o { <http://s> <http://p> ?o }");
+        expect(results.length).toBe(1);
+        expect(results[0].o.value).toBe("b");
+        await store.promises.execute('DELETE DATA { <http://s> <http://p> "b" }');
+        expect(await termCount(store)).toBe(0);
+    });
+
+    it("does not use up an OID when it removes a literal", async function () {
+        var store = await newStore();
+        await store.promises.execute('INSERT DATA { <http://s> <http://p> "a" }');
+        var before = store.engine.lexicon.oidCounter;
+        await store.promises.execute('DELETE DATA { <http://s> <http://p> "a" }');
+        expect(store.engine.lexicon.oidCounter).toBe(before);
+    });
+
+    describe("of graphs", function () {
+        var graphData = function (n, object) {
+            var parts = [];
+            for (var i = 0; i < n; i++) {
+                parts.push("GRAPH <http://g" + i + "> { <http://s> <http://p> <" + (object || "http://o") + "> }");
+            }
+            return parts.join(" ");
+        };
+
+        it("registers a graph once, and removes it with its last triple", async function () {
+            var store = await newStore();
+            await store.promises.execute("INSERT DATA { " + graphData(10) + " }");
+            await store.promises.execute("INSERT DATA { " + graphData(10, "http://o2") + " }");
+            var graphs = await registeredGraphs(store);
+            expect(graphs.length).toBe(10);
+            await store.promises.execute("DELETE DATA { " + graphData(10) + " }");
+            expect((await registeredGraphs(store)).length).toBe(10);
+            await store.promises.execute("DELETE DATA { " + graphData(10, "http://o2") + " }");
+            expect(await registeredGraphs(store)).toEqual([]);
+            expect(await termCount(store)).toBe(0);
+        });
+
+        it("keeps an empty graph listed while its IRI is used elsewhere", async function () {
+            var store = await newStore();
+            await store.promises.execute(
+                "INSERT DATA { <http://g> <http://p> <http://o> . GRAPH <http://g> { <http://s> <http://p> <http://o> } }",
+            );
+            await store.promises.execute("DELETE DATA { GRAPH <http://g> { <http://s> <http://p> <http://o> } }");
+            expect(await registeredGraphs(store)).toEqual(["http://g"]);
+        });
+
+        it("does not register the graph of a DELETE DATA that removes nothing", async function () {
+            var store = await newStore();
+            await store.promises.execute("INSERT DATA { <http://x> <http://p> <http://o> }");
+            await store.promises.execute("DELETE DATA { GRAPH <http://x> { <http://s> <http://p> <http://o> } }");
+            await store.promises.execute("DELETE DATA { GRAPH <http://y> { <http://s> <http://p> <http://o> } }");
+            expect(await registeredGraphs(store)).toEqual([]);
+        });
+
+        ["CLEAR NAMED", "CLEAR ALL", "DROP ALL"].forEach(function (update) {
+            it("runs " + update + " on graphs whose IRIs it removes", async function () {
+                var store = await newStore();
+                await store.promises.execute("INSERT DATA { " + graphData(5) + " }");
+                await store.promises.execute(update);
+                expect(await registeredGraphs(store)).toEqual([]);
+                expect(await termCount(store)).toBe(0);
+            });
+        });
+    });
+
+    describe("of subscriptions", function () {
+        it("keeps a subscribed IRI, so the subscription matches after its triple is deleted and re-inserted", async function () {
+            var store = await newStore();
+            var events = [];
+            await new Promise(function (resolve) {
+                store.subscribe(
+                    "http://s",
+                    null,
+                    null,
+                    null,
+                    function (event) {
+                        events.push(event);
+                    },
+                    resolve,
+                );
+            });
+            await store.promises.execute("INSERT DATA { <http://s> <http://p> <http://o> }");
+            await store.promises.execute("DELETE DATA { <http://s> <http://p> <http://o> }");
+            await store.promises.execute("INSERT DATA { <http://s> <http://p> <http://o> }");
+            expect(events).toEqual(["added", "deleted", "added"]);
+        });
+
+        it("keeps an observed query's IRIs, so it sees a triple re-inserted after its delete", async function () {
+            var store = await newStore();
+            var results = [];
+            await new Promise(function (resolve) {
+                store.startObservingQuery(
+                    "SELECT ?o { <http://s> <http://p> ?o }",
+                    function (bindings) {
+                        results.push(bindings.length);
+                    },
+                    resolve,
+                );
+            });
+            await store.promises.execute("INSERT DATA { <http://s> <http://p> <http://o> }");
+            await store.promises.execute("DELETE DATA { <http://s> <http://p> <http://o> }");
+            await store.promises.execute("INSERT DATA { <http://s> <http://p> <http://o> }");
+            expect(results[results.length - 1]).toBe(1);
+        });
+    });
+});

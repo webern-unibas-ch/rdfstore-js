@@ -283,4 +283,70 @@ describe("BTree", function () {
             done();
         });
     });
+
+    [2, 3, 5].forEach(function (order) {
+        it("replaces the data of an existing key instead of adding a duplicate (order " + order + ")", function (done) {
+            var keys = [];
+            for (var i = 1; i <= 20; i++) keys.push(i);
+            new btree.Tree(order, function (tree) {
+                async.eachSeries(
+                    keys,
+                    function (key, k) {
+                        tree.insert(key, key, function () {
+                            k();
+                        });
+                    },
+                    function () {
+                        // the keys sit in leaves and in inner nodes
+                        async.eachSeries(
+                            keys,
+                            function (key, k) {
+                                tree.insert(key, key * 10, function () {
+                                    k();
+                                });
+                            },
+                            function () {
+                                var found = [];
+                                tree.walk(
+                                    function (node) {
+                                        found.push(node);
+                                    },
+                                    function () {
+                                        expect(
+                                            found.map(function (node) {
+                                                return node.key;
+                                            }),
+                                        ).toEqual(keys);
+                                        found.forEach(function (node) {
+                                            expect(node.data).toBe(node.key * 10);
+                                        });
+                                        async.eachSeries(
+                                            keys,
+                                            function (key, k) {
+                                                tree.delete(key, function () {
+                                                    k();
+                                                });
+                                            },
+                                            function () {
+                                                var left = 0;
+                                                tree.walk(
+                                                    function () {
+                                                        left++;
+                                                    },
+                                                    function () {
+                                                        expect(left).toBe(0);
+                                                        done();
+                                                    },
+                                                );
+                                            },
+                                        );
+                                    },
+                                );
+                            },
+                        );
+                    },
+                );
+            });
+        });
+    });
 });

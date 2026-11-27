@@ -757,9 +757,6 @@ describe("QueryEngine", function () {
     });
 
     it("Test InsertionDeletionTrivial1", function (done) {
-        pending(
-            "DELETE DATA leaves the quad's terms in the lexicon: re-registered, and the counter written back as a duplicate B-tree key",
-        );
         newEngine(function (engine) {
             engine.execute(
                 "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
@@ -791,9 +788,6 @@ describe("QueryEngine", function () {
     });
 
     it("Test InsertionDeletion2", function (done) {
-        pending(
-            "DELETE DATA leaves the quad's terms in the lexicon: re-registered, and the counter written back as a duplicate B-tree key",
-        );
         newEngine(function (engine) {
             engine.execute(
                 "INSERT DATA {  GRAPH <a> { <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> } }",
