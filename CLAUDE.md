@@ -72,6 +72,7 @@ Every error reaches the caller's callback exactly once, as `callback(err)` ([spe
 
 - Jasmine config: [spec/support/jasmine.json](spec/support/jasmine.json). It sets `random: false`, but Jasmine 7 still runs the specs in random order (the output prints the seed). Pass `--random=false` or `--seed=<n>` to reproduce an order-dependent failure.
 - [spec/w3c_spec.js](spec/w3c_spec.js) runs the W3C SPARQL 1.1 syntax suites (`syntax-query`, `syntax-update-1`, `syntax-update-2` in `spec/w3c/`) via [spec/w3c_suite_helper.js](spec/w3c_suite_helper.js). The helper supports only syntax tests. It defines one spec per approved test and checks each query with the parser and the AQT (what `execute` does before evaluating). Tests that don't pass yet are listed in its `KNOWN_EXCEPTIONS` and run as pending. A listed test that passes fails, so that it gets removed from the list. Use them to check parser and grammar changes. For SPARQL evaluation cases, take individual tests from [w3c/rdf-tests](https://github.com/w3c/rdf-tests) and turn them into regular specs.
+- [spec/helpers/engine.js](spec/helpers/engine.js) has `newEngine([options], callback)`, which builds an in-memory `QueryEngine` (Lexicon + QuadBackend, `treeOrder` 2 by default), and `countLexiconTerms(lexicon, callback)`. Jasmine loads `spec/helpers/` before the specs, so the file only exports.
 - Specs import the real `async` package (v3), whose `whilst` expects an async test function: `function(cb){ cb(null, cond); }`. A test that returns a boolean never calls back, and the spec times out.
 
 ## Repo conventions

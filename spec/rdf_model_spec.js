@@ -1,5 +1,5 @@
 var RDFModel = require("../src/rdf_model");
-var newEngine = require("./helpers/engine").newEngine;
+var { newEngine } = require("./helpers/engine");
 
 describe("RDFModel", function () {
     it("Should be possible to use filters", function (done) {

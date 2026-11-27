@@ -77,6 +77,7 @@ describe("RVN3Parser#parse", function () {
             if (err) return done.fail(err);
             data = data.toString("utf8");
             RVN3Parser.parser.parse(data, {}, function (err, result) {
+                expect(err).toBeNull();
                 expect(result.length).toBe(9);
                 done();
             });

@@ -1,6 +1,4 @@
-var engineHelper = require("./helpers/engine");
-var newEngine = engineHelper.newEngine;
-var countLexiconTerms = engineHelper.countLexiconTerms;
+var { newEngine, countLexiconTerms } = require("./helpers/engine");
 var fs = require("fs");
 var _ = require("lodash");
 var async = require("async");
@@ -65,6 +63,7 @@ describe("QueryEngine", function () {
                     expect(err).toBe(null);
 
                     engine.execute("SELECT * { ?s ?p ?o }", function (err, result) {
+                        expect(err).toBeNull();
                         expect(result.length).toBe(2);
                         expect(result[0]["s"].value).toBe("http://example/book3");
                         expect(result[1]["s"].value).toBe("http://example/book3");
@@ -72,8 +71,8 @@ describe("QueryEngine", function () {
                         if (result[0]["p"].value === "http://example.com/vocab#title") {
                             expect(result[0]["o"].value).toBe("http://test.com/example");
                         } else if (result[0]["p"].value === "http://example.com/vocab#pages") {
-                            expect(result[1]["o"].value).toBe("95");
-                            expect(result[1]["o"].type).toBe("http://www.w3.org/2001/XMLSchema#integer");
+                            expect(result[0]["o"].value).toBe("95");
+                            expect(result[0]["o"].type).toBe("http://www.w3.org/2001/XMLSchema#integer");
                         } else {
                             fail("unexpected solution");
                         }
@@ -99,6 +98,7 @@ describe("QueryEngine", function () {
             engine.execute(
                 "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example>; <http://example.com/vocab#pages> 95 }",
                 function (err, result) {
+                    expect(err).toBeNull();
                     engine.execute(
                         "INSERT DATA { <http://example/book4> <http://example.com/vocab#title> <http://test.com/example>; <http://example.com/vocab#pages> 96 }",
                         function (err, result) {
@@ -757,7 +757,9 @@ describe("QueryEngine", function () {
     });
 
     it("Test InsertionDeletionTrivial1", function (done) {
-        pending("the lexicon keeps a quad's terms after DELETE DATA (reference count never reaches 0)");
+        pending(
+            "DELETE DATA leaves the quad's terms in the lexicon: re-registered, and the counter written back as a duplicate B-tree key",
+        );
         newEngine(function (engine) {
             engine.execute(
                 "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
@@ -789,7 +791,9 @@ describe("QueryEngine", function () {
     });
 
     it("Test InsertionDeletion2", function (done) {
-        pending("the lexicon keeps a quad's terms after DELETE DATA (reference count never reaches 0)");
+        pending(
+            "DELETE DATA leaves the quad's terms in the lexicon: re-registered, and the counter written back as a duplicate B-tree key",
+        );
         newEngine(function (engine) {
             engine.execute(
                 "INSERT DATA {  GRAPH <a> { <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> } }",
@@ -803,6 +807,7 @@ describe("QueryEngine", function () {
                             engine.execute(
                                 "SELECT * FROM NAMED <a> { GRAPH <a> { ?s ?p ?o } }",
                                 function (err, result) {
+                                    expect(err).toBeNull();
                                     expect(result.length).toBe(1);
                                     expect(result[0]["s"].value).toBe("http://example/book3");
                                     expect(result[0]["p"].value).toBe("http://example.com/vocab#title");
@@ -811,6 +816,7 @@ describe("QueryEngine", function () {
                                     engine.execute(
                                         "SELECT * FROM NAMED <b> { GRAPH <b> { ?s ?p ?o } }",
                                         function (err, result) {
+                                            expect(err).toBeNull();
                                             expect(result.length).toBe(1);
                                             expect(result[0]["s"].value).toBe("http://example/book3");
                                             expect(result[0]["p"].value).toBe("http://example.com/vocab#title");
@@ -823,11 +829,13 @@ describe("QueryEngine", function () {
                                                     engine.execute(
                                                         "SELECT * FROM NAMED <a> { GRAPH <a> { ?s ?p ?o } }",
                                                         function (err, result) {
+                                                            expect(err).toBeNull();
                                                             expect(result.length).toBe(0);
 
                                                             engine.execute(
                                                                 "SELECT * FROM NAMED <b> { GRAPH <b> { ?s ?p ?o } }",
                                                                 function (err, result) {
+                                                                    expect(err).toBeNull();
                                                                     expect(result.length).toBe(1);
                                                                     expect(result[0]["s"].value).toBe(
                                                                         "http://example/book3",

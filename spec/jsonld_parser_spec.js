@@ -108,22 +108,28 @@ describe("JSONLDParser#parse", function () {
         ];
 
         JSONLDParser.parser.parse(input, null, {}, function (err, result) {
+            expect(err).toBeNull();
             expect(result.length).toBe(9);
 
-            // blank node labels are relabeled, and without a context foaf: stays a compact IRI
-            var names = {};
+            // blank node labels are relabeled; without a context foaf: stays a compact IRI and the homepage a string
+            var nodes = {};
             for (var i = 0; i < result.length; i++) {
                 var triple = result[i];
-                if (triple.predicate.value === "foaf:name") {
-                    names[triple.subject.blank] = triple.object.literal;
-                }
+                var node = (nodes[triple.subject.blank] = nodes[triple.subject.blank] || {});
+                node[triple.predicate.value] = triple.object.literal || triple.object.value;
             }
-            expect(Object.keys(names).length).toBe(3);
-            expect(Object.values(names).sort()).toEqual([
-                '"Bob"^^<http://www.w3.org/2001/XMLSchema#string>',
-                '"Eve"^^<http://www.w3.org/2001/XMLSchema#string>',
-                '"Manu"^^<http://www.w3.org/2001/XMLSchema#string>',
-            ]);
+            var homepages = {};
+            for (var label in nodes) {
+                homepages[nodes[label]["foaf:name"]] = nodes[label]["foaf:homepage"];
+            }
+            expect(homepages).toEqual({
+                '"Bob"^^<http://www.w3.org/2001/XMLSchema#string>':
+                    '"http://example.com/bob/"^^<http://www.w3.org/2001/XMLSchema#string>',
+                '"Eve"^^<http://www.w3.org/2001/XMLSchema#string>':
+                    '"http://example.com/eve/"^^<http://www.w3.org/2001/XMLSchema#string>',
+                '"Manu"^^<http://www.w3.org/2001/XMLSchema#string>':
+                    '"http://example.com/manu/"^^<http://www.w3.org/2001/XMLSchema#string>',
+            });
 
             done();
         });
