@@ -189,10 +189,6 @@ QueryFilters.run = function(filterExpr, bindings, nullifyFilters, dataset, env, 
             // ebv can be directly a RDFTerm (e.g. atomic expression in filter)
             // this additional call to ebv will return -> true/false/error
             const ebv = QueryFilters.ebv(QueryFilters.runFilter(filterExpr, thisDenormBindings, queryEngine, dataset, env));
-            //console.log("EBV:")
-            //console.log(ebv)
-            //console.log("FOR:")
-            //console.log(thisDenormBindings)
             if(QueryFilters.isEbvError(ebv)) {
                 // error
                 if(nullifyFilters) {
@@ -224,9 +220,6 @@ QueryFilters.collect = function(filterExpr, bindings, dataset, env, queryEngine,
         }
         return callback(filteredBindings);
     });
-};
-
-QueryFilters.runDistinct = function(projectedBindings, projectionVariables) {
 };
 
 // A key for a whole solution, for COUNT(DISTINCT *)
@@ -379,8 +372,6 @@ QueryFilters.runFilter = function(filterExpr, bindings, queryEngine, dataset, en
 };
 
 QueryFilters.runExpression = function(filterExpr, bindings, queryEngine, dataset, env) {
-    //console.log("RUNNING FILTER");
-    //console.log(filterExpr);
     if(filterExpr.expressionType != null) {
         const expressionType = filterExpr.expressionType;
         if(expressionType == 'relationalexpression') {
@@ -411,7 +402,6 @@ QueryFilters.runExpression = function(filterExpr, bindings, queryEngine, dataset
                 return bindings[filterExpr.value.value];
             } else {
                 // numeric, literal, etc...
-                //return queryEngine.filterExpr.value;
                 if(typeof(filterExpr.value) != 'object') {
                     return filterExpr.value
                 } else {
@@ -674,8 +664,6 @@ QueryFilters.ebvError = function() {
 QueryFilters.isEbvError = function(term) {
     if(typeof(term) == 'object' && term != null) {
         return term.type === "https://github.com/antoniogarrote/js-tools/types#error";
-//    } else if(term == null) {
-//        return true;
     } else {
         return false;
     }

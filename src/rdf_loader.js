@@ -146,6 +146,3 @@ RDFLoader.prototype.tryToParse = function(parser, graph, input, options, callbac
 module.exports = {
     RDFLoader: RDFLoader
 };
-
-
-// var loader = require("./js-communication/src/rdf_loader").RDFLoader; loader = new loader.RDFLoader(); loader.load('http://dbpedialite.org/titles/Lisp_%28programming_language%29', function(success, results){console.log("hey"); console.log(success); console.log(results)})

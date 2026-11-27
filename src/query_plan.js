@@ -517,21 +517,6 @@ QueryPlanDPSize.areCompatibleBindings = function(bindingsA, bindingsB) {
     return true;
 };
 
-//QueryPlanDPSize.areCompatibleBindingsStrict = function(bindingsA, bindingsB) {
-//    var foundSome = false;
-//    for(var variable in bindingsA) {
-// 	if(bindingsB[variable]!=null && (bindingsB[variable] != bindingsA[variable])) {
-// 	    return false;
-// 	} else if(bindingsB[variable] == bindingsA[variable]){
-// 	    foundSome = true;
-// 	}
-//    }
-//
-//    return foundSome;
-//};
-
-
-
 QueryPlanDPSize.mergeBindings = function(bindingsA, bindingsB) {
     const merged = {};
     for(const variable in bindingsA) {
@@ -697,33 +682,6 @@ QueryPlanDPSize.augmentMissingBindings = function(bindingA, bindingB) {
     }
     return bindingA;
 };
-
-/*
- QueryPlanDPSize.diff = function(bindingsA, biundingsb) {
- var result = [];
-
- for(var i=0; i< bindingsA.length; i++) {
- var bindingA = bindingsA[i];
- var matched = false;
- for(var j=0; j<bindingsB.length; j++) {
- var bindingB = bindingsB[j];
- if(QueryPlanDPSize.areCompatibleBindings(bindingA, bindingB)){
- matched = true;
- result.push(QueryPlanDPSize.mergeBindings(bindingA, bindingB));
- }
- }
- if(matched === false) {
- // missing bindings must be present for further processing
- // e.g. filtering by not present value (see DAWG tests
- // bev-6)
- QueryPlanDPSize.augmentMissingBindings(bindingA, bindingB);
- result.push(bindingA);
- }
- }
-
- return result;
- };
- */
 
 QueryPlanDPSize.leftOuterJoinBindings = function(bindingsA, bindingsB, leftSolutions) {
     return QueryPlanDPSize.hashJoinBindings(bindingsA, bindingsB, true, leftSolutions);

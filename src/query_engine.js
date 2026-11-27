@@ -851,8 +851,6 @@ QueryEngine.prototype.executeQuery = function(syntaxTree, callback, defaultDatas
                                 if(s!=null && pred!=null && o!=null) {
                                     const triple = new RDFModel.Triple(s,pred,o);
                                     graph.add(triple);
-                                    //} else {
-                                    //    return callback(false, "Error creating output graph")
                                 }
                             }
                             }

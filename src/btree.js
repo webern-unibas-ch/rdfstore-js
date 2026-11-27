@@ -531,7 +531,6 @@ Tree.prototype._moveKey = function (parent, i, position, callback) {
     }
 
     const that = this;
-    //var lchild = parent.children[i-1];
     that._diskRead(parent.children[i], function (lchild) {
         that._diskRead(parent.children[i + 1], function (rchild) {
 
