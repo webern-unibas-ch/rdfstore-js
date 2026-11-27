@@ -1,0 +1,2 @@
+# Format staged JS/TS files with Prettier (.lintstagedrc.json)
+yarn lint-staged

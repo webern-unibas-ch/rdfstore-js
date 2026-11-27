@@ -1,0 +1,15 @@
+# Build output and generated code
+dist/
+src/parser.js
+
+# Not linted or shipped
+src/perftest/
+
+# Test data
+spec/w3c/
+spec/data/
+
+# Tooling
+.yarn/
+.idea/
+yarn.lock
