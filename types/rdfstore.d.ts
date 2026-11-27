@@ -222,13 +222,13 @@ export declare class Store {
 
     startObservingNode(nodeUri: string, listener: (node: Graph) => void): void;
     startObservingNode(nodeUri: string, graphUri: string, listener: (node: Graph) => void): void;
-    stopObservingNode(listener: (node: Graph) => void, done?: () => void): void;
+    stopObservingNode(listener: (node: Graph) => void): void;
     startObservingQuery(
         query: string,
         listener: (bindings: SelectResult) => void,
         ready?: (err: Error | null) => void,
     ): void;
-    stopObservingQuery(query: string, done?: () => void): void;
+    stopObservingQuery(query: string): void;
     subscribe(
         subject: string | null,
         predicate: string | null,
@@ -237,7 +237,7 @@ export declare class Store {
         listener: (event: GraphEvent, triples: Triple[]) => void,
         ready?: (...args: any[]) => void,
     ): void;
-    unsubscribe(listener: (event: GraphEvent, triples: Triple[]) => void, done?: () => void): void;
+    unsubscribe(listener: (event: GraphEvent, triples: Triple[]) => void): void;
     setBatchLoadEvents(fireEvents: boolean): void;
 
     setPrefix(prefix: string, uri: string): void;

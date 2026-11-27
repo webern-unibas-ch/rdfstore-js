@@ -549,8 +549,6 @@ store.subscribe("http://example/book",null,null,null,cb);
 store.unsubscribe(cb);
 ```
 
-*unsubscribe*, *stopObservingNode* and *stopObservingQuery* take an optional last argument: a function that is called once the store has released the IRIs and literals the listener used, which it keeps while a listener needs them. *Since v0.9.18-alpha.26.*
-
 The main difference between both methods is that *subscribe* receives the triples that have changed meanwhile *startObservingNode* receives alway the whole node with its updated triples. *startObservingNode* receives the node as a RDF Interface graph object.
 
 ```javascript

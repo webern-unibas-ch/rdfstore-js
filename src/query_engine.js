@@ -1622,7 +1622,15 @@ QueryEngine.prototype.executeUpdate = function (syntaxTree, callback) {
     const prologues = syntaxTree.prologues || [prologue];
     this.registerNsInEnvironment(prologues[0], queryEnv);
 
-    // operations separated by ';' run one after the other; the first error stops the request
+    // first the terms of stopped subscriptions and observed queries, inside this update and not alongside it
+    this.callbacksBackend.releasePendingTerms(function () {
+        that._executeUpdateUnits(units, prologues, queryEnv, callback);
+    });
+};
+
+// operations separated by ';' run one after the other; the first error stops the request
+QueryEngine.prototype._executeUpdateUnits = function (units, prologues, queryEnv, callback) {
+    const that = this;
     let lastResult;
     let index = 0;
     Utils.eachSeries(
@@ -1703,8 +1711,6 @@ QueryEngine.prototype._executeUpdateUnit = function (aqt, queryEnv, callback) {
 
 // Stores parsed quads; calls back (err) or (null, number of new quads).
 QueryEngine.prototype.batchLoad = function (quads, callback) {
-    let counter = 0;
-    const blanks = {};
     const that = this;
 
     // check every quad first, so that a broken one does not leave the batch half stored
@@ -1716,6 +1722,17 @@ QueryEngine.prototype.batchLoad = function (quads, callback) {
             }
         }
     }
+    // first the terms of stopped subscriptions and observed queries, inside this load and not alongside it
+    this.callbacksBackend.releasePendingTerms(function () {
+        that._batchLoadQuads(quads, callback);
+    });
+};
+
+QueryEngine.prototype._batchLoadQuads = function (quads, callback) {
+    let counter = 0;
+    const blanks = {};
+    const that = this;
+    const components = ["subject", "predicate", "object", "graph"];
 
     if (this.eventsOnBatchLoad) this.callbacksBackend.startGraphModification();
 
@@ -2148,8 +2165,8 @@ QueryEngine.prototype._executeQuadDelete = function (quad, queryEnv, deletedBlan
         },
         function (k) {
             if (error === false) {
-                // the references of the removed quad, and those normalizeQuad registered. Blank nodes are left
-                // to _releaseBlanks, other quads may still use them
+                // the references normalizeQuad registered and, if the quad was removed, its own. Blank nodes are
+                // left to _releaseBlanks, other quads may still use them
                 that.lexicon.unregister(quad, key, function () {
                     if (!found) return k();
                     that.lexicon.release(quad, key, function () {

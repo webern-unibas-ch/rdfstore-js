@@ -54,11 +54,11 @@ var observeNode = function (store, uri) {
     });
 };
 
-// calls store[method](arg, done) and resolves once done runs
-var released = function (store, method, arg) {
-    return new Promise(function (resolve) {
-        store[method](arg, resolve);
-    });
+// stops a listener or query, then runs an update that changes nothing: updates release the terms of
+// stopped listeners and queries first
+var released = async function (store, method, arg) {
+    store[method](arg);
+    await store.promises.execute("DELETE DATA { <http://none> <http://none> <http://none> }");
 };
 
 describe("Lexicon references", function () {
@@ -269,6 +269,49 @@ describe("Lexicon references", function () {
             expect(results.length).toBe(1);
             await store.promises.execute("DELETE DATA { <http://s> <http://p> <http://o> }");
             expect(await termCount(store)).toBe(0);
+        });
+
+        it("keeps a stopped listener's terms until the next update or load", async function () {
+            var store = await newStore();
+            var listener = function () {};
+            await subscribe(store, "http://s", listener);
+            store.unsubscribe(listener);
+            expect(await termCount(store)).toBeGreaterThan(0);
+            await store.promises.load("text/turtle", "");
+            expect(await termCount(store)).toBe(0);
+        });
+
+        it("drops a subscription that is unsubscribed before it is set up", async function () {
+            var store = await newStore();
+            var events = [];
+            var listener = function (event) {
+                events.push(event);
+            };
+            // subscribe usually sets up at once; Utils' throttled nextTick defers every 100th step,
+            // so some of these subscriptions are still being set up when unsubscribe runs
+            for (var i = 0; i < 300; i++) {
+                var ready = subscribe(store, "http://s" + i, listener);
+                store.unsubscribe(listener);
+                await ready;
+            }
+            for (var j = 0; j < 300; j++) {
+                await store.promises.execute("INSERT DATA { <http://s" + j + "> <http://p> <http://o> }");
+            }
+            expect(events).toEqual([]);
+        });
+
+        it("keeps the term of an INSERT right after unsubscribe", async function () {
+            // the tree sizes vary the B-tree depth, and with it how the two operations would interleave
+            for (var size of [0, 1, 3, 7, 15, 30, 60, 120]) {
+                var store = await newStore();
+                if (size > 0) await store.promises.execute("INSERT DATA { " + triples(size) + " }");
+                var listener = function () {};
+                await subscribe(store, "http://x", listener);
+                store.unsubscribe(listener);
+                await store.promises.execute("INSERT DATA { <http://x> <http://p> <http://o> }");
+                var results = await store.promises.execute("SELECT ?o { <http://x> <http://p> ?o }");
+                expect(results.length).toBe(1);
+            }
         });
     });
 });
