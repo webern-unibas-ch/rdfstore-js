@@ -1,6 +1,6 @@
 "use strict";
 
-const async = require('./utils');
+const Utils = require('./utils');
 const Tree = require('./btree').Tree;
 
 /**
@@ -15,7 +15,7 @@ const Lexicon = function(callback){
     this.defaultGraphUriTerm = {"token":"uri","prefix":null,"suffix":null,"value":this.defaultGraphUri};
     this.oidCounter = 1;
 
-    async.seq(function(k){
+    Utils.seq(function(k){
         new Tree(2,function(tree){
             that.uris = tree;
             k();
@@ -104,7 +104,7 @@ Lexicon.prototype.registerUri = function(uri, callback) {
                 const oidStr = 'u'+oid;
                 that.oidCounter++;
 
-                async.seq(function(k){
+                Utils.seq(function(k){
                     that.uris.insert(uri, [oid,0], function(){
                         k();
                     })
@@ -175,7 +175,7 @@ Lexicon.prototype.registerLiteral = function(literal, callback) {
                 const oidStr = 'l'+oid;
                 that.oidCounter++;
 
-                async.seq(function(k){
+                Utils.seq(function(k){
                     that.literals.insert(literal, [oid,0], function(){
                         k();
                     })
@@ -266,7 +266,7 @@ Lexicon.prototype.retrieve = function(oid, callback) {
         });
     } else {
 
-        async.seq(function(found,k){
+        Utils.seq(function(found,k){
             that.oidUris.search('u'+oid, function(maybeUri) {
                 if(maybeUri != null) {
                     k(null,that.parseUri(maybeUri));
@@ -315,7 +315,7 @@ Lexicon.prototype.clear = function(callback) {
     this.defaultGraphUriTerm = {"token":"uri","prefix":null,"suffix":null,"value":this.defaultGraphUri};
     this.oidCounter = 1;
 
-    async.seq(function(k){
+    Utils.seq(function(k){
         new Tree(2,function(tree){
             that.uris = tree;
             k();
@@ -369,7 +369,7 @@ Lexicon.prototype.unregister = function (quad, key, callback) {
             that._unregisterTerm(term.token, oid, k);
         }
     };
-    async.seq(function(k){
+    Utils.seq(function(k){
         unregisterTerm(quad.subject, key.subject, k);
     }, function(k){
         unregisterTerm(quad.predicate, key.predicate, k);
@@ -408,7 +408,7 @@ Lexicon.prototype._unregisterTerm = function (kind, oid, callback) {
                     const counter = oidData[1];
                     if ("" + oidData[0] === "" + oid) {
                         if (counter === 0) {
-                            async.seq(function(k) {
+                            Utils.seq(function(k) {
                                 that.oidUris.delete(oidStr, function () {
                                     k();
                                 });
@@ -448,7 +448,7 @@ Lexicon.prototype._unregisterTerm = function (kind, oid, callback) {
                 const counter = oidData[1];
                 if ("" + oidData[0] === "" + oid) {
                     if (counter === 0) {
-                        async.seq(function(k) {
+                        Utils.seq(function(k) {
                             that.oidLiterals.delete(oidStr, function () {
                                 k();
                             });

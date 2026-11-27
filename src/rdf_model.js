@@ -1,7 +1,7 @@
 "use strict";
 
 // imports
-const _ = require("./utils");
+const Utils = require("./utils");
 const QueryFilters = require("./query_filters").QueryFilters;
 
 const RDFModel = {};
@@ -41,7 +41,7 @@ RDFModel.UrisMap = function() {
 RDFModel.UrisMap.prototype.values = function() {
     const collected = {};
     for(const p in this) {
-	if(!_.include(this.interfaceProperties,p) &&
+	if(!Utils.include(this.interfaceProperties,p) &&
 	    typeof(this[p])!=='function' &&
 	    p!=='defaultNs' &&
 	    p!=='interfaceProperties') {
@@ -84,7 +84,7 @@ RDFModel.UrisMap.prototype.setDefault = function(iri) {
 
 RDFModel.UrisMap.prototype.addAll = function(prefixMap, override) {
     for(const prefix in prefixMap) {
-	if(!_.include(this.interfaceProperties, prefix)) {
+	if(!Utils.include(this.interfaceProperties, prefix)) {
 	    if(this[prefix] != null) {
 		if(override === true) {
 		    this[prefix] = prefixMap[prefix];
@@ -226,7 +226,7 @@ RDFModel.RDFEnvironment = function () {
 	this.prefixes.set(p, RDFModel.defaultContext[p]);
     }
 };
-RDFModel.RDFEnvironment.prototype = _.create(RDFModel.Profile.prototype,{'constructor': RDFModel.RDFEnvironment});
+RDFModel.RDFEnvironment.prototype = Utils.create(RDFModel.Profile.prototype,{'constructor': RDFModel.RDFEnvironment});
 
 RDFModel.RDFEnvironment.prototype.createBlankNode = function() {
     const bnode =  new RDFModel.BlankNode(this.blankNodeCounter);
@@ -349,7 +349,7 @@ RDFModel.BlankNode = function(bnodeId) {
     this.bnodeId = bnodeId;
 };
 
-RDFModel.BlankNode.prototype = _.create(RDFModel.RDFNode.prototype, {'constructor':RDFModel.BlankNode});
+RDFModel.BlankNode.prototype = Utils.create(RDFModel.RDFNode.prototype, {'constructor':RDFModel.BlankNode});
 
 RDFModel.BlankNode.prototype.toString = function(){
     return this.nominalValue;
@@ -375,7 +375,7 @@ RDFModel.Literal = function(value, language, datatype) {
     }
 };
 
-RDFModel.Literal.prototype = _.create(RDFModel.RDFNode.prototype,{'constructor':RDFModel.Literal});
+RDFModel.Literal.prototype = Utils.create(RDFModel.RDFNode.prototype,{'constructor':RDFModel.Literal});
 
 RDFModel.Literal.prototype.toString = function(){
     let tmp = '"'+this.nominalValue+'"';
@@ -412,7 +412,7 @@ RDFModel.NamedNode = function(val) {
     }
 };
 
-RDFModel.NamedNode.prototype = _.create(RDFModel.RDFNode.prototype, {'constructor':RDFModel.NamedNode});
+RDFModel.NamedNode.prototype = Utils.create(RDFModel.RDFNode.prototype, {'constructor':RDFModel.NamedNode});
 
 RDFModel.NamedNode.prototype.toString = function(){
     return this.nominalValue;

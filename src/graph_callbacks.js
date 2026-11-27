@@ -1,8 +1,7 @@
 "use strict";
 
 //imports
-const _ = require('./utils');
-const async = require('./utils');
+const Utils = require('./utils');
 const Pattern = require('./quad_index').Pattern;
 const RDFModel = require('./rdf_model');
 const AbstractQueryTree = require('./abstract_query_tree').AbstractQueryTree;
@@ -188,7 +187,7 @@ Callbacks.CallbacksBackend.prototype.subscribeEmpty = function(event, callback) 
 Callbacks.CallbacksBackend.prototype.unsubscribeEmpty = function(event, callback) {
     let callbacks = this.emptyNotificationsMap[event];
     if(callbacks != null) {
-	callbacks = _.reject(callbacks, function(cb){ return cb === callback });
+	callbacks = Utils.reject(callbacks, function(cb){ return cb === callback });
     }
     this.emptyNotificationsMap[event] = callbacks;
 };
@@ -283,7 +282,7 @@ Callbacks.CallbacksBackend.prototype._indexForPattern = function(pattern) {
 	const index = matchingIndices[i];
 	const indexComponents = this.componentOrders[index];
 	for(let j=0; j<indexComponents.length; j++) {
-	    if(_.include(indexKey, indexComponents[j])===false) {
+	    if(Utils.include(indexKey, indexComponents[j])===false) {
 		break;
 	    }
 	    if(j==indexKey.length-1) {
@@ -395,7 +394,7 @@ Callbacks.CallbacksBackend.prototype.observeQuery = function(query, callback, en
     const dataset = parsedTree.dataset;
     const union = this.engine.unionDefaultGraph && dataset.implicit.length === 0 && dataset.named.length === 0;
 
-    async.eachSeries(patterns, function(quad, k) {
+    Utils.eachSeries(patterns, function(quad, k) {
 	if(quad.graph == null) {
 	    quad.graph = union ? {token: 'var', value: 'graph:union'} : that.engine.lexicon.defaultGraphUriTerm;
 	}
@@ -452,7 +451,7 @@ Callbacks.CallbacksBackend.prototype.stopObservingQuery = function(query) {
 	    delete this.queriesMap[ids[i]];
 	    delete this.queriesCallbacksMap[ids[i]];
 	}
-	this.queriesList = _.reject(this.queriesList, function(queryId){ return _.include(ids, queryId) });
+	this.queriesList = Utils.reject(this.queriesList, function(queryId){ return Utils.include(ids, queryId) });
     }
 };
 
@@ -466,8 +465,8 @@ Callbacks.CallbacksBackend.prototype._searchQueriesInIndex = function(index, ord
 	const filteredIds = [];
 	for(let j=0; j<matched.length; j++) {
 	    const queryId = matched[j];
-	    if(_.include(this.pendingQueries,queryId)) {
-		_.remove(this.pendingQueries,function(pendingQueryId){ return pendingQueryId === queryId });
+	    if(Utils.include(this.pendingQueries,queryId)) {
+		Utils.remove(this.pendingQueries,function(pendingQueryId){ return pendingQueryId === queryId });
 		this.matchedQueries.push(queryId);
 	    }
 	    // removing IDs for queries no longer being observed
@@ -491,7 +490,7 @@ Callbacks.CallbacksBackend.prototype.dispatchQueries = function(callback) {
     let query, queryCallback;
     const toDispatchMap = {};
 
-    async.eachSeries(this.matchedQueries, function(queryId,k) {
+    Utils.eachSeries(this.matchedQueries, function(queryId,k) {
 	// avoid duplicate notifications
 	if(toDispatchMap[queryId] == null) {
 	    toDispatchMap[queryId] = true;

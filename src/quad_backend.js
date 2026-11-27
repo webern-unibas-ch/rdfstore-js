@@ -2,7 +2,7 @@
 
 // imports
 const QuadIndex = require("./quad_index").QuadIndex;
-const utils = require('./utils');
+const Utils = require('./utils');
 
 /*
  * "perfect" indices for RDF indexing
@@ -24,7 +24,7 @@ const QuadBackend = function (configuration, callback) {
     this.componentOrders = QuadBackend.componentOrders;
     const that = this;
 
-    utils.eachSeries(this.indices,function(indexKey, k){
+    Utils.eachSeries(this.indices,function(indexKey, k){
         new QuadIndex({
             order:that.treeOrder,
             componentOrder:that.componentOrders[indexKey]
@@ -55,7 +55,7 @@ QuadBackend.prototype._indexForPattern = function (pattern) {
         const index = QuadBackend.allIndices[i];
         const indexComponents = QuadBackend.componentOrders[index];
         for (let j = 0; j < indexComponents.length; j++) {
-            if (utils.include(indexKey, indexComponents[j]) === false) {
+            if (Utils.include(indexKey, indexComponents[j]) === false) {
                 break;
             }
             if (j == indexKey.length - 1) {
@@ -70,7 +70,7 @@ QuadBackend.prototype._indexForPattern = function (pattern) {
 
 QuadBackend.prototype.index = function (quad, callback) {
     const that = this;
-    utils.eachSeries(this.indices, function (indexKey, k) {
+    Utils.eachSeries(this.indices, function (indexKey, k) {
         const index = that.indexMap[indexKey];
         index.insert(quad, function () {
             k();
@@ -102,7 +102,7 @@ QuadBackend.prototype.search = function (quad, callback) {
 
 QuadBackend.prototype.delete = function (quad, callback) {
     const that = this;
-    utils.eachSeries(this.indices, function (indexKey, k) {
+    Utils.eachSeries(this.indices, function (indexKey, k) {
         const index = that.indexMap[indexKey];
         index.delete(quad, function () {
             k();
@@ -114,7 +114,7 @@ QuadBackend.prototype.delete = function (quad, callback) {
 
 QuadBackend.prototype.clear = function(callback) {
     const that = this;
-    utils.eachSeries(this.indices, function (indexKey, k) {
+    Utils.eachSeries(this.indices, function (indexKey, k) {
         new QuadIndex({
             order: that.treeOrder,
             componentOrder: that.componentOrders[indexKey]

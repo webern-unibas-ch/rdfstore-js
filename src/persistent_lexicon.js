@@ -1,7 +1,6 @@
 "use strict";
 
-const utils = require('./utils');
-const async = utils;
+const Utils = require('./utils');
 const InMemoryLexicon = require('./lexicon').Lexicon;
 
 /**
@@ -12,7 +11,7 @@ const InMemoryLexicon = require('./lexicon').Lexicon;
 const PersistentLexicon = function(callback, dbName){
     const that = this;
 
-    utils.registerIndexedDB(that);
+    Utils.registerIndexedDB(that);
 
     this.defaultGraphOid = 0;
     this.defaultGraphUri = "https://github.com/antoniogarrote/rdfstore-js#default_graph";
@@ -176,7 +175,7 @@ PersistentLexicon.prototype.resolveUri = function(uri,callback) {
  * @returns {string}
  */
 PersistentLexicon.prototype.registerBlank = function(callback) {
-    const oidStr = utils.guid();
+    const oidStr = Utils.guid();
     const that = this;
 
     const objectStore = that.db.transaction(["components"],"readwrite").objectStore("components");
@@ -354,7 +353,7 @@ PersistentLexicon.prototype.unregister = function (quad, key, callback) {
             that._unregisterTerm(term.token, oid, k);
         }
     };
-    async.seq(function(k){
+    Utils.seq(function(k){
         unregisterTerm(quad.subject, key.subject, k);
     }, function(k){
         unregisterTerm(quad.predicate, key.predicate, k);

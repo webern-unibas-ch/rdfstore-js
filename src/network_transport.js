@@ -1,7 +1,7 @@
 "use strict";
 
-const utils = require("./utils");
-if(!utils.isWorker()) {
+const Utils = require("./utils");
+if(!Utils.isWorker()) {
     const http = require("http");
     const https = require("https");
 
@@ -40,7 +40,7 @@ if(!utils.isWorker()) {
             };
 
             // a dropped connection can report through the request, the response or both
-            const done = utils.once(callback);
+            const done = Utils.once(callback);
             const request = client.request(params, function (response) {
                 const headers = response.headers;
                 let data = "";

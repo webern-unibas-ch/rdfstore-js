@@ -1,8 +1,7 @@
 "use strict";
 
 const BaseTree = require("./btree").Tree;
-const _ = require('./utils');
-const async = require('./utils');
+const Utils = require('./utils');
 
 /**
  * NodeKey
@@ -65,7 +64,7 @@ const Pattern = function (components) {
     // inserted in the lexicon.
     // OIDs retrieved from the lexicon *are* numbers so
     // they can be told apart from variables (strings)
-    _.forEach(['subject', 'predicate', 'object', 'graph'], function(component){
+    Utils.forEach(['subject', 'predicate', 'object', 'graph'], function(component){
         if (typeof(that[component]) === 'string') {
             indiferent.push(component);
             that.keyComponents[component] = null;
@@ -136,7 +135,7 @@ const QuadIndex = function (params, callback) {
     }
 };
 
-QuadIndex.prototype = _.create(BaseTree.prototype, {'constructor':BaseTree});
+QuadIndex.prototype = Utils.create(BaseTree.prototype, {'constructor':BaseTree});
 
 
 /**
@@ -176,7 +175,7 @@ QuadIndex.prototype._rangeTraverse = function(tree,node, pattern, callback) {
     const acum = [];
     const pendingNodes = [node];
 
-    async.whilst(function(){
+    Utils.whilst(function(){
         return pendingNodes.length > 0;
     }, function(k){
         // next node to process
@@ -210,7 +209,7 @@ QuadIndex.prototype._rangeTraverse = function(tree,node, pattern, callback) {
                 pendingNodes.push(childNode);
                 let idxMax = idxMin;
 
-                async.whilst(function(){
+                Utils.whilst(function(){
                     // keep pushing nodes while the key for that nod ematches the pattern
                     return (idxMax < node.numberActives && tree.rangeComparator(node.keys[idxMax].key,patternKey) === 0);
 

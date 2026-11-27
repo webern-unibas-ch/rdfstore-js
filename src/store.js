@@ -7,7 +7,7 @@ const PersistentBackend = require("./persistent_quad_backend").PersistentQuadBac
 const InMemoryLexicon = require("./lexicon").Lexicon;
 const PersistentLexicon = require("./persistent_lexicon").PersistentLexicon;
 const RDFModel = require("./rdf_model");
-const _ = require("./utils");
+const Utils = require("./utils");
 const createStorePromises = require("./store_promises").createStorePromises;
 
 
@@ -226,10 +226,10 @@ Store.prototype.executeWithEnvironment = function() {
 	namedGraphs   = arguments[2];
     }
 
-    defaultGraphs = _.map(defaultGraphs, function(graph){
+    defaultGraphs = Utils.map(defaultGraphs, function(graph){
 	return {'token':'uri','value':graph};
     });
-    namedGraphs = _.map(namedGraphs, function(graph){
+    namedGraphs = Utils.map(namedGraphs, function(graph){
 	return {'token':'uri','value':graph};
     });
 
@@ -441,7 +441,7 @@ Store.prototype.subscribe = function(s, p, o, g, callback, readyCallback) {
 		const queryEnv = {blanks:{}, outCache:{}};
 		const bindings = [];
 
-		_.each(triples, function(triple){
+		Utils.each(triples, function(triple){
 	    	const s = RDFModel.buildRDFResource(triple.subject,bindings,that.engine,queryEnv);
 	    	const p = RDFModel.buildRDFResource(triple.predicate,bindings,that.engine,queryEnv);
 	    	const o = RDFModel.buildRDFResource(triple.object,bindings,that.engine,queryEnv);
@@ -808,7 +808,7 @@ Store.prototype.registerParser = function(mediaType, parser) {
  */
 Store.prototype.registeredGraphs = function(callback) {
     this.engine.lexicon.registeredGraphs(true, function(graphs){
-	const graphNodes = _.map(graphs, function(graph){
+	const graphNodes = Utils.map(graphs, function(graph){
 	    return new RDFModel.NamedNode(graph);
 	});
 
@@ -925,7 +925,7 @@ const create = function(){
 };
 
 Store.yieldFrequency = function(val) {
-    _.yieldFrequency(val);
+    Utils.yieldFrequency(val);
 };
 
 /**
@@ -936,7 +936,7 @@ Store.yieldFrequency = function(val) {
  */
 const promises = {
     create: function(params) {
-        return _.toPromise(function(cb) { new Store(params || {}, cb); });
+        return Utils.toPromise(function(cb) { new Store(params || {}, cb); });
     }
 };
 

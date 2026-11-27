@@ -3,7 +3,6 @@
 // imports
 const SparqlParser = require("./parser");
 const Utils = require("./utils");
-const _ = Utils;
 
 function NonSupportedSparqlFeatureError(feature, message) {
     this.name = "NonSupportedSparqlFeatureError";
@@ -121,7 +120,7 @@ AbstractQueryTree.prototype.build = function(node, env, graph) {
     } else if (node.token === 'basicgraphpattern') {
         if(graph != null) {
             for(let i=0; i<node.triplesContext.length; i++) {
-                node.triplesContext[i].graph = _.clone(graph, true);
+                node.triplesContext[i].graph = Utils.clone(graph, true);
             }
         }
         let bgp = {
@@ -245,9 +244,9 @@ const isPlainPath = function(path) {
 
 const expandPlainPath = function(subject, path, object, graph, acum) {
     if(path.type === 'link') {
-        const triple = {subject: _.clone(subject, true), predicate: path.iri, object: _.clone(object, true)};
+        const triple = {subject: Utils.clone(subject, true), predicate: path.iri, object: Utils.clone(object, true)};
         if(graph != null) {
-            triple.graph = _.clone(graph, true);
+            triple.graph = Utils.clone(graph, true);
         }
         acum.push(triple);
     } else if(path.type === 'inverse') {
@@ -284,7 +283,7 @@ AbstractQueryTree.prototype._buildGroupGraphPattern = function(node, env, graph)
     if(graph != null) {
         // inside GRAPH the group starts from the active graph(s), see the EMPTY_PATTERN case of
         // QueryEngine.executeSelectUnit, so every solution binds the graph
-        g.graph = _.clone(graph, true);
+        g.graph = Utils.clone(graph, true);
         for(let i=0; i<f.length; i++) {
             AbstractQueryTree.setExistsGraph(f[i].value, graph);
         }
@@ -357,7 +356,7 @@ AbstractQueryTree.setExistsGraph = function(expression, graph) {
     }
     if(expression.expressionType === 'builtincall' &&
         (expression.builtincall === 'exists' || expression.builtincall === 'notexists')) {
-        expression.graph = _.clone(graph, true);
+        expression.graph = Utils.clone(graph, true);
     } else {
         for(const p in expression) {
             AbstractQueryTree.setExistsGraph(expression[p], graph);
@@ -593,7 +592,7 @@ AbstractQueryTree.prototype._bindFilter = function(filterExpr, bindings) {
 AbstractQueryTree.prototype.replace = function(aqt, from, to, ns) {
     if(aqt.graph != null && aqt.graph.token && aqt.graph.token === from.token &&
         aqt.graph.value == from.value) {
-        aqt.graph = _.clone(to,true);
+        aqt.graph = Utils.clone(to,true);
     }
     if(aqt.filter != null) {
         const acum = [];

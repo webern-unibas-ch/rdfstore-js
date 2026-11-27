@@ -11,7 +11,6 @@
  */
 
 const Utils = require("./utils");
-const async = require("./utils");
 
 const PropertyPaths = {};
 
@@ -245,7 +244,7 @@ const evaluate = function(ctx, path, ends, callback) {
         });
     } else if(path.type === 'alt') {
         let union = null;
-        async.eachSeries(path.paths, function(part, k) {
+        Utils.eachSeries(path.paths, function(part, k) {
             evaluate(ctx, part, ends, function(err, relation) {
                 if(err == null) {
                     union = union == null ? relation : mapRelation(union, function(pairs, graph) {
@@ -264,7 +263,7 @@ const evaluate = function(ctx, path, ends, callback) {
         const parts = backwards ? path.paths.slice().reverse() : path.paths;
         let result = null;
         let reached = backwards ? ends.ends : ends.starts;
-        async.eachSeries(parts, function(part, k) {
+        Utils.eachSeries(parts, function(part, k) {
             evaluate(ctx, part, backwards ? {ends: reached} : {starts: reached}, function(err, relation) {
                 if(err != null) {
                     return k(err);

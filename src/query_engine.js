@@ -11,8 +11,6 @@ const PropertyPaths = require("./property_paths").PropertyPaths;
 const RDFModel = require("./rdf_model");
 const RDFLoader = require("./rdf_loader").RDFLoader;
 const Callbacks = require("./graph_callbacks").CallbacksBackend;
-const async = require('./utils');
-const _ = require('./utils');
 
 const QueryEngine = function(params) {
     if(arguments.length != 0) {
@@ -130,7 +128,7 @@ QueryEngine.prototype.applyLimitOffset = function(offset, limit, bindings) {
 QueryEngine.prototype.applySingleOrderBy = function(orderFilters, modifiedBindings, dataset, outEnv, callback) {
     const acum = [];
     const that = this;
-    async.eachSeries(orderFilters, function(orderFilter,k){
+    Utils.eachSeries(orderFilters, function(orderFilter,k){
         QueryFilters.collect(orderFilter.expression, [modifiedBindings], dataset, outEnv, that, function(results) {
             acum.push(results[0].value);
             k()
@@ -144,7 +142,7 @@ QueryEngine.prototype.applyOrderBy = function(order, modifiedBindings, dataset, 
     const that = this;
     const acum = [];
     if(order != null && order.length > 0) {
-        async.eachSeries(modifiedBindings, function(bindings,k){
+        Utils.eachSeries(modifiedBindings, function(bindings,k){
             that.applySingleOrderBy(order, bindings, dataset, outEnv, function(results){
                 acum.push(results);
                 k();
@@ -506,7 +504,7 @@ QueryEngine.prototype.normalizeTerm = function(term, env, shouldIndex, callback)
 
 QueryEngine.prototype.normalizeDatasets = function(datasets, outerEnv, callback) {
     const that = this;
-    async.eachSeries(datasets, function(dataset, k){
+    Utils.eachSeries(datasets, function(dataset, k){
         if(dataset.value === that.lexicon.defaultGraphUri) {
             dataset.oid = that.lexicon.defaultGraphOid;
             k();
@@ -554,7 +552,7 @@ QueryEngine.prototype.normalizeQuad = function(quad, queryEnv, shouldIndex, call
     const that = this;
     let error = false;
 
-    async.seq(function(k){
+    Utils.seq(function(k){
         if(quad.graph == null || quad.graph.value === that.lexicon.defaultGraphUri) {
             graph = 0; // default graph
             k();
@@ -637,7 +635,7 @@ QueryEngine.prototype.denormalizeBindingsList = function(bindingsList, env, call
     const that = this;
     const denormList = [];
 
-    async.eachSeries(bindingsList, function(bindings, k){
+    Utils.eachSeries(bindingsList, function(bindings, k){
         that.denormalizeBindings(bindings, env, function(denorm){
             denormList.push(denorm);
             k();
@@ -656,10 +654,10 @@ QueryEngine.prototype.denormalizeBindingsList = function(bindingsList, env, call
 QueryEngine.prototype.copyDenormalizedBindings = function(bindingsList, out, callback) {
     const that = this;
     const denormList = [];
-    async.eachSeries(bindingsList, function(bindings, k){
+    Utils.eachSeries(bindingsList, function(bindings, k){
         const denorm = {};
-        const variables = _.keys(bindings);
-        async.eachSeries(variables, function(variable, kk){
+        const variables = Utils.keys(bindings);
+        Utils.eachSeries(variables, function(variable, kk){
             const oid = bindings[variable];
             if(oid == null) {
                 // this can be null, e.g. union different variables (check SPARQL recommendation examples UNION)
@@ -693,10 +691,10 @@ QueryEngine.prototype.copyDenormalizedBindings = function(bindingsList, out, cal
 };
 
 QueryEngine.prototype.denormalizeBindings = function(bindings, env, callback) {
-    const variables = _.keys(bindings);
+    const variables = Utils.keys(bindings);
     const envOut = env.outCache;
     const that = this;
-    async.eachSeries(variables, function(variable, k){
+    Utils.eachSeries(variables, function(variable, k){
         const oid = bindings[variable];
         if(oid == null) {
             // this can be null, e.g. union different variables (check SPARQL recommendation examples UNION)
@@ -946,7 +944,7 @@ QueryEngine.prototype.executeSelect = function(unit, env, defaultDataset, namedD
                             }
                             that.groupSolution(result, unit.group, dataset, env, function(groupedBindings){
                                 const scopes = [];
-                                async.eachSeries(groupedBindings, function(groupedBindingsGroup, k){
+                                Utils.eachSeries(groupedBindings, function(groupedBindingsGroup, k){
                                     that.copyDenormalizedBindings(groupedBindingsGroup, env.outCache, function(denormGroup){
                                         const scope = that.groupScope(plan, denormGroup, dataset, env);
                                         for (let h = 0; h < plan.having.length; h++) {
@@ -1006,7 +1004,7 @@ QueryEngine.prototype.groupSolution = function(bindings, group, dataset, queryEn
     if(group === 'singleGroup') {
         callback([bindings]);
     } else {
-        async.eachSeries(bindings, function(currentBindings,k){
+        Utils.eachSeries(bindings, function(currentBindings,k){
             let mustAddBindings = true;
 
             /**
@@ -1015,7 +1013,7 @@ QueryEngine.prototype.groupSolution = function(bindings, group, dataset, queryEn
              * If it is the first iteration we also save in a different array the order for the
              * grouped variables that will be used later to build the final groups
              */
-            async.eachSeries(group, function(currentOrderClause, kk){
+            Utils.eachSeries(group, function(currentOrderClause, kk){
                 let orderVariable = null;
 
                 if(currentOrderClause.token === 'var') {
@@ -1218,7 +1216,7 @@ QueryEngine.prototype.executeSelectUnit = function(projection, dataset, pattern,
 QueryEngine.prototype.executeSelectUnits = function(projection, dataset, setQuery1, setQuery2, env, skipIfFirstEmpty, callback) {
     const that = this;
     let set1, set2;
-    async.seq(
+    Utils.seq(
         function(k){
             that.executeSelectUnit(projection, dataset, setQuery1, env, function (err, result) {
                 set1 = result;
@@ -1297,7 +1295,7 @@ const boundValues = function(term, solutions) {
 QueryEngine.prototype.executeBGPScope = function(projection, dataset, parts, env, callback) {
     const that = this;
     let solutions = null;
-    async.eachSeries(parts, function(part, k) {
+    Utils.eachSeries(parts, function(part, k) {
         if(solutions != null && solutions.length === 0) {
             return k();
         }
@@ -1453,7 +1451,7 @@ QueryEngine.prototype.executeUpdate = function(syntaxTree, callback) {
     // operations separated by ';' run one after the other; the first error stops the request
     let lastResult;
     let index = 0;
-    async.eachSeries(units, function(unit, k){
+    Utils.eachSeries(units, function(unit, k){
         let aqt;
         if(index > 0) {
             // the declarations before this operation
@@ -1480,7 +1478,7 @@ QueryEngine.prototype.executeUpdate = function(syntaxTree, callback) {
 QueryEngine.prototype._executeUpdateUnit = function(aqt, queryEnv, callback) {
     const that = this;
     if(aqt.kind === 'insertdata') {
-        async.eachSeries(aqt.quads, function(quad, k){
+        Utils.eachSeries(aqt.quads, function(quad, k){
             that._executeQuadInsert(quad, queryEnv, k);
         }, function(err){
             if(err != null)
@@ -1489,7 +1487,7 @@ QueryEngine.prototype._executeUpdateUnit = function(aqt, queryEnv, callback) {
                 callback(null, true);
         });
     } else if(aqt.kind === 'deletedata') {
-        async.eachSeries(aqt.quads, function(quad, k){
+        Utils.eachSeries(aqt.quads, function(quad, k){
             that._executeQuadDelete(quad, queryEnv, null, k);
         }, function(err){
             if(err != null)
@@ -1604,9 +1602,9 @@ QueryEngine.prototype.batchLoad = function(quads, callback) {
     };
 
 
-    async.eachSeries(quads, function(quad,k){
+    Utils.eachSeries(quads, function(quad,k){
         const newQuad = {};
-        async.eachSeries(components, function(component,kk){
+        Utils.eachSeries(components, function(component,kk){
             registerComponent(quad, component, newQuad, kk)
         }, function(){
             const originalQuad = quad;
@@ -1659,7 +1657,7 @@ QueryEngine.prototype._executeModifyQuery = function(aqt, queryEnv, callback) {
     aqt.insert = aqt.insert == null ? [] : aqt.insert;
     aqt.delete = aqt.delete == null ? [] : aqt.delete;
 
-    async.seq(
+    Utils.seq(
         function(k) {
             // select query
 
@@ -1703,7 +1701,7 @@ QueryEngine.prototype._executeModifyQuery = function(aqt, queryEnv, callback) {
             // delete query
             if(querySuccess) {
                 that.instantiateTemplate(aqt.delete, solutions, bindings, aqt.with, null, queryEnv, function(instances){
-                    async.eachSeries(instances, function(instance, kk) {
+                    Utils.eachSeries(instances, function(instance, kk) {
                         that._executeQuadDelete(instance.quad, instance.env, blanks, function(){
                             kk();
                         });
@@ -1716,7 +1714,7 @@ QueryEngine.prototype._executeModifyQuery = function(aqt, queryEnv, callback) {
             // insert query
             if(querySuccess) {
                 that.instantiateTemplate(aqt.insert, solutions, bindings, aqt.with, blanks, queryEnv, function(instances){
-                    async.eachSeries(instances, function(instance, kk) {
+                    Utils.eachSeries(instances, function(instance, kk) {
                         that._executeQuadInsert(instance.quad, instance.env, function(){
                             kk();
                         });
@@ -1748,7 +1746,7 @@ QueryEngine.prototype.instantiateTemplate = function(template, solutions, bindin
     const components = ['subject', 'predicate', 'object', 'graph'];
     const instances = [];
     let index = 0;
-    async.eachSeries(bindings, function(binding, k) {
+    Utils.eachSeries(bindings, function(binding, k) {
         const solution = solutions[index++];
         const env = {blanks: {}, outCache: queryEnv.outCache, namespaces: queryEnv.namespaces, base: queryEnv.base};
         for(const variable in solution) {
@@ -1758,7 +1756,7 @@ QueryEngine.prototype.instantiateTemplate = function(template, solutions, bindin
         }
         // template label or BNODE() label -> blank node of this solution, with the label the lexicon gives its OID
         const fresh = {};
-        async.eachSeries(template, function(src, kk) {
+        Utils.eachSeries(template, function(src, kk) {
             const quad = {};
             // [component, key in fresh]
             const newTerms = [];
@@ -1786,7 +1784,7 @@ QueryEngine.prototype.instantiateTemplate = function(template, solutions, bindin
                     quad[component] = term;
                 }
             }
-            async.eachSeries(newTerms, function(newTerm, kkk) {
+            Utils.eachSeries(newTerms, function(newTerm, kkk) {
                 const component = newTerm[0], key = newTerm[1];
                 if(fresh[key] != null) {
                     quad[component] = fresh[key];
@@ -1814,7 +1812,7 @@ QueryEngine.prototype._executeQuadInsert = function(quad, queryEnv, callback) {
     let normalized;
     let error = false;
     let errorMessage = null;
-    async.seq(
+    Utils.seq(
         function(k){
             that.normalizeQuad(quad, queryEnv, true, function(result){
                 if(result != null){
@@ -1860,7 +1858,7 @@ QueryEngine.prototype._executeQuadDelete = function(quad, queryEnv, deletedBlank
     let error = false;
     let found = false;
     let errorMessage, key;
-    async.seq(
+    Utils.seq(
         function(k){
             that.normalizeQuad(quad, queryEnv, true, function(result){
                 if(result != null){
@@ -1931,7 +1929,7 @@ QueryEngine.prototype._blankOids = function(quad, normalized) {
 // Removes the blank nodes with these OIDs from the lexicon if no quad uses them anymore.
 QueryEngine.prototype._releaseBlanks = function(oids, callback) {
     const that = this;
-    async.eachSeries(Array.from(new Set(oids)), function(oid, k){
+    Utils.eachSeries(Array.from(new Set(oids)), function(oid, k){
         that.backend.range(new QuadIndex.Pattern({subject: oid, predicate: 'p', object: 'o', graph: 'g'}), function(asSubject){
             if(asSubject != null && asSubject.length > 0)
                 return k();
@@ -1972,7 +1970,7 @@ QueryEngine.prototype._executeClearGraph = function(destinyGraph, queryEnv, call
         that.lexicon.registeredGraphs(true, function(graphs){
             if(graphs!=null) {
                 let foundErrorDeleting = null;
-                async.eachSeries(graphs, function(graph,k){
+                Utils.eachSeries(graphs, function(graph,k){
                     if(foundErrorDeleting == null) {
                         that._executeNestedUpdate("DELETE { GRAPH <"+graph+"> { ?s ?p ?o } } WHERE { GRAPH <"+graph+"> { ?s ?p ?o } }", function(err){
                             if(!err) {
@@ -2093,7 +2091,7 @@ QueryEngine.prototype.runBinds = function(binds, bindings, dataset, env, callbac
             // DISTINCT can then compare OIDs and term objects as they are.
             // lexical form -> OID or -1, for values that repeat (e.g. a constant)
             const oids = new Map();
-            async.eachSeries(terms, function(entry, k){
+            Utils.eachSeries(terms, function(entry, k){
                 const key = entry.term.token === 'uri' ? "u" + entry.term.value : "l" + Utils.lexicalFormLiteral(entry.term, env);
                 const replace = function(oid) {
                     if(oid != null && oid !== -1) {

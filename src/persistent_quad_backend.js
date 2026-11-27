@@ -1,7 +1,7 @@
 "use strict";
 
 // imports
-const utils = require('./utils');
+const Utils = require('./utils');
 
 /*
  * "perfect" indices for RDF indexing
@@ -21,7 +21,7 @@ const PersistentQuadBackend = function (configuration, callback) {
 
     if (arguments !== 0) {
 
-        utils.registerIndexedDB(that);
+        Utils.registerIndexedDB(that);
 
         this.indexMap = {};
         this.indices = ['S','P','O','G','SP','SO','SG','PO','PG','OG','SPO','SPG','SOG','POG','SPOG']
@@ -61,7 +61,7 @@ const PersistentQuadBackend = function (configuration, callback) {
         request.onupgradeneeded = function(event) {
             const db = event.target.result;
             const objectStore = db.createObjectStore(that.dbName, { keyPath: 'SPOG'});
-            utils.each(that.indices, function(index){
+            Utils.each(that.indices, function(index){
                 if(index !== 'SPOG') {
                     objectStore.createIndex(index,index,{unique: false});
                 }
@@ -73,7 +73,7 @@ const PersistentQuadBackend = function (configuration, callback) {
 
 PersistentQuadBackend.prototype.index = function (quad, callback) {
     const that = this;
-    utils.each(this.indices, function(index){
+    Utils.each(this.indices, function(index){
         quad[index] = that._genMinIndexKey(quad, index);
     });
 
@@ -148,7 +148,7 @@ PersistentQuadBackend.prototype.delete = function (quad, callback) {
 
 PersistentQuadBackend.prototype._genMinIndexKey = function(quad,index) {
     const indexComponents = this.componentOrders[index];
-    return utils.map(indexComponents, function(component){
+    return Utils.map(indexComponents, function(component){
         if(typeof(quad[component]) === 'string' || quad[component] == null) {
             return "0";
         } else {
@@ -169,7 +169,7 @@ PersistentQuadBackend.prototype._genMaxIndexKey = function(quad,index) {
             acum[i] = componentValue;
         }
     }
-    return utils.map(acum, function(componentValue){
+    return Utils.map(acum, function(componentValue){
         return ""+componentValue
     }).join('.');
 };

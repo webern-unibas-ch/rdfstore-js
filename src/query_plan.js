@@ -1,7 +1,6 @@
 "use strict";
 
-const _ = require('./utils');
-const async = require('./utils');
+const Utils = require('./utils');
 
 /**
  * Functions to build and execute query plans for a particular query
@@ -115,7 +114,7 @@ QueryPlanDPSize.executeAndBGPsGroups = function(bgps) {
             }
         }
 
-        if(_.size(toJoin) === 0) {
+        if(Utils.size(toJoin) === 0) {
             // we haven't found a single existing group sharing vars
             // with the BGP. We need to create a new group only for this BGP.
             newGroups['g'+groupId] = [bgp];
@@ -130,7 +129,7 @@ QueryPlanDPSize.executeAndBGPsGroups = function(bgps) {
         groupVars = newGroupVars;
     }
 
-    return _.values(groups);
+    return Utils.values(groups);
 };
 
 /**
@@ -188,7 +187,7 @@ QueryPlanDPSize.createJoinTree = function(leftPlan, rightPlan) {
             distinct[leftIds[i]] = true;
         }
     }
-    const ids = _.keys(distinct);
+    const ids = Utils.keys(distinct);
 
     // Returns the new join tree
     return {
@@ -237,7 +236,7 @@ QueryPlanDPSize.executeAndBGPsDPSize = function(allBgps, dataset, queryEngine, e
     const groups = QueryPlanDPSize.executeAndBGPsGroups(allBgps);
     const groupResults = [];
 
-    async.eachSeries(groups,function(bgps,k) {
+    Utils.eachSeries(groups,function(bgps,k) {
         // @todo
         // this lambda function should be moved to its named function
 
@@ -338,7 +337,7 @@ QueryPlanDPSize.executeAndBGPsDPSize = function(allBgps, dataset, queryEngine, e
         // now execute the Bushy trees and perform
         // cross products between groups
         let acum = null;
-        async.eachSeries(groupResults, function(tree,k) {
+        Utils.eachSeries(groupResults, function(tree,k) {
 
 
             QueryPlanDPSize.executeBushyTree(tree, dataset, queryEngine, env, function(result) {
@@ -378,7 +377,7 @@ QueryPlanDPSize.executeBGPDatasets = function(bgp, dataset, queryEngine, queryEn
     if(bgp.graph == null) {
         //union through all default graph(s)
         const acum = [];
-        async.eachSeries(dataset.implicit,
+        Utils.eachSeries(dataset.implicit,
             function(implicitGraph, k){
                 if(duplicates[implicitGraph.oid] == null) {
                     duplicates[implicitGraph.oid] = true;
@@ -400,7 +399,7 @@ QueryPlanDPSize.executeBGPDatasets = function(bgp, dataset, queryEngine, queryEn
         const graphVar = bgp.graph.value;
         let acum = [];
 
-        async.eachSeries(dataset.named,
+        Utils.eachSeries(dataset.named,
             function(graph, k){
                 if(duplicates[graph.oid] == null) {
                     duplicates[graph.oid] = true;

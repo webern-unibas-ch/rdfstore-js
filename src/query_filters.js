@@ -1,8 +1,6 @@
 "use strict";
 
 const Utils = require('./utils');
-const     _ = Utils;
-const async = require('./utils');
 const NonSupportedSparqlFeatureError = require('./abstract_query_tree').NonSupportedSparqlFeatureError;
 
 const QueryFilters = {};
@@ -21,7 +19,7 @@ QueryFilters.checkFilters = function(pattern, bindings, nullifyErrors, dataset, 
         if(err != null) {
             return callback(err);
         }
-        async.eachSeries(preProcessedFilters, function(filter,k){
+        Utils.eachSeries(preProcessedFilters, function(filter,k){
             QueryFilters.run(filter.value, bindings, nullifyErrors, dataset, queryEnv, queryEngine, function(err, filteredBindings){
                 if(err != null) {
                     return k(err);
@@ -50,7 +48,7 @@ QueryFilters.checkFilters = function(pattern, bindings, nullifyErrors, dataset, 
 
 QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEngine, dataset, env ,cb) {
     const preProcessedFilters = [];
-    async.eachSeries(filters, function(filter, k){
+    Utils.eachSeries(filters, function(filter, k){
         if(filter.value.expressionType === 'builtincall' &&
            (filter.value.builtincall === 'exists' ||
             filter.value.builtincall === 'notexists')) {
@@ -61,7 +59,7 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
             const solutionsWithOids = bindings;
             queryEngine.copyDenormalizedBindings(bindings, env.outCache, function(denormBindings){
                 let index = 0;
-                async.eachSeries(denormBindings, function(bindings, kk) {
+                Utils.eachSeries(denormBindings, function(bindings, kk) {
                     const solution = solutionsWithOids[index++];
                     let ast;
                     // inside GRAPH, the active graph of this solution (see AbstractQueryTree.setExistsGraph)
@@ -71,7 +69,7 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
                     }
                     try {
                         // this runs after a nextTick, so an error in the pattern (e.g. a BIND to a variable in scope) must not throw
-                        ast = queryEngine.abstractQueryTree.parseSelect({pattern: _.clone(args[0],true)}, graph);
+                        ast = queryEngine.abstractQueryTree.parseSelect({pattern: Utils.clone(args[0],true)}, graph);
                         // in the pattern a blank node matches like a variable: a bound one keeps its OID, and
                         // one from BNODE(), not in the store, gets -1 (matches nothing)
                         const patternBindings = {};
@@ -113,7 +111,7 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
                 });
             });
         } else if (filter.value.expressionType === "conditionalor" || filter.value.expressionType === "conditionaland") {
-            const operands = _.map(filter.value.operands, function(operand){ return {"value": operand}; });
+            const operands = Utils.map(filter.value.operands, function(operand){ return {"value": operand}; });
             QueryFilters.preprocessExistentialFilters(operands, bindings, queryEngine, dataset, env, function(err, preprocessedOperands){
                 if(err != null) {
                     return k(err);
@@ -123,7 +121,7 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
                 k();
             });
         } else if (filter.value.expressionType === "multiplicativeexpression") {
-            const operands = _.map(filter.value.factors, function(operand){ return {"value": operand}; });
+            const operands = Utils.map(filter.value.factors, function(operand){ return {"value": operand}; });
             QueryFilters.preprocessExistentialFilters(operands, bindings, queryEngine, dataset, env, function(err, preprocessedOperands){
                 if(err != null) {
                     return k(err);
@@ -133,7 +131,7 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
                 k();
             });
         } else if (filter.value.expressionType === "additiveexpression") {
-            const operands = _.map(filter.value.summands, function(operand){ return {"value": operand}; });
+            const operands = Utils.map(filter.value.summands, function(operand){ return {"value": operand}; });
             QueryFilters.preprocessExistentialFilters(operands, bindings, queryEngine, dataset, env, function(err, preprocessedOperands){
                 if(err != null) {
                     return k(err);
@@ -155,7 +153,7 @@ QueryFilters.preprocessExistentialFilters = function(filters, bindings, queryEng
             });
         } else if(filter.value.expressionType === "irireforfunction" || filter.value.expressionType === "custom") {
             if(filter.value.args != null) {
-                const operands = _.map(filter.value.args, function (operand) {
+                const operands = Utils.map(filter.value.args, function (operand) {
                     return {"value": operand};
                 });
                 QueryFilters.preprocessExistentialFilters(operands, bindings, queryEngine, dataset, env, function(err, preprocessedOperands){

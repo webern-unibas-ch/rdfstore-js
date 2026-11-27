@@ -1,8 +1,7 @@
 "use strict";
 
-const utils = require('./utils');
-const async = utils;
-const nextTick = utils.nextTick;
+const Utils = require('./utils');
+const nextTick = Utils.nextTick;
 
 const left = -1;
 const right = 1;
@@ -161,7 +160,7 @@ Tree.prototype.__walk = function(tree,node,f,callback) {
         }
         return callback();
     } else {
-        async.whilst(function(){
+        Utils.whilst(function(){
             return i < max;
         },function(c){
             tree._diskRead(node.children[i], function(n){
