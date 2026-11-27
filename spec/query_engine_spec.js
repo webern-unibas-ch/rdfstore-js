@@ -14,11 +14,11 @@ describe("QueryEngine", function () {
             engine.execute(
                 'PREFIX ns: <http://example.org/ns#>  PREFIX x:  <http://example.org/x/> PREFIX z:  <http://example.org/x/#> INSERT DATA { x:x ns:p  "d:x ns:p" . x:x x:p   "x:x x:p" . z:x z:p   "z:x z:p" . }',
                 function (err, result) {
-                    if (err !== null) throw err;
+                    expect(err).toBeNull();
                     engine.execute(
                         "BASE <http://example.org/x/> PREFIX : <> SELECT * WHERE { :x ?p ?v }",
                         function (err, results) {
-                            if (err !== null) throw err;
+                            expect(err).toBeNull();
                             expect(results.length).toBe(2);
 
                             for (var i = 0; i < results.length; i++) {
@@ -43,7 +43,8 @@ describe("QueryEngine", function () {
         newEngine(function (engine) {
             engine.execute(
                 "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
-                function (result) {
+                function (err) {
+                    expect(err).toBeNull();
                     engine.execute("SELECT * { ?s ?p ?o }", function (err, result) {
                         expect(err).toBe(null);
                         expect(result.length).toBe(1);
@@ -762,7 +763,8 @@ describe("QueryEngine", function () {
         newEngine(function (engine) {
             engine.execute(
                 "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
-                function (result) {
+                function (err) {
+                    expect(err).toBeNull();
                     engine.execute("SELECT * { ?s ?p ?o }", function (err, result) {
                         expect(result.length).toBe(1);
                         expect(result[0]["s"].value).toBe("http://example/book3");
@@ -771,7 +773,8 @@ describe("QueryEngine", function () {
 
                         engine.execute(
                             "DELETE DATA { <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
-                            function (result) {
+                            function (err) {
+                                expect(err).toBeNull();
                                 engine.execute("SELECT * { ?s ?p ?o }", function (err, result) {
                                     expect(result.length).toBe(0);
                                     countLexiconTerms(engine.lexicon, function (count) {
@@ -817,7 +820,8 @@ describe("QueryEngine", function () {
 
                                             engine.execute(
                                                 "DELETE DATA { GRAPH <a> { <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }  }",
-                                                function (result) {
+                                                function (err) {
+                                                    expect(err).toBeNull();
                                                     engine.execute(
                                                         "SELECT * FROM NAMED <a> { GRAPH <a> { ?s ?p ?o } }",
                                                         function (err, result) {
@@ -873,7 +877,8 @@ describe("QueryEngine", function () {
                                         <http://example/president42> foaf:familyName "Clinton" .\
                                    } \
                                }',
-                function (result) {
+                function (err) {
+                    expect(err).toBeNull();
                     engine.execute(
                         "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                               WITH <http://example/addresses>\
@@ -1022,7 +1027,8 @@ describe("QueryEngine", function () {
                                         <http://example/president42> foaf:familyName "Clinton" .\
                                    } \
                                }',
-                function (result) {
+                function (err) {
+                    expect(err).toBeNull();
                     engine.execute(
                         "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                               WITH <http://example/addresses>\
@@ -1080,7 +1086,8 @@ describe("QueryEngine", function () {
                                         <http://example/president25> foaf:familyName "McKinley" .\
                                    } \
                                }',
-                function (result) {
+                function (err) {
+                    expect(err).toBeNull();
                     engine.execute(
                         'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president27> \
@@ -1089,7 +1096,8 @@ describe("QueryEngine", function () {
                                         <http://example/president27> foaf:familyName "Taft" .\
                                    } \
                                }',
-                        function (result) {
+                        function (err) {
+                            expect(err).toBeNull();
                             engine.execute("CLEAR GRAPH <http://example/president27>", function (err, results) {
                                 engine.execute(
                                     "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }",
@@ -1130,7 +1138,8 @@ describe("QueryEngine", function () {
                                         <http://example/president25> foaf:familyName "McKinley" .\
                                    } \
                                }',
-                        function (result) {
+                        function (err) {
+                            expect(err).toBeNull();
                             engine.execute(
                                 'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president27> \
@@ -1139,7 +1148,8 @@ describe("QueryEngine", function () {
                                         <http://example/president27> foaf:familyName "Taft" .\
                                    } \
                                }',
-                                function (result) {
+                                function (err) {
+                                    expect(err).toBeNull();
                                     engine.execute("CLEAR DEFAULT", function (err, results) {
                                         engine.execute("SELECT *  { ?s ?p ?o } ", function (err, results) {
                                             expect(results.length).toBe(0);
@@ -1186,7 +1196,8 @@ describe("QueryEngine", function () {
                                         <http://example/president25> foaf:familyName "McKinley" .\
                                    } \
                                }',
-                        function (result) {
+                        function (err) {
+                            expect(err).toBeNull();
                             engine.execute(
                                 'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president27> \
@@ -1195,7 +1206,8 @@ describe("QueryEngine", function () {
                                         <http://example/president27> foaf:familyName "Taft" .\
                                    } \
                                }',
-                                function (result) {
+                                function (err) {
+                                    expect(err).toBeNull();
                                     engine.execute("CLEAR NAMED", function (err, results) {
                                         engine.execute("SELECT *  { ?s ?p ?o } ", function (err, results) {
                                             expect(err).toBeNull();
@@ -1243,7 +1255,8 @@ describe("QueryEngine", function () {
                                         <http://example/president25> foaf:familyName "McKinley" .\
                                    } \
                                }',
-                        function (result) {
+                        function (err) {
+                            expect(err).toBeNull();
                             engine.execute(
                                 'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president27> \
@@ -1252,7 +1265,8 @@ describe("QueryEngine", function () {
                                         <http://example/president27> foaf:familyName "Taft" .\
                                    } \
                                }',
-                                function (result) {
+                                function (err) {
+                                    expect(err).toBeNull();
                                     engine.execute("CLEAR ALL", function (err, results) {
                                         engine.execute("SELECT *  { ?s ?p ?o } ", function (err, results) {
                                             expect(err).toBeNull();
@@ -1307,7 +1321,8 @@ describe("QueryEngine", function () {
                                         <http://example/president25> foaf:familyName "McKinley" .\
                                    } \
                                }',
-                function (result) {
+                function (err) {
+                    expect(err).toBeNull();
                     engine.execute(
                         'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president27> \
@@ -1316,7 +1331,8 @@ describe("QueryEngine", function () {
                                         <http://example/president27> foaf:familyName "Taft" .\
                                    } \
                                }',
-                        function (result) {
+                        function (err) {
+                            expect(err).toBeNull();
                             engine.execute("DROP GRAPH <http://example/president27>", function (err, results) {
                                 engine.execute(
                                     "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }",
@@ -1357,7 +1373,8 @@ describe("QueryEngine", function () {
                                         <http://example/president25> foaf:familyName "McKinley" .\
                                    } \
                                }',
-                        function (result) {
+                        function (err) {
+                            expect(err).toBeNull();
                             engine.execute(
                                 'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president27> \
@@ -1366,7 +1383,8 @@ describe("QueryEngine", function () {
                                         <http://example/president27> foaf:familyName "Taft" .\
                                    } \
                                }',
-                                function (result) {
+                                function (err) {
+                                    expect(err).toBeNull();
                                     engine.execute("DROP DEFAULT", function (err, results) {
                                         engine.execute("SELECT *  { ?s ?p ?o } ", function (err, results) {
                                             expect(results.length).toBe(0);
@@ -1413,7 +1431,8 @@ describe("QueryEngine", function () {
                                         <http://example/president25> foaf:familyName "McKinley" .\
                                    } \
                                }',
-                        function (result) {
+                        function (err) {
+                            expect(err).toBeNull();
                             engine.execute(
                                 'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president27> \
@@ -1422,7 +1441,8 @@ describe("QueryEngine", function () {
                                         <http://example/president27> foaf:familyName "Taft" .\
                                    } \
                                }',
-                                function (result) {
+                                function (err) {
+                                    expect(err).toBeNull();
                                     engine.execute("DROP NAMED", function (err, results) {
                                         engine.execute("SELECT *  { ?s ?p ?o } ", function (err, results) {
                                             expect(err).toBeNull();
@@ -1470,7 +1490,8 @@ describe("QueryEngine", function () {
                                         <http://example/president25> foaf:familyName "McKinley" .\
                                    } \
                                }',
-                        function (result) {
+                        function (err) {
+                            expect(err).toBeNull();
                             engine.execute(
                                 'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president27> \
@@ -1479,7 +1500,8 @@ describe("QueryEngine", function () {
                                         <http://example/president27> foaf:familyName "Taft" .\
                                    } \
                                }',
-                                function (result) {
+                                function (err) {
+                                    expect(err).toBeNull();
                                     engine.execute("DROP ALL", function (err, results) {
                                         engine.execute("SELECT *  { ?s ?p ?o } ", function (err, results) {
                                             expect(err).toBeNull();
@@ -1526,7 +1548,8 @@ describe("QueryEngine", function () {
                                         <http://example/president42> foaf:givenName "Bill" .\
                                         <http://example/president42> foaf:familyName "Clinton" .\
                                    }',
-                function (result) {
+                function (err) {
+                    expect(err).toBeNull();
                     engine.execute(
                         "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                               DELETE WHERE  { ?person foaf:givenName 'Bill'}",
@@ -3609,7 +3632,8 @@ describe("QueryEngine", function () {
                                <book2>  ns:price     23 .\
                                <book2>  ns:discount  0.25 .\
                              }';
-            engine.execute(query, function (success, result) {
+            engine.execute(query, function (err, result) {
+                expect(err).toBeNull();
                 var query =
                     "PREFIX  dc:  <http://purl.org/dc/elements/1.1/>\
                                  PREFIX  ns:  <http://example.org/ns#>\
@@ -3643,7 +3667,8 @@ describe("QueryEngine", function () {
                             <book2>  ns:price     23 .\
                             <book2>  ns:discount  0.25 .\
                           }';
-            engine.execute(query, function (success, result) {
+            engine.execute(query, function (err, result) {
+                expect(err).toBeNull();
                 var query =
                     "PREFIX  dc:  <http://purl.org/dc/elements/1.1/>\
                               PREFIX  ns:  <http://example.org/ns#>\

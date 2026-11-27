@@ -1470,7 +1470,8 @@ describe("Store", function () {
              FILTER (?s=<http://test.com/A>)
              } `;
 
-                store.execute(query, function (success, results) {
+                store.execute(query, function (err, results) {
+                    expect(err).toBeNull();
                     expect(results.length).toBe(2);
                     done();
                 });

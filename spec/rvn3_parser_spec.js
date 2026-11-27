@@ -52,7 +52,7 @@ describe("RVN3Parser#parse", function () {
     it("Should be able to parse N3 data with a provided graph", function (done) {
         fs = require("fs");
         fs.readFile(path.resolve(__dirname, "data/sp2b_10k.n3"), function (err, data) {
-            if (err) throw err;
+            if (err) return done.fail(err);
             data = data.toString("utf8");
             RVN3Parser.parser.parse(data, "http://test.com/graph1", {}, function (err, result) {
                 expect(err).toBeNull();
@@ -69,7 +69,7 @@ describe("RVN3Parser#parse", function () {
     it("Should be able to parse N3 data with a null graph", function (done) {
         fs = require("fs");
         fs.readFile(path.resolve(__dirname, "data/sp2b_10k.n3"), function (err, data) {
-            if (err) throw err;
+            if (err) return done.fail(err);
             data = data.toString("utf8");
             RVN3Parser.parser.parse(data, {}, function (err, result) {
                 expect(err).toBeNull();
@@ -86,7 +86,7 @@ describe("RVN3Parser#parse", function () {
     it("Should parse N3 data with comments", function (done) {
         fs = require("fs");
         fs.readFile(path.resolve(__dirname, "./data/with_comments.n3"), function (err, data) {
-            if (err) throw err;
+            if (err) return done.fail(err);
             data = data.toString("utf8");
             var result = RVN3Parser.parser.parse(data, {}, function (err, result) {
                 expect(result.length).toBe(9);
