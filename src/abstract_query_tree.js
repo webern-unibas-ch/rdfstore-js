@@ -67,7 +67,6 @@ AbstractQueryTree.prototype.parseExecutableUnit = function(executableUnit) {
 AbstractQueryTree.prototype.parseSelect = function(syntaxTree, graph){
 
     if(syntaxTree == null) {
-        console.log("error parsing query");
         return null;
     } else {
         const env = {};
@@ -101,7 +100,6 @@ AbstractQueryTree.prototype.parseSelect = function(syntaxTree, graph){
 
 AbstractQueryTree.prototype.parseInsertData = function(syntaxTree){
     if(syntaxTree == null) {
-        console.log("error parsing query");
         return null;
     } else {
         return syntaxTree;

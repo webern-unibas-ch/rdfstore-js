@@ -299,7 +299,6 @@ PersistentLexicon.prototype.retrieve = function(oid, callback) {
                 } else if(event.target.result.literal != null) {
                     callback(that.parseLiteral(event.target.result.value.slice(3,event.target.result.value.length)));
                 } else {
-                    console.log(event.target.result);
                     callback(null,new Error("Unknown type of component "+event.target.result));
                 }
             } else {
