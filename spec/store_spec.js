@@ -2,86 +2,71 @@ var Store = require("../src/store");
 
 describe("Store", function () {
     describe("execute", function () {
-        it("should insert a triple and select it", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                expect(err).toBeNull();
-                store.execute(
-                    "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
-                    function (err, result) {
-                        expect(err).toBe(null);
-                        store.execute("SELECT * { ?s ?p ?o }", function (err, results) {
-                            expect(err).toBe(null);
-                            expect(results.length).toBe(1);
-                            expect(results[0].s.value).toBe("http://example/book3");
-                            expect(results[0].p.value).toBe("http://example.com/vocab#title");
-                            expect(results[0].o.value).toBe("http://test.com/example");
-                            store.close(function () {
-                                done();
-                            });
-                        });
-                    },
-                );
-            });
+        it("should insert a triple and select it", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            await store.promises.execute(
+                "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
+            );
+
+            var results = await store.promises.execute("SELECT * { ?s ?p ?o }");
+
+            expect(results.length).toBe(1);
+            expect(results[0].s.value).toBe("http://example/book3");
+            expect(results[0].p.value).toBe("http://example.com/vocab#title");
+            expect(results[0].o.value).toBe("http://test.com/example");
+            await store.promises.close();
         });
 
-        it("should insert a triple and select it with B-tree order 50", function (done) {
-            new Store.Store({ treeOrder: 50, name: "test", overwrite: true }, function (err, store) {
-                expect(err).toBe(null);
-                store.execute(
-                    "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
-                    function (err) {
-                        expect(err).toBe(null);
-                        store.execute("SELECT * { ?s ?p ?o }", function (err, results) {
-                            expect(err).toBe(null);
-                            expect(results.length).toBe(1);
-                            expect(results[0].s.value).toBe("http://example/book3");
-                            expect(results[0].p.value).toBe("http://example.com/vocab#title");
-                            expect(results[0].o.value).toBe("http://test.com/example");
+        it("should insert a triple and select it with B-tree order 50", async function () {
+            var store = await Store.promises.create({ treeOrder: 50, name: "test", overwrite: true });
 
-                            store.close(function () {
-                                done();
-                            });
-                        });
-                    },
-                );
-            });
+            await store.promises.execute(
+                "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
+            );
+
+            var results = await store.promises.execute("SELECT * { ?s ?p ?o }");
+
+            expect(results.length).toBe(1);
+            expect(results[0].s.value).toBe("http://example/book3");
+            expect(results[0].p.value).toBe("http://example.com/vocab#title");
+            expect(results[0].o.value).toBe("http://test.com/example");
+
+            await store.promises.close();
         });
 
-        it("should store a triple inserted twice once (DuplicatedInsert)", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                store.execute(
-                    "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
-                    function (result, msg) {
-                        store.execute(
-                            "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
-                            function (result, msg) {
-                                store.execute("SELECT * { ?s ?p ?o }", function (err, results) {
-                                    expect(err).toBe(null);
-                                    expect(results.length).toBe(1);
-                                    expect(results[0].s.value).toBe("http://example/book3");
-                                    expect(results[0].p.value).toBe("http://example.com/vocab#title");
-                                    expect(results[0].o.value).toBe("http://test.com/example");
+        it("should store a triple inserted twice once (DuplicatedInsert)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
 
-                                    store.close(function () {
-                                        done();
-                                    });
-                                });
-                            },
-                        );
-                    },
-                );
-            });
+            await store.promises.execute(
+                "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
+            );
+
+            await store.promises.execute(
+                "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
+            );
+
+            var results = await store.promises.execute("SELECT * { ?s ?p ?o }");
+
+            expect(results.length).toBe(1);
+            expect(results[0].s.value).toBe("http://example/book3");
+            expect(results[0].p.value).toBe("http://example.com/vocab#title");
+            expect(results[0].o.value).toBe("http://test.com/example");
+
+            await store.promises.close();
         });
 
-        it("should return one blank node per solution from a CONSTRUCT template (ConstructBlankNodes)", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                var uriGraph = "http://www.example.com/data.ttl";
-                var triplesTTL =
-                    "@prefix foaf: <http://xmlns.com/foaf/0.1/> . <http://www.example.com/resource/12645> a foaf:Person . ";
+        it("should return one blank node per solution from a CONSTRUCT template (ConstructBlankNodes)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
 
-                store.load("text/turtle", triplesTTL, uriGraph, function (err, results) {
-                    var query =
-                        'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
+            var uriGraph = "http://www.example.com/data.ttl";
+            var triplesTTL =
+                "@prefix foaf: <http://xmlns.com/foaf/0.1/> . <http://www.example.com/resource/12645> a foaf:Person . ";
+
+            await store.promises.load("text/turtle", triplesTTL, uriGraph);
+
+            var query =
+                'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
                          PREFIX test: <http://vocab.netlabs.org/test#>\
                          CONSTRUCT {\
                             ?s test:item [\
@@ -91,102 +76,91 @@ describe("Store", function () {
                             ] .\
                          }\
                          FROM <' +
-                        uriGraph +
-                        ">\
+                uriGraph +
+                ">\
                          WHERE {\
                            ?s a foaf:Person .\
                          }";
 
-                    store.execute(query, function (err, graph) {
-                        expect(err).toBeNull();
-                        var distinctBlankSubjects = {};
-                        var triples = graph.toArray();
-                        var triple;
-                        expect(triples.length).toBe(4);
-                        for (var i = 0; i < triples.length; i++) {
-                            triple = triples[i];
-                            if (triple.subject.interfaceName === "BlankNode") {
-                                distinctBlankSubjects[triple.subject.bnodeId] = true;
-                            } else {
-                                expect(triple.subject.valueOf()).toBe("http://www.example.com/resource/12645");
-                                expect(triple.object.interfaceName).toBe("BlankNode");
-                                distinctBlankSubjects[triple.object.bnodeId] = true;
-                            }
-                        }
+            var graph = await store.promises.execute(query);
 
-                        var numDistinctBlankSujects = Object.keys(distinctBlankSubjects).length;
+            var distinctBlankSubjects = {};
+            var triples = graph.toArray();
+            var triple;
+            expect(triples.length).toBe(4);
+            for (var i = 0; i < triples.length; i++) {
+                triple = triples[i];
+                if (triple.subject.interfaceName === "BlankNode") {
+                    distinctBlankSubjects[triple.subject.bnodeId] = true;
+                } else {
+                    expect(triple.subject.valueOf()).toBe("http://www.example.com/resource/12645");
+                    expect(triple.object.interfaceName).toBe("BlankNode");
+                    distinctBlankSubjects[triple.object.bnodeId] = true;
+                }
+            }
 
-                        expect(numDistinctBlankSujects).toBe(1);
-                        store.close(function () {
-                            done();
-                        });
-                    });
-                });
-            });
+            var numDistinctBlankSujects = Object.keys(distinctBlankSubjects).length;
+
+            expect(numDistinctBlankSujects).toBe(1);
+            await store.promises.close();
         });
 
-        it("should match a variable used twice in a pattern only to equal terms (RedundantVars1)", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                store.load("text/n3", "<http://A> <http://B> <http://C>.", function (err) {
-                    store.execute("SELECT *  WHERE { ?x ?p ?x }", function (err, results) {
-                        expect(results.length).toBe(0);
-                        done();
-                    });
-                });
-            });
+        it("should match a variable used twice in a pattern only to equal terms (RedundantVars1)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            await store.promises.load("text/n3", "<http://A> <http://B> <http://C>.");
+
+            var results = await store.promises.execute("SELECT *  WHERE { ?x ?p ?x }");
+
+            expect(results.length).toBe(0);
         });
 
-        it("should select the triples whose subject equals their object (RedundantVars2)", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                store.load(
-                    "text/n3",
-                    "<http://C> <http://B> <http://C>.\
+        it("should select the triples whose subject equals their object (RedundantVars2)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            await store.promises.load(
+                "text/n3",
+                "<http://C> <http://B> <http://C>.\
                  <http://D> <http://E> <http://F>.",
-                    function (err) {
-                        store.execute("SELECT *  WHERE { ?x ?p ?x }", function (err, results) {
-                            expect(results.length).toBe(1);
-                            done();
-                        });
-                    },
-                );
-            });
+            );
+
+            var results = await store.promises.execute("SELECT *  WHERE { ?x ?p ?x }");
+
+            expect(results.length).toBe(1);
         });
 
-        it("should construct nothing when a repeated variable matches no triple (RedundantVars3)", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                store.load("text/n3", "<http://A> <http://B> <http://C>.", function (err) {
-                    store.execute("CONSTRUCT { ?x ?p ?x }  WHERE { ?x ?p ?x }", function (err, results) {
-                        var counter = 0;
-                        results.triples.forEach(function (result) {
-                            counter++;
-                        });
+        it("should construct nothing when a repeated variable matches no triple (RedundantVars3)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
 
-                        expect(counter).toBe(0);
-                        done();
-                    });
-                });
+            await store.promises.load("text/n3", "<http://A> <http://B> <http://C>.");
+
+            var results = await store.promises.execute("CONSTRUCT { ?x ?p ?x }  WHERE { ?x ?p ?x }");
+
+            var counter = 0;
+            results.triples.forEach(function (result) {
+                counter++;
             });
+
+            expect(counter).toBe(0);
         });
 
-        it("should construct the triples whose subject equals their object (RedundantVars4)", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                store.load(
-                    "text/n3",
-                    "<http://C> <http://B> <http://C>.\
+        it("should construct the triples whose subject equals their object (RedundantVars4)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            await store.promises.load(
+                "text/n3",
+                "<http://C> <http://B> <http://C>.\
                  <http://D> <http://E> <http://F>.",
-                    function (err) {
-                        store.execute("CONSTRUCT { ?x ?p ?x }  WHERE { ?x ?p ?x }", function (err, results) {
-                            var counter = 0;
-                            results.triples.forEach(function (result) {
-                                counter++;
-                            });
+            );
 
-                            expect(counter).toBe(1);
-                            done();
-                        });
-                    },
-                );
+            var results = await store.promises.execute("CONSTRUCT { ?x ?p ?x }  WHERE { ?x ?p ?x }");
+
+            var counter = 0;
+            results.triples.forEach(function (result) {
+                counter++;
             });
+
+            expect(counter).toBe(1);
         });
 
         it("should execute requests that end in whitespace", async function () {
@@ -224,11 +198,11 @@ describe("Store", function () {
     });
 
     describe("graphs and nodes", function () {
-        it("should return the default graph and filter it", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                expect(err).toBe(null);
-                var query =
-                    'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
+        it("should return the default graph and filter it", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            var query =
+                'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
                      PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
                      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
                      PREFIX : <http://example.org/people/>\
@@ -246,33 +220,28 @@ describe("Store", function () {
                          foaf:mbox       <mailto:bob@home> \
                          .\
                      }';
-                store.execute(query, function (err) {
-                    expect(err).toBe(null);
-                    store.graph(function (err, graph) {
-                        expect(err).toBe(null);
-                        var results = graph.filter(store.rdf.filters.describes("http://example.org/people/alice"));
+            await store.promises.execute(query);
 
-                        var resultsCount = results.toArray().length;
+            var graph = await store.promises.graph();
 
-                        var resultsSubject = results.filter(store.rdf.filters.s("http://example.org/people/alice"));
-                        var resultsObject = results.filter(store.rdf.filters.o("http://example.org/people/alice"));
+            var results = graph.filter(store.rdf.filters.describes("http://example.org/people/alice"));
 
-                        expect(resultsObject.toArray().length).toBe(1);
-                        expect(resultsObject.toArray().length + resultsSubject.toArray().length).toBe(resultsCount);
+            var resultsCount = results.toArray().length;
 
-                        store.close(function () {
-                            done();
-                        });
-                    });
-                });
-            });
+            var resultsSubject = results.filter(store.rdf.filters.s("http://example.org/people/alice"));
+            var resultsObject = results.filter(store.rdf.filters.o("http://example.org/people/alice"));
+
+            expect(resultsObject.toArray().length).toBe(1);
+            expect(resultsObject.toArray().length + resultsSubject.toArray().length).toBe(resultsCount);
+
+            await store.promises.close();
         });
 
-        it("should return the default graph and a named graph", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                expect(err).toBe(null);
-                var query =
-                    'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
+        it("should return the default graph and a named graph", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            var query =
+                'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
                      PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
                      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
                      PREFIX : <http://example.org/people/>\
@@ -286,10 +255,10 @@ describe("Store", function () {
                          .\
                        }\
                      }';
-                store.execute(query, function (err) {
-                    expect(err).toBe(null);
-                    var query =
-                        'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
+            await store.promises.execute(query);
+
+            query =
+                'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
                          PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
                          PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
                          PREFIX : <http://example.org/people/>\
@@ -303,28 +272,23 @@ describe("Store", function () {
                                   .\
                            }\
                          }';
-                    store.execute(query, function (err, results) {
-                        expect(err).toBe(null);
-                        store.graph(function (succes, graph) {
-                            expect(graph.toArray().length).toBe(0);
+            await store.promises.execute(query);
 
-                            store.graph("http://example.org/people/alice", function (succes, results) {
-                                expect(results.toArray().length).toBe(4);
-                                store.close(function () {
-                                    done();
-                                });
-                            });
-                        });
-                    });
-                });
-            });
+            var graph = await store.promises.graph();
+
+            expect(graph.toArray().length).toBe(0);
+
+            var results = await store.promises.graph("http://example.org/people/alice");
+
+            expect(results.toArray().length).toBe(4);
+            await store.promises.close();
         });
 
-        it("should return the triples of a node", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                expect(err).toBe(null);
-                var query =
-                    'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
+        it("should return the triples of a node", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            var query =
+                'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
                      PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
                      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
                      PREFIX : <http://example.org/people/>\
@@ -342,24 +306,19 @@ describe("Store", function () {
                          foaf:mbox       <mailto:bob@home> \
                          .\
                      }';
-                store.execute(query, function (err, results) {
-                    expect(err).toBe(null);
-                    store.node("http://example.org/people/alice", function (err, graph) {
-                        expect(err).toBe(null);
-                        expect(graph.toArray().length).toBe(4);
-                        store.close(function () {
-                            done();
-                        });
-                    });
-                });
-            });
+            await store.promises.execute(query);
+
+            var graph = await store.promises.node("http://example.org/people/alice");
+
+            expect(graph.toArray().length).toBe(4);
+            await store.promises.close();
         });
 
-        it("should return the triples of a node in a named graph", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                expect(err).toBe(null);
-                var query =
-                    'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
+        it("should return the triples of a node in a named graph", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            var query =
+                'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
                      PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
                      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
                      PREFIX : <http://example.org/people/>\
@@ -373,10 +332,10 @@ describe("Store", function () {
                          .\
                        }\
                      }';
-                store.execute(query, function (err) {
-                    expect(err).toBe(null);
-                    var query =
-                        'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
+            await store.promises.execute(query);
+
+            query =
+                'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
                          PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
                          PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
                          PREFIX : <http://example.org/people/>\
@@ -390,32 +349,26 @@ describe("Store", function () {
                                   .\
                            }\
                          }';
-                    store.execute(query, function (err) {
-                        expect(err).toBe(null);
-                        store.graph(function (err, graph) {
-                            expect(err).toBe(null);
-                            expect(graph.toArray().length).toBe(0);
+            await store.promises.execute(query);
 
-                            store.node(
-                                "http://example.org/people/alice",
-                                "http://example.org/people/alice",
-                                function (err, results) {
-                                    expect(results.toArray().length).toBe(4);
-                                    store.close(function () {
-                                        done();
-                                    });
-                                },
-                            );
-                        });
-                    });
-                });
-            });
+            var graph = await store.promises.graph();
+
+            expect(graph.toArray().length).toBe(0);
+
+            var results = await store.promises.node(
+                "http://example.org/people/alice",
+                "http://example.org/people/alice",
+            );
+
+            expect(results.toArray().length).toBe(4);
+            await store.promises.close();
         });
 
-        it("should list the registered graphs (RegisteredGraph)", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                var query =
-                    'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
+        it("should list the registered graphs (RegisteredGraph)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            var query =
+                'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
                      PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
                      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
                      PREFIX : <http://example.org/people/>\
@@ -429,9 +382,10 @@ describe("Store", function () {
                          .\
                        }\
                      }';
-                store.execute(query, function (err, results) {
-                    var query =
-                        'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
+            await store.promises.execute(query);
+
+            query =
+                'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
                          PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
                          PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
                          PREFIX : <http://example.org/people/>\
@@ -445,49 +399,49 @@ describe("Store", function () {
                                   .\
                            }\
                          }';
-                    store.execute(query, function (err, results) {
-                        store.registeredGraphs(function (results, graphs) {
-                            expect(graphs.length).toBe(2);
-                            var values = [];
-                            for (var i = 0; i < graphs.length; i++) {
-                                values.push(graphs[i].valueOf());
-                            }
-                            values.sort();
-                            expect(values[0]).toBe("http://example.org/people/alice");
-                            expect(values[1]).toBe("http://example.org/people/bob");
-                            store.close(function () {
-                                done();
-                            });
-                        });
-                    });
-                });
-            });
+            await store.promises.execute(query);
+
+            var graphs = await store.promises.registeredGraphs();
+
+            expect(graphs.length).toBe(2);
+            var values = [];
+            for (var i = 0; i < graphs.length; i++) {
+                values.push(graphs[i].valueOf());
+            }
+            values.sort();
+            expect(values[0]).toBe("http://example.org/people/alice");
+            expect(values[1]).toBe("http://example.org/people/bob");
+            await store.promises.close();
         });
 
-        it("should bind GRAPH variables to the graph names", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                store.load(
-                    "text/n3",
-                    '@prefix dc: <http://purl.org/dc/elements/1.1/> .\
+        it("should bind GRAPH variables to the graph names", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            await store.promises.load(
+                "text/n3",
+                '@prefix dc: <http://purl.org/dc/elements/1.1/> .\
                  <http://example.org/bob>    dc:publisher  "Bob Hacker" .\
                 <http://example.org/alice>  dc:publisher  "Alice Hacker" .',
-                    function (err) {
-                        store.load(
-                            "text/n3",
-                            '@prefix foaf: <http://xmlns.com/foaf/0.1/> .\
+            );
+
+            await store.promises.load(
+                "text/n3",
+                '@prefix foaf: <http://xmlns.com/foaf/0.1/> .\
                             _:a foaf:name "Bob" .\
                         _:a foaf:mbox <mailto:bob@oldcorp.example.org> .',
-                            "http://example.org/bob",
-                            function (err) {
-                                store.load(
-                                    "text/n3",
-                                    '@prefix foaf: <http://xmlns.com/foaf/0.1/> .\
+                "http://example.org/bob",
+            );
+
+            await store.promises.load(
+                "text/n3",
+                '@prefix foaf: <http://xmlns.com/foaf/0.1/> .\
                                 _:a foaf:name "Alice" .\
                                 _:a foaf:mbox <mailto:alice@work.example.org> .',
-                                    "http://example.org/alice",
-                                    function (err) {
-                                        store.execute(
-                                            "PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
+                "http://example.org/alice",
+            );
+
+            var results = await store.promises.execute(
+                "PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
                                             PREFIX dc: <http://purl.org/dc/elements/1.1/>\
                                             SELECT ?who ?g ?mbox\
                                         FROM <http://example.org/dft.ttl>\
@@ -498,41 +452,30 @@ describe("Store", function () {
                                             ?g dc:publisher ?who .\
                                             GRAPH ?g { ?x foaf:mbox ?mbox }\
                                     }",
-                                            ["https://github.com/antoniogarrote/rdfstore-js#default_graph"],
-                                            ["http://example.org/alice", "http://example.org/bob"],
-                                            function (err, results) {
-                                                expect(results.length).toBe(2);
-                                                // no ORDER BY: the order of the rows is not defined
-                                                results.sort(function (a, b) {
-                                                    return a.who.value < b.who.value ? -1 : 1;
-                                                });
-                                                expect(results[0].who.value).toBe("Alice Hacker");
-                                                expect(results[0].g.value).toBe("http://example.org/alice");
-                                                expect(results[0].mbox.value).toBe("mailto:alice@work.example.org");
-
-                                                expect(results[1].who.value).toBe("Bob Hacker");
-                                                expect(results[1].g.value).toBe("http://example.org/bob");
-                                                expect(results[1].mbox.value).toBe("mailto:bob@oldcorp.example.org");
-
-                                                done();
-                                            },
-                                        );
-                                    },
-                                );
-                            },
-                        );
-                    },
-                );
+                ["https://github.com/antoniogarrote/rdfstore-js#default_graph"],
+                ["http://example.org/alice", "http://example.org/bob"],
+            );
+            expect(results.length).toBe(2);
+            // no ORDER BY: the order of the rows is not defined
+            results.sort(function (a, b) {
+                return a.who.value < b.who.value ? -1 : 1;
             });
+            expect(results[0].who.value).toBe("Alice Hacker");
+            expect(results[0].g.value).toBe("http://example.org/alice");
+            expect(results[0].mbox.value).toBe("mailto:alice@work.example.org");
+
+            expect(results[1].who.value).toBe("Bob Hacker");
+            expect(results[1].g.value).toBe("http://example.org/bob");
+            expect(results[1].mbox.value).toBe("mailto:bob@oldcorp.example.org");
         });
     });
 
     describe("prefixes", function () {
-        it("should resolve CURIEs with the prefixes set by setPrefix", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                expect(err).toBe(null);
-                var query =
-                    'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
+        it("should resolve CURIEs with the prefixes set by setPrefix", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            var query =
+                'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
                      PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
                      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
                      PREFIX : <http://example.org/people/>\
@@ -546,10 +489,10 @@ describe("Store", function () {
                          .\
                        }\
                      }';
-                store.execute(query, function (err) {
-                    expect(err).toBe(null);
-                    var query =
-                        'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
+            await store.promises.execute(query);
+
+            query =
+                'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
                          PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
                          PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
                          PREFIX : <http://example.org/people/>\
@@ -563,31 +506,24 @@ describe("Store", function () {
                                   .\
                            }\
                          }';
-                    store.execute(query, function (err) {
-                        expect(err).toBe(null);
-                        store.setPrefix("ex", "http://example.org/people/");
-                        store.graph(function (err, graph) {
-                            expect(err).toBe(null);
-                            expect(graph.toArray().length).toBe(0);
+            await store.promises.execute(query);
 
-                            store.node("ex:alice", "ex:alice", function (err, results) {
-                                expect(err).toBe(null);
-                                expect(results.toArray().length).toBe(4);
-                                store.close(function () {
-                                    done();
-                                });
-                            });
-                        });
-                    });
-                });
-            });
+            store.setPrefix("ex", "http://example.org/people/");
+            var graph = await store.promises.graph();
+
+            expect(graph.toArray().length).toBe(0);
+
+            var results = await store.promises.node("ex:alice", "ex:alice");
+
+            expect(results.toArray().length).toBe(4);
+            await store.promises.close();
         });
 
-        it("should resolve CURIEs with the default prefix", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                expect(err).toBe(null);
-                var query =
-                    'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
+        it("should resolve CURIEs with the default prefix", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            var query =
+                'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
                      PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
                      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
                      PREFIX : <http://example.org/people/>\
@@ -601,10 +537,10 @@ describe("Store", function () {
                          .\
                        }\
                      }';
-                store.execute(query, function (err) {
-                    expect(err).toBe(null);
-                    var query =
-                        'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
+            await store.promises.execute(query);
+
+            query =
+                'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
                          PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
                          PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
                          PREFIX : <http://example.org/people/>\
@@ -618,402 +554,352 @@ describe("Store", function () {
                                   .\
                            }\
                          }';
-                    store.execute(query, function (err, results) {
-                        expect(err).toBe(null);
-                        store.setDefaultPrefix("http://example.org/people/");
-                        store.graph(function (err, graph) {
-                            expect(err).toBe(null);
-                            expect(graph.toArray().length).toBe(0);
+            await store.promises.execute(query);
 
-                            store.node(":alice", ":alice", function (err, results) {
-                                expect(err).toBe(null);
-                                expect(results.toArray().length).toBe(4);
-                                store.close(function () {
-                                    done();
-                                });
-                            });
-                        });
-                    });
-                });
-            });
+            store.setDefaultPrefix("http://example.org/people/");
+            var graph = await store.promises.graph();
+
+            expect(graph.toArray().length).toBe(0);
+
+            var results = await store.promises.node(":alice", ":alice");
+
+            expect(results.toArray().length).toBe(4);
+            await store.promises.close();
         });
 
-        it("should register the default profile namespaces (DefaultPrefixes)", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                store.execute(
-                    'INSERT DATA {  <http://example/person1> <http://xmlns.com/foaf/0.1/name> "Celia" }',
-                    function (result, msg) {
-                        store.execute("SELECT * { ?s foaf:name ?name }", function (err, results) {
-                            expect(err).toBe(null);
-                            expect(results.length).toBe(0);
+        it("should register the default profile namespaces (DefaultPrefixes)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
 
-                            store.registerDefaultProfileNamespaces();
+            await store.promises.execute(
+                'INSERT DATA {  <http://example/person1> <http://xmlns.com/foaf/0.1/name> "Celia" }',
+            );
 
-                            store.execute("SELECT * { ?s foaf:name ?name }", function (err, results) {
-                                expect(err).toBe(null);
-                                expect(results.length).toBe(1);
-                                expect(results[0].name.value).toBe("Celia");
-                                store.close(function () {
-                                    done();
-                                });
-                            });
-                        });
-                    },
-                );
-            });
+            var results = await store.promises.execute("SELECT * { ?s foaf:name ?name }");
+
+            expect(results.length).toBe(0);
+
+            store.registerDefaultProfileNamespaces();
+
+            results = await store.promises.execute("SELECT * { ?s foaf:name ?name }");
+
+            expect(results.length).toBe(1);
+            expect(results[0].name.value).toBe("Celia");
+            await store.promises.close();
         });
     });
 
     describe("insert, delete and clear", function () {
-        it("should insert a graph into the default graph (Insert1)", function (done) {
-            Store.create({ name: "test", overwrite: true }, function (err, store) {
-                store.setPrefix("ex", "http://example.org/people/");
+        it("should insert a graph into the default graph (Insert1)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
 
-                var graph = store.rdf.createGraph();
-                graph.add(
-                    store.rdf.createTriple(
-                        store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
-                        store.rdf.createNamedNode(store.rdf.resolve("foaf:name")),
-                        store.rdf.createLiteral("alice"),
-                    ),
-                );
+            store.setPrefix("ex", "http://example.org/people/");
 
-                graph.add(
-                    store.rdf.createTriple(
-                        store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
-                        store.rdf.createNamedNode(store.rdf.resolve("foaf:knows")),
-                        store.rdf.createNamedNode(store.rdf.resolve("ex:Bob")),
-                    ),
-                );
+            var graph = store.rdf.createGraph();
+            graph.add(
+                store.rdf.createTriple(
+                    store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
+                    store.rdf.createNamedNode(store.rdf.resolve("foaf:name")),
+                    store.rdf.createLiteral("alice"),
+                ),
+            );
 
-                store.insert(graph, function (err, results) {
-                    store.node("ex:Alice", function (err, graph) {
-                        expect(graph.toArray().length).toBe(2);
-                        store.close(function () {
-                            done();
-                        });
-                    });
-                });
-            });
+            graph.add(
+                store.rdf.createTriple(
+                    store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
+                    store.rdf.createNamedNode(store.rdf.resolve("foaf:knows")),
+                    store.rdf.createNamedNode(store.rdf.resolve("ex:Bob")),
+                ),
+            );
+
+            await store.promises.insert(graph);
+
+            graph = await store.promises.node("ex:Alice");
+
+            expect(graph.toArray().length).toBe(2);
+            await store.promises.close();
         });
 
-        it("should insert a graph into a named graph (Insert2)", function (done) {
-            Store.create({ name: "test", overwrite: true }, function (err, store) {
-                store.setPrefix("ex", "http://example.org/people/");
+        it("should insert a graph into a named graph (Insert2)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
 
-                var graph = store.rdf.createGraph();
-                graph.add(
-                    store.rdf.createTriple(
-                        store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
-                        store.rdf.createNamedNode(store.rdf.resolve("foaf:name")),
-                        store.rdf.createLiteral("alice"),
-                    ),
-                );
+            store.setPrefix("ex", "http://example.org/people/");
 
-                graph.add(
-                    store.rdf.createTriple(
-                        store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
-                        store.rdf.createNamedNode(store.rdf.resolve("foaf:knows")),
-                        store.rdf.createNamedNode(store.rdf.resolve("ex:Bob")),
-                    ),
-                );
+            var graph = store.rdf.createGraph();
+            graph.add(
+                store.rdf.createTriple(
+                    store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
+                    store.rdf.createNamedNode(store.rdf.resolve("foaf:name")),
+                    store.rdf.createLiteral("alice"),
+                ),
+            );
 
-                store.insert(graph, "ex:alice", function (err, results) {
-                    store.node("ex:Alice", "ex:alice", function (err, graph) {
-                        expect(graph.toArray().length).toBe(2);
-                        store.close(function () {
-                            done();
-                        });
-                    });
-                });
-            });
+            graph.add(
+                store.rdf.createTriple(
+                    store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
+                    store.rdf.createNamedNode(store.rdf.resolve("foaf:knows")),
+                    store.rdf.createNamedNode(store.rdf.resolve("ex:Bob")),
+                ),
+            );
+
+            await store.promises.insert(graph, "ex:alice");
+
+            graph = await store.promises.node("ex:Alice", "ex:alice");
+
+            expect(graph.toArray().length).toBe(2);
+            await store.promises.close();
         });
 
-        it("should delete a graph from the default graph (Delete1)", function (done) {
-            Store.create({ name: "test", overwrite: true }, function (err, store) {
-                store.setPrefix("ex", "http://example.org/people/");
+        it("should delete a graph from the default graph (Delete1)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
 
-                var graph = store.rdf.createGraph();
-                graph.add(
-                    store.rdf.createTriple(
-                        store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
-                        store.rdf.createNamedNode(store.rdf.resolve("foaf:name")),
-                        store.rdf.createLiteral("alice"),
-                    ),
-                );
+            store.setPrefix("ex", "http://example.org/people/");
 
-                graph.add(
-                    store.rdf.createTriple(
-                        store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
-                        store.rdf.createNamedNode(store.rdf.resolve("foaf:knows")),
-                        store.rdf.createNamedNode(store.rdf.resolve("ex:Bob")),
-                    ),
-                );
+            var graph = store.rdf.createGraph();
+            graph.add(
+                store.rdf.createTriple(
+                    store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
+                    store.rdf.createNamedNode(store.rdf.resolve("foaf:name")),
+                    store.rdf.createLiteral("alice"),
+                ),
+            );
 
-                store.insert(graph, function (err, results) {
-                    store.node("ex:Alice", function (err, graph) {
-                        expect(graph.toArray().length).toBe(2);
-                        store.delete(graph, function (err, result) {
-                            store.node("ex:Alice", function (err, graph) {
-                                expect(graph.toArray().length).toBe(0);
-                                store.close(function () {
-                                    done();
-                                });
-                            });
-                        });
-                    });
-                });
-            });
+            graph.add(
+                store.rdf.createTriple(
+                    store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
+                    store.rdf.createNamedNode(store.rdf.resolve("foaf:knows")),
+                    store.rdf.createNamedNode(store.rdf.resolve("ex:Bob")),
+                ),
+            );
+
+            await store.promises.insert(graph);
+
+            graph = await store.promises.node("ex:Alice");
+
+            expect(graph.toArray().length).toBe(2);
+            await store.promises.delete(graph);
+
+            graph = await store.promises.node("ex:Alice");
+
+            expect(graph.toArray().length).toBe(0);
+            await store.promises.close();
         });
 
-        it("should delete a graph from a named graph (Delete2)", function (done) {
-            Store.create({ name: "test", overwrite: true }, function (err, store) {
-                store.setPrefix("ex", "http://example.org/people/");
+        it("should delete a graph from a named graph (Delete2)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
 
-                var graph = store.rdf.createGraph();
-                graph.add(
-                    store.rdf.createTriple(
-                        store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
-                        store.rdf.createNamedNode(store.rdf.resolve("foaf:name")),
-                        store.rdf.createLiteral("alice"),
-                    ),
-                );
+            store.setPrefix("ex", "http://example.org/people/");
 
-                graph.add(
-                    store.rdf.createTriple(
-                        store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
-                        store.rdf.createNamedNode(store.rdf.resolve("foaf:knows")),
-                        store.rdf.createNamedNode(store.rdf.resolve("ex:Bob")),
-                    ),
-                );
+            var graph = store.rdf.createGraph();
+            graph.add(
+                store.rdf.createTriple(
+                    store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
+                    store.rdf.createNamedNode(store.rdf.resolve("foaf:name")),
+                    store.rdf.createLiteral("alice"),
+                ),
+            );
 
-                store.insert(graph, "ex:alice", function (err, results) {
-                    store.node("ex:Alice", "ex:alice", function (err, graph) {
-                        expect(graph.toArray().length).toBe(2);
-                        store.delete(graph, "ex:alice", function (err, result) {
-                            store.node("ex:Alice", function (err, graph) {
-                                expect(graph.toArray().length).toBe(0);
-                                store.close(function () {
-                                    done();
-                                });
-                            });
-                        });
-                    });
-                });
-            });
+            graph.add(
+                store.rdf.createTriple(
+                    store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
+                    store.rdf.createNamedNode(store.rdf.resolve("foaf:knows")),
+                    store.rdf.createNamedNode(store.rdf.resolve("ex:Bob")),
+                ),
+            );
+
+            await store.promises.insert(graph, "ex:alice");
+
+            graph = await store.promises.node("ex:Alice", "ex:alice");
+
+            expect(graph.toArray().length).toBe(2);
+            await store.promises.delete(graph, "ex:alice");
+
+            graph = await store.promises.node("ex:Alice");
+
+            expect(graph.toArray().length).toBe(0);
+            await store.promises.close();
         });
 
-        it("should clear the default graph (Clear)", function (done) {
-            Store.create({ name: "test", overwrite: true }, function (err, store) {
-                store.setPrefix("ex", "http://example.org/people/");
+        it("should clear the default graph (Clear)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
 
-                var graph = store.rdf.createGraph();
-                graph.add(
-                    store.rdf.createTriple(
-                        store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
-                        store.rdf.createNamedNode(store.rdf.resolve("foaf:name")),
-                        store.rdf.createLiteral("alice"),
-                    ),
-                );
+            store.setPrefix("ex", "http://example.org/people/");
 
-                graph.add(
-                    store.rdf.createTriple(
-                        store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
-                        store.rdf.createNamedNode(store.rdf.resolve("foaf:knows")),
-                        store.rdf.createNamedNode(store.rdf.resolve("ex:Bob")),
-                    ),
-                );
+            var graph = store.rdf.createGraph();
+            graph.add(
+                store.rdf.createTriple(
+                    store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
+                    store.rdf.createNamedNode(store.rdf.resolve("foaf:name")),
+                    store.rdf.createLiteral("alice"),
+                ),
+            );
 
-                store.insert(graph, "ex:alice", function (err, results) {
-                    store.node("ex:Alice", "ex:alice", function (err, graph) {
-                        expect(graph.toArray().length).toBe(2);
-                        store.clear("ex:alice", function (err, result) {
-                            store.node("ex:Alice", function (err, graph) {
-                                expect(graph.toArray().length).toBe(0);
-                                store.close(function () {
-                                    done();
-                                });
-                            });
-                        });
-                    });
-                });
-            });
+            graph.add(
+                store.rdf.createTriple(
+                    store.rdf.createNamedNode(store.rdf.resolve("ex:Alice")),
+                    store.rdf.createNamedNode(store.rdf.resolve("foaf:knows")),
+                    store.rdf.createNamedNode(store.rdf.resolve("ex:Bob")),
+                ),
+            );
+
+            await store.promises.insert(graph, "ex:alice");
+
+            graph = await store.promises.node("ex:Alice", "ex:alice");
+
+            expect(graph.toArray().length).toBe(2);
+            await store.promises.clear("ex:alice");
+
+            graph = await store.promises.node("ex:Alice");
+
+            expect(graph.toArray().length).toBe(0);
+            await store.promises.close();
         });
     });
 
     describe("load", function () {
-        it("should load JSON-LD into a named graph (Load1)", function (done) {
-            Store.create({ name: "test", overwrite: true }, function (err, store) {
-                store.setPrefix("ex", "http://example.org/people/");
+        it("should load JSON-LD into a named graph (Load1)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
 
-                var input = {
-                    "@context": {
-                        rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-                        xsd: "http://www.w3.org/2001/XMLSchema#",
-                        name: "http://xmlns.com/foaf/0.1/name",
-                        age: { "@id": "http://xmlns.com/foaf/0.1/age", "@type": "xsd:integer" },
-                        homepage: { "@id": "http://xmlns.com/foaf/0.1/homepage", "@type": "@id" },
-                        ex: "http://example.org/people/",
-                    },
-                    "@id": "ex:john_smith",
-                    name: "John Smith",
-                    age: "41",
-                    homepage: "http://example.org/home/",
-                };
-                store.load("application/json", input, "ex:test", function (err, results) {
-                    store.node("ex:john_smith", "ex:test", function (err, graph) {
-                        expect(graph.toArray().length).toBe(3);
-                        store.close(function () {
-                            done();
-                        });
-                    });
-                });
-            });
+            store.setPrefix("ex", "http://example.org/people/");
+
+            var input = {
+                "@context": {
+                    rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+                    xsd: "http://www.w3.org/2001/XMLSchema#",
+                    name: "http://xmlns.com/foaf/0.1/name",
+                    age: { "@id": "http://xmlns.com/foaf/0.1/age", "@type": "xsd:integer" },
+                    homepage: { "@id": "http://xmlns.com/foaf/0.1/homepage", "@type": "@id" },
+                    ex: "http://example.org/people/",
+                },
+                "@id": "ex:john_smith",
+                name: "John Smith",
+                age: "41",
+                homepage: "http://example.org/home/",
+            };
+            await store.promises.load("application/json", input, "ex:test");
+
+            var graph = await store.promises.node("ex:john_smith", "ex:test");
+
+            expect(graph.toArray().length).toBe(3);
+            await store.promises.close();
         });
 
-        it("should load N3 into a named graph (Load3)", function (done) {
-            Store.create({ name: "test", overwrite: true }, function (err, store) {
-                store.setPrefix("ex", "http://example.org/examples/");
+        it("should load N3 into a named graph (Load3)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
 
-                var input =
-                    '_:a <http://test.com/p1> "test". _:a <http://test.com/p2> "test2". _:b <http://test.com/p1> "test" .';
-                store.load("text/n3", input, "ex:test", function (err, results) {
-                    store.execute(
-                        "select ?s { GRAPH <http://example.org/examples/test> { ?s ?p ?o } }",
-                        function (err, results) {
-                            expect(err).toBeNull();
+            store.setPrefix("ex", "http://example.org/examples/");
 
-                            var blankIds = {};
+            var input =
+                '_:a <http://test.com/p1> "test". _:a <http://test.com/p2> "test2". _:b <http://test.com/p1> "test" .';
+            await store.promises.load("text/n3", input, "ex:test");
 
-                            for (var i = 0; i < results.length; i++) {
-                                var blankId = results[i].s.value;
-                                blankIds[blankId] = true;
-                            }
-                            var counter = Object.keys(blankIds).length;
+            var results = await store.promises.execute(
+                "select ?s { GRAPH <http://example.org/examples/test> { ?s ?p ?o } }",
+            );
 
-                            expect(counter).toBe(2);
-                            store.close(function () {
-                                done();
-                            });
-                        },
-                    );
-                });
-            });
+            var blankIds = {};
+
+            for (var i = 0; i < results.length; i++) {
+                var blankId = results[i].s.value;
+                blankIds[blankId] = true;
+            }
+            var counter = Object.keys(blankIds).length;
+
+            expect(counter).toBe(2);
+            await store.promises.close();
         });
 
-        it("should load N3 into the graph given in the options (Load5)", function (done) {
-            Store.create({ name: "test", overwrite: true }, function (err, store) {
-                store.setPrefix("ex", "http://example.org/examples/");
+        it("should load N3 into the graph given in the options (Load5)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
 
-                var input =
-                    '_:a <http://test.com/p1> "test". _:a <http://test.com/p2> "test2". _:b <http://test.com/p1> "test" .';
-                store.load("text/n3", input, { graph: "ex:test" }, function (err, results) {
-                    store.execute(
-                        "select ?s { GRAPH <http://example.org/examples/test> { ?s ?p ?o } }",
-                        function (err, results) {
-                            expect(err).toBe(null);
+            store.setPrefix("ex", "http://example.org/examples/");
 
-                            var blankIds = {};
+            var input =
+                '_:a <http://test.com/p1> "test". _:a <http://test.com/p2> "test2". _:b <http://test.com/p1> "test" .';
+            await store.promises.load("text/n3", input, { graph: "ex:test" });
 
-                            for (var i = 0; i < results.length; i++) {
-                                var blankId = results[i].s.value;
-                                blankIds[blankId] = true;
-                            }
-                            var counter = Object.keys(blankIds).length;
+            var results = await store.promises.execute(
+                "select ?s { GRAPH <http://example.org/examples/test> { ?s ?p ?o } }",
+            );
 
-                            expect(counter).toBe(2);
-                            store.close(function () {
-                                done();
-                            });
-                        },
-                    );
-                });
-            });
+            var blankIds = {};
+
+            for (var i = 0; i < results.length; i++) {
+                var blankId = results[i].s.value;
+                blankIds[blankId] = true;
+            }
+            var counter = Object.keys(blankIds).length;
+
+            expect(counter).toBe(2);
+            await store.promises.close();
         });
 
-        it("should resolve relative IRIs against the baseURI option (Load5b)", function (done) {
-            Store.create({ name: "test", overwrite: true }, function (err, store) {
-                store.setPrefix("ex", "http://example.org/examples/");
+        it("should resolve relative IRIs against the baseURI option (Load5b)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
 
-                var input =
-                    '<#me> <http://test.com/p1> "test". <http://test.com/something#me> <http://test.com/p2> "test2". _:b <http://test.com/p1> "test" .';
-                store.load("text/n3", input, { baseURI: "http://test.com/something" }, function (err, results) {
-                    store.execute("select ?s { ?s ?p ?o }", function (err, results) {
-                        expect(err).toBe(null);
-                        var blankIds = {};
+            store.setPrefix("ex", "http://example.org/examples/");
 
-                        for (var i = 0; i < results.length; i++) {
-                            var blankId = results[i].s.value;
-                            blankIds[blankId] = true;
-                        }
-                        var counter = Object.keys(blankIds).length;
+            var input =
+                '<#me> <http://test.com/p1> "test". <http://test.com/something#me> <http://test.com/p2> "test2". _:b <http://test.com/p1> "test" .';
+            await store.promises.load("text/n3", input, { baseURI: "http://test.com/something" });
 
-                        expect(counter).toBe(2);
-                        store.close(function () {
-                            done();
-                        });
-                    });
-                });
-            });
+            var results = await store.promises.execute("select ?s { ?s ?p ?o }");
+
+            var blankIds = {};
+
+            for (var i = 0; i < results.length; i++) {
+                var blankId = results[i].s.value;
+                blankIds[blankId] = true;
+            }
+            var counter = Object.keys(blankIds).length;
+
+            expect(counter).toBe(2);
+            await store.promises.close();
         });
 
-        it("should load N3 with the baseURI and graph options (Load5c)", function (done) {
-            Store.create({ name: "test", overwrite: true }, function (err, store) {
-                store.setPrefix("ex", "http://example.org/examples/");
+        it("should load N3 with the baseURI and graph options (Load5c)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
 
-                var input =
-                    '<#me> <http://test.com/p1> "test". <http://test.com/something#me> <http://test.com/p2> "test2". _:b <http://test.com/p1> "test" .';
-                store.load(
-                    "text/n3",
-                    input,
-                    {
-                        baseURI: "http://test.com/something",
-                        graph: "ex:test",
-                    },
-                    function (err, results) {
-                        store.execute(
-                            "select ?s { GRAPH <http://example.org/examples/test> { ?s ?p ?o }  }",
-                            function (err, results) {
-                                expect(err).toBe(null);
+            store.setPrefix("ex", "http://example.org/examples/");
 
-                                var blankIds = {};
-
-                                for (var i = 0; i < results.length; i++) {
-                                    var blankId = results[i].s.value;
-                                    blankIds[blankId] = true;
-                                }
-                                var counter = Object.keys(blankIds).length;
-
-                                expect(counter).toBe(2);
-                                store.close(function () {
-                                    done();
-                                });
-                            },
-                        );
-                    },
-                );
+            var input =
+                '<#me> <http://test.com/p1> "test". <http://test.com/something#me> <http://test.com/p2> "test2". _:b <http://test.com/p1> "test" .';
+            await store.promises.load("text/n3", input, {
+                baseURI: "http://test.com/something",
+                graph: "ex:test",
             });
+
+            var results = await store.promises.execute(
+                "select ?s { GRAPH <http://example.org/examples/test> { ?s ?p ?o }  }",
+            );
+
+            var blankIds = {};
+
+            for (var i = 0; i < results.length; i++) {
+                var blankId = results[i].s.value;
+                blankIds[blankId] = true;
+            }
+            var counter = Object.keys(blankIds).length;
+
+            expect(counter).toBe(2);
+            await store.promises.close();
         });
 
-        it("should store a JSON-LD triple loaded twice once (DuplicatedParsing)", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                var data = { "@id": "http://test.com/me", "http://somproperty.org/prop": "data" };
-                store.load("application/json", data, function (result, msg) {
-                    store.load("application/json", data, function (result, msg) {
-                        store.execute("SELECT * { ?s ?p ?o }", function (err, results) {
-                            expect(err).toBe(null);
-                            expect(results.length).toBe(1);
-                            expect(results[0].s.value).toBe("http://test.com/me");
-                            store.close(function () {
-                                done();
-                            });
-                        });
-                    });
-                });
-            });
+        it("should store a JSON-LD triple loaded twice once (DuplicatedParsing)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            var data = { "@id": "http://test.com/me", "http://somproperty.org/prop": "data" };
+            await store.promises.load("application/json", data);
+
+            await store.promises.load("application/json", data);
+
+            var results = await store.promises.execute("SELECT * { ?s ?p ?o }");
+
+            expect(results.length).toBe(1);
+            expect(results[0].s.value).toBe("http://test.com/me");
+            await store.promises.close();
         });
 
-        it("should load JSON-LD with every JSON-LD media type (ShouldLoadJSONLDWithAllMediaTypes)", function (done) {
+        it("should load JSON-LD with every JSON-LD media type (ShouldLoadJSONLDWithAllMediaTypes)", async function () {
             var input = {
                 "@type": "foaf:Person",
                 "foaf:name": "Manu Sporny",
@@ -1027,111 +913,110 @@ describe("Store", function () {
 
             var jsonmedia = 0,
                 jsonldmedia = 0;
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                store.load("application/ld+json", input, function (err) {
-                    store.execute("SELECT * { ?s ?p ?o }", function (err, results) {
-                        jsonmedia = results.length;
-                        expect(jsonmedia).toBeGreaterThan(0);
+            var store = await Store.promises.create({ name: "test", overwrite: true });
 
-                        new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                            store.load("application/json", input, function (err) {
-                                store.execute("SELECT * { ?s ?p ?o }", function (err, results) {
-                                    jsonldmedia = results.length;
-                                    expect(jsonldmedia).toBeGreaterThan(0);
+            await store.promises.load("application/ld+json", input);
 
-                                    expect(jsonldmedia).toBe(jsonmedia);
-                                    done();
-                                });
-                            });
-                        });
-                    });
-                });
-            });
+            var results = await store.promises.execute("SELECT * { ?s ?p ?o }");
+
+            jsonmedia = results.length;
+            expect(jsonmedia).toBeGreaterThan(0);
+
+            store = await Store.promises.create({ name: "test", overwrite: true });
+
+            await store.promises.load("application/json", input);
+
+            results = await store.promises.execute("SELECT * { ?s ?p ?o }");
+
+            jsonldmedia = results.length;
+            expect(jsonldmedia).toBeGreaterThan(0);
+
+            expect(jsonldmedia).toBe(jsonmedia);
         });
     });
 
     describe("events API", function () {
-        it("should notify a node observer of changes (EventsAPI1)", function (done) {
+        it("should notify a node observer of changes (EventsAPI1)", async function () {
             var counter = 0;
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                store.execute(
-                    "INSERT DATA {  <http://example/book> <http://example.com/vocab#title> <http://test.com/example> }",
-                    function (result, msg) {
-                        store.startObservingNode("http://example/book", function (graph) {
-                            var observerFn = arguments.callee;
-                            if (counter === 0) {
-                                counter++;
-                                expect(graph.toArray().length).toBe(1);
-                                store.execute(
-                                    "INSERT DATA {  <http://example/book> <http://example.com/vocab#title2> <http://test.com/example2> }",
-                                );
-                            } else if (counter === 1) {
-                                counter++;
-                                expect(graph.toArray().length).toBe(2);
-                                store.execute(
-                                    "DELETE DATA {  <http://example/book> <http://example.com/vocab#title2> <http://test.com/example2> }",
-                                );
-                            } else if (counter === 2) {
-                                counter++;
-                                expect(graph.toArray().length).toBe(1);
-                                store.stopObservingNode(observerFn);
-                                store.execute(
-                                    "INSERT DATA {  <http://example/book> <http://example.com/vocab#title2> <http://test.com/example3> }",
-                                );
-                                store.close(function () {
-                                    done();
-                                });
-                            } else if (counter === 3) {
-                                expect(false).toBe(true);
-                            }
-                        });
-                    },
-                );
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            await store.promises.execute(
+                "INSERT DATA {  <http://example/book> <http://example.com/vocab#title> <http://test.com/example> }",
+            );
+
+            await new Promise(function (resolve) {
+                store.startObservingNode("http://example/book", function (graph) {
+                    var observerFn = arguments.callee;
+                    if (counter === 0) {
+                        counter++;
+                        expect(graph.toArray().length).toBe(1);
+                        store.execute(
+                            "INSERT DATA {  <http://example/book> <http://example.com/vocab#title2> <http://test.com/example2> }",
+                        );
+                    } else if (counter === 1) {
+                        counter++;
+                        expect(graph.toArray().length).toBe(2);
+                        store.execute(
+                            "DELETE DATA {  <http://example/book> <http://example.com/vocab#title2> <http://test.com/example2> }",
+                        );
+                    } else if (counter === 2) {
+                        counter++;
+                        expect(graph.toArray().length).toBe(1);
+                        store.stopObservingNode(observerFn);
+                        store.execute(
+                            "INSERT DATA {  <http://example/book> <http://example.com/vocab#title2> <http://test.com/example3> }",
+                        );
+                        store.close(resolve);
+                    } else if (counter === 3) {
+                        expect(false).toBe(true);
+                    }
+                });
             });
         });
 
-        it("should notify a node observer of changes in a named graph (EventsAPI2)", function (done) {
+        it("should notify a node observer of changes in a named graph (EventsAPI2)", async function () {
             var counter = 0;
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                store.execute(
-                    "INSERT DATA { GRAPH <http://example/graph> { <http://example/book> <http://example.com/vocab#title> <http://test.com/example> } }",
-                    function (result, msg) {
-                        store.startObservingNode("http://example/book", "http://example/graph", function (graph) {
-                            var observerFn = arguments.callee;
-                            if (counter === 0) {
-                                counter++;
-                                expect(graph.toArray().length).toBe(1);
-                                store.execute(
-                                    "INSERT DATA { GRAPH <http://example/graph> { <http://example/book> <http://example.com/vocab#title2> <http://test.com/example2> } }",
-                                );
-                            } else if (counter === 1) {
-                                counter++;
-                                expect(graph.toArray().length).toBe(2);
-                                store.execute(
-                                    "DELETE DATA { GRAPH <http://example/graph> { <http://example/book> <http://example.com/vocab#title2> <http://test.com/example2> } }",
-                                );
-                            } else if (counter === 2) {
-                                counter++;
-                                expect(graph.toArray().length).toBe(1);
-                                store.stopObservingNode(observerFn);
-                                store.execute(
-                                    "INSERT DATA { GRAPH <http://example/graph> { <http://example/book> <http://example.com/vocab#title2> <http://test.com/example3> } }",
-                                );
-                                store.close(function () {
-                                    done();
-                                });
-                            } else if (counter === 3) {
-                                expect(false).toBe(true);
-                            }
-                        });
-                    },
-                );
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            await store.promises.execute(
+                "INSERT DATA { GRAPH <http://example/graph> { <http://example/book> <http://example.com/vocab#title> <http://test.com/example> } }",
+            );
+
+            await new Promise(function (resolve) {
+                store.startObservingNode("http://example/book", "http://example/graph", function (graph) {
+                    var observerFn = arguments.callee;
+                    if (counter === 0) {
+                        counter++;
+                        expect(graph.toArray().length).toBe(1);
+                        store.execute(
+                            "INSERT DATA { GRAPH <http://example/graph> { <http://example/book> <http://example.com/vocab#title2> <http://test.com/example2> } }",
+                        );
+                    } else if (counter === 1) {
+                        counter++;
+                        expect(graph.toArray().length).toBe(2);
+                        store.execute(
+                            "DELETE DATA { GRAPH <http://example/graph> { <http://example/book> <http://example.com/vocab#title2> <http://test.com/example2> } }",
+                        );
+                    } else if (counter === 2) {
+                        counter++;
+                        expect(graph.toArray().length).toBe(1);
+                        store.stopObservingNode(observerFn);
+                        store.execute(
+                            "INSERT DATA { GRAPH <http://example/graph> { <http://example/book> <http://example.com/vocab#title2> <http://test.com/example3> } }",
+                        );
+                        store.close(resolve);
+                    } else if (counter === 3) {
+                        expect(false).toBe(true);
+                    }
+                });
             });
         });
 
-        it("should notify a subscription of matching changes (EventsAPI3)", function (done) {
+        it("should notify a subscription of matching changes (EventsAPI3)", async function () {
             var counter = 0;
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            await new Promise(function (resolve) {
                 store.subscribe(
                     "http://example/book",
                     null,
@@ -1159,205 +1044,172 @@ describe("Store", function () {
                             expect(false).toBe(true);
                         }
                     },
-                    function () {
-                        store.execute(
-                            "INSERT DATA {  <http://example/book> <http://example.com/vocab#title> <http://test.com/example> }",
-                            function () {
-                                store.execute(
-                                    "INSERT DATA {  <http://example/book> <http://example.com/vocab#title2> <http://test.com/example2>.\
-                                              <http://example/book> <http://example.com/vocab#title3> <http://test.com/example3> }",
-                                    function () {
-                                        store.execute(
-                                            "DELETE DATA {  <http://example/book> <http://example.com/vocab#title2> <http://test.com/example2> }",
-                                            function () {
-                                                store.execute(
-                                                    "INSERT DATA {  <http://example/book> <http://example.com/vocab#title2> <http://test.com/example3> }",
-                                                    function () {
-                                                        store.close(function () {
-                                                            done();
-                                                        });
-                                                    },
-                                                );
-                                            },
-                                        );
-                                    },
-                                );
-                            },
-                        );
-                    },
+                    resolve,
                 );
             });
+            await store.promises.execute(
+                "INSERT DATA {  <http://example/book> <http://example.com/vocab#title> <http://test.com/example> }",
+            );
+            await store.promises.execute(
+                "INSERT DATA {  <http://example/book> <http://example.com/vocab#title2> <http://test.com/example2>.\
+                                              <http://example/book> <http://example.com/vocab#title3> <http://test.com/example3> }",
+            );
+            await store.promises.execute(
+                "DELETE DATA {  <http://example/book> <http://example.com/vocab#title2> <http://test.com/example2> }",
+            );
+            await store.promises.execute(
+                "INSERT DATA {  <http://example/book> <http://example.com/vocab#title2> <http://test.com/example3> }",
+            );
+            await store.promises.close();
         });
     });
 
     describe("custom functions", function () {
-        it("should call a registered custom function in a FILTER (RegisterCustomFunction)", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                store.load(
-                    "text/n3",
-                    "@prefix test: <http://test.com/> .\
+        it("should call a registered custom function in a FILTER (RegisterCustomFunction)", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            await store.promises.load(
+                "text/n3",
+                "@prefix test: <http://test.com/> .\
                  test:A test:prop 5.\
                  test:B test:prop 4.\
                  test:C test:prop 1.\
                  test:D test:prop 3.",
-                    function (err) {
-                        store.registerCustomFunction("my_addition", function (engine, args) {
-                            var v1 = engine.effectiveTypeValue(args[0]);
-                            var v2 = engine.effectiveTypeValue(args[1]);
-                            return engine.ebvBoolean(v1 + v2 < 5);
-                        });
-                        store.execute(
-                            "PREFIX test: <http://test.com/> SELECT * { ?x test:prop ?v1 . ?y test:prop ?v2 . filter(custom:my_addition(?v1,?v2)) }",
-                            function (err, results) {
-                                expect(results.length).toBe(3);
-                                for (var i = 0; i < results.length; i++) {
-                                    expect(parseInt(results[i].v1.value) + parseInt(results[i].v2.value)).toBeLessThan(
-                                        5,
-                                    );
-                                }
-                                done();
-                            },
-                        );
-                    },
-                );
+            );
+
+            store.registerCustomFunction("my_addition", function (engine, args) {
+                var v1 = engine.effectiveTypeValue(args[0]);
+                var v2 = engine.effectiveTypeValue(args[1]);
+                return engine.ebvBoolean(v1 + v2 < 5);
             });
+            var results = await store.promises.execute(
+                "PREFIX test: <http://test.com/> SELECT * { ?x test:prop ?v1 . ?y test:prop ?v2 . filter(custom:my_addition(?v1,?v2)) }",
+            );
+
+            expect(results.length).toBe(3);
+            for (var i = 0; i < results.length; i++) {
+                expect(parseInt(results[i].v1.value) + parseInt(results[i].v2.value)).toBeLessThan(5);
+            }
         });
 
-        it("should call a custom function registered under a URI", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                store.load(
-                    "text/n3",
-                    "@prefix test: <http://test.com/> .\
+        it("should call a custom function registered under a URI", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            await store.promises.load(
+                "text/n3",
+                "@prefix test: <http://test.com/> .\
                  test:A test:prop 5.\
                  test:B test:prop 4.\
                  test:C test:prop 1.\
                  test:D test:prop 3.",
-                    function (err) {
-                        store.registerCustomFunction("http://test.com/my_addition", function (engine, args) {
-                            var v1 = engine.effectiveTypeValue(args[0]);
-                            var v2 = engine.effectiveTypeValue(args[1]);
-                            return engine.ebvBoolean(v1 + v2 < 5);
-                        });
-                        store.execute(
-                            "PREFIX test: <http://test.com/> SELECT * { ?x test:prop ?v1 . ?y test:prop ?v2 . filter(<http://test.com/my_addition>(?v1,?v2)) }",
-                            function (err, results) {
-                                expect(results.length).toBe(3);
-                                for (var i = 0; i < results.length; i++) {
-                                    expect(parseInt(results[i].v1.value) + parseInt(results[i].v2.value)).toBeLessThan(
-                                        5,
-                                    );
-                                }
-                                done();
-                            },
-                        );
-                    },
-                );
+            );
+
+            store.registerCustomFunction("http://test.com/my_addition", function (engine, args) {
+                var v1 = engine.effectiveTypeValue(args[0]);
+                var v2 = engine.effectiveTypeValue(args[1]);
+                return engine.ebvBoolean(v1 + v2 < 5);
             });
+            var results = await store.promises.execute(
+                "PREFIX test: <http://test.com/> SELECT * { ?x test:prop ?v1 . ?y test:prop ?v2 . filter(<http://test.com/my_addition>(?v1,?v2)) }",
+            );
+
+            expect(results.length).toBe(3);
+            for (var i = 0; i < results.length; i++) {
+                expect(parseInt(results[i].v1.value) + parseInt(results[i].v2.value)).toBeLessThan(5);
+            }
         });
 
-        it("should call a custom function registered under a CURIE", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                store.load(
-                    "text/n3",
-                    "@prefix test: <http://test.com/> .\
+        it("should call a custom function registered under a CURIE", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            await store.promises.load(
+                "text/n3",
+                "@prefix test: <http://test.com/> .\
                  test:A test:prop 5.\
                  test:B test:prop 4.\
                  test:C test:prop 1.\
                  test:D test:prop 3.",
-                    function (err) {
-                        store.registerCustomFunction("http://test.com/my_addition2", function (engine, args) {
-                            var v1 = engine.effectiveTypeValue(args[0]);
-                            var v2 = engine.effectiveTypeValue(args[1]);
-                            return engine.ebvBoolean(v1 + v2 < 5);
-                        });
-                        store.execute(
-                            "PREFIX test: <http://test.com/> SELECT * { ?x test:prop ?v1 . ?y test:prop ?v2 . filter(test:my_addition2(?v1,?v2)) }",
-                            function (err, results) {
-                                expect(results.length).toBe(3);
-                                for (var i = 0; i < results.length; i++) {
-                                    expect(parseInt(results[i].v1.value) + parseInt(results[i].v2.value)).toBeLessThan(
-                                        5,
-                                    );
-                                }
-                                done();
-                            },
-                        );
-                    },
-                );
+            );
+
+            store.registerCustomFunction("http://test.com/my_addition2", function (engine, args) {
+                var v1 = engine.effectiveTypeValue(args[0]);
+                var v2 = engine.effectiveTypeValue(args[1]);
+                return engine.ebvBoolean(v1 + v2 < 5);
             });
+            var results = await store.promises.execute(
+                "PREFIX test: <http://test.com/> SELECT * { ?x test:prop ?v1 . ?y test:prop ?v2 . filter(test:my_addition2(?v1,?v2)) }",
+            );
+
+            expect(results.length).toBe(3);
+            for (var i = 0; i < results.length; i++) {
+                expect(parseInt(results[i].v1.value) + parseInt(results[i].v2.value)).toBeLessThan(5);
+            }
         });
 
-        it("should call a custom function inside an aggregate", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                store.load(
-                    "text/n3",
-                    "@prefix test: <http://test.com/> .\
+        it("should call a custom function inside an aggregate", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            await store.promises.load(
+                "text/n3",
+                "@prefix test: <http://test.com/> .\
                  test:A test:prop 1.\
                  test:A test:prop 2.\
                  test:B test:prop 5.",
-                    function (err) {
-                        store.registerCustomFunction("http://test.com/my_double", function (engine, args) {
-                            var v = engine.effectiveTypeValue(args[0]);
-                            return {
-                                token: "literal",
-                                type: "http://www.w3.org/2001/XMLSchema#integer",
-                                value: "" + v * 2,
-                            };
-                        });
-                        store.execute(
-                            "PREFIX test: <http://test.com/> SELECT ?x (SUM(test:my_double(?v)) AS ?sum) { ?x test:prop ?v } GROUP BY ?x",
-                            function (err, results) {
-                                expect(err).toBeNull();
-                                expect(results.length).toBe(2);
-                                var sums = {};
-                                for (var i = 0; i < results.length; i++) {
-                                    sums[results[i].x.value] = results[i].sum.value;
-                                }
-                                expect(sums["http://test.com/A"]).toBe("6");
-                                expect(sums["http://test.com/B"]).toBe("10");
-                                done();
-                            },
-                        );
-                    },
-                );
+            );
+
+            store.registerCustomFunction("http://test.com/my_double", function (engine, args) {
+                var v = engine.effectiveTypeValue(args[0]);
+                return {
+                    token: "literal",
+                    type: "http://www.w3.org/2001/XMLSchema#integer",
+                    value: "" + v * 2,
+                };
             });
+            var results = await store.promises.execute(
+                "PREFIX test: <http://test.com/> SELECT ?x (SUM(test:my_double(?v)) AS ?sum) { ?x test:prop ?v } GROUP BY ?x",
+            );
+
+            expect(results.length).toBe(2);
+            var sums = {};
+            for (var i = 0; i < results.length; i++) {
+                sums[results[i].x.value] = results[i].sum.value;
+            }
+            expect(sums["http://test.com/A"]).toBe("6");
+            expect(sums["http://test.com/B"]).toBe("10");
         });
 
-        it("should evaluate a custom function in a BIND expression", function (done) {
-            new Store.Store({ name: "test", overwrite: false }, function (err, store) {
-                store.load(
-                    "text/n3",
-                    "@prefix test: <http://test.com/> .\
+        it("should evaluate a custom function in a BIND expression", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: false });
+
+            await store.promises.load(
+                "text/n3",
+                "@prefix test: <http://test.com/> .\
                  test:A test:prop 5.\
                  test:B test:prop 4.\
                  test:C test:prop 1.\
                  test:D test:prop 3.",
-                    function (err) {
-                        store.registerCustomFunction("http://test.com/my_default_value", function (engine, args) {
-                            return {
-                                token: "literal",
-                                value: "test_value",
-                                type: "http://www.w3.org/2001/XMLSchema#string",
-                            };
-                        });
-                        store.execute(
-                            "PREFIX test: <http://test.com/> SELECT * { OPTIONAL { ?x test:prop ?v1 . BIND(test:my_default_value(?v1) AS ?default_value) } }",
-                            function (err, results) {
-                                expect(results.length).toBe(4);
-                                for (var i = 0; i < results.length; i++) {
-                                    expect(results[i].default_value.value).toBe("test_value");
-                                }
-                                done();
-                            },
-                        );
-                    },
-                );
+            );
+
+            store.registerCustomFunction("http://test.com/my_default_value", function (engine, args) {
+                return {
+                    token: "literal",
+                    value: "test_value",
+                    type: "http://www.w3.org/2001/XMLSchema#string",
+                };
             });
+            var results = await store.promises.execute(
+                "PREFIX test: <http://test.com/> SELECT * { OPTIONAL { ?x test:prop ?v1 . BIND(test:my_default_value(?v1) AS ?default_value) } }",
+            );
+
+            expect(results.length).toBe(4);
+            for (var i = 0; i < results.length; i++) {
+                expect(results[i].default_value.value).toBe("test_value");
+            }
         });
     });
 
     describe("filters", function () {
-        it("should evaluate EXISTS and NOT EXISTS filters", function (done) {
+        it("should evaluate EXISTS and NOT EXISTS filters", async function () {
             var query =
                 "SELECT ?s WHERE { \
                      FILTER NOT EXISTS {\
@@ -1370,68 +1222,60 @@ describe("Store", function () {
                      }\
                    }";
 
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                expect(err).toBe(null);
-                store.execute(
-                    "INSERT DATA {  <a> <b> <b1> . \
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            await store.promises.execute(
+                "INSERT DATA {  <a> <b> <b1> . \
                                           <a> <c> <c1> . \
                                           <a2> <b> <b2> . \
                                           <a3> <d> <d1> . \
                                           <a4> <d> <d3> . \
                                           <a4> <b> <b> . \
                                           <a4> <c> <c1> }",
-                    function () {
-                        store.execute(query, function (err, results) {
-                            expect(err).toBe(null);
-                            expect(results.length).toBe(2);
-                            var vars = {};
-                            for (var i = 0; i < results.length; i++) {
-                                vars[results[i]["s"].value] = true;
-                            }
-                            expect(vars["a2"]).toBe(true);
-                            expect(vars["a3"]).toBe(true);
-                            done();
-                        });
-                    },
-                );
-            });
+            );
+
+            var results = await store.promises.execute(query);
+
+            expect(results.length).toBe(2);
+            var vars = {};
+            for (var i = 0; i < results.length; i++) {
+                vars[results[i]["s"].value] = true;
+            }
+            expect(vars["a2"]).toBe(true);
+            expect(vars["a3"]).toBe(true);
         });
 
-        it("should evaluate regex filters", function (done) {
+        it("should evaluate regex filters", async function () {
             var query =
                 'SELECT ?s { \
                      ?s ?p ?o .\
                      FILTER regex(?o, "test")\
                    }';
 
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                expect(err).toBe(null);
-                store.execute(
-                    'INSERT DATA {  <a1> <b> "atestofsomething" . \
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            await store.promises.execute(
+                'INSERT DATA {  <a1> <b> "atestofsomething" . \
                                           <a11> <c> "test" . \
                                           <a2> <b> "other" . \
                                           <a3> <d> "someother" . \
                                           <a4> <d> 1 . \
                                           <a4> <b> 2 . \
                                           <a4> <c> 3 }',
-                    function () {
-                        store.execute(query, function (err, results) {
-                            expect(err).toBe(null);
-                            expect(results.length).toBe(2);
-                            var vars = {};
-                            for (var i = 0; i < results.length; i++) {
-                                vars[results[i]["s"].value] = true;
-                            }
-                            expect(vars["a1"]).toBe(true);
-                            expect(vars["a11"]).toBe(true);
-                            done();
-                        });
-                    },
-                );
-            });
+            );
+
+            var results = await store.promises.execute(query);
+
+            expect(results.length).toBe(2);
+            var vars = {};
+            for (var i = 0; i < results.length; i++) {
+                vars[results[i]["s"].value] = true;
+            }
+            expect(vars["a1"]).toBe(true);
+            expect(vars["a11"]).toBe(true);
         });
 
-        it("should evaluate numeric filters", function (done) {
+        it("should evaluate numeric filters", async function () {
             var query =
                 'PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\
                    SELECT ?s { \
@@ -1439,55 +1283,49 @@ describe("Store", function () {
                      FILTER (xsd:double(?o) > "10.0"^^<http://www.w3.org/2001/XMLSchema#double>)\
                    }';
 
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                expect(err).toBe(null);
-                store.execute(
-                    'INSERT DATA {  <a1> <b> 16.0 . \
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            await store.promises.execute(
+                'INSERT DATA {  <a1> <b> 16.0 . \
                                           <a2> <b> 3.0 . \
                                           <a3> <d> "11.4"^^<http://www.w3.org/2001/XMLSchema#double> . \
                                           <a4> <d> "0.3"^^<http://www.w3.org/2001/XMLSchema#double> . \
                                           <a5> <c> 13 .\
                                           <a6> <c> "3"^^<http://www.w3.org/2001/XMLSchema#integer> }',
-                    function () {
-                        store.execute(query, function (err, results) {
-                            expect(err).toBe(null);
-                            expect(results.length).toBe(3);
-                            var vars = {};
-                            for (var i = 0; i < results.length; i++) {
-                                vars[results[i]["s"].value] = true;
-                            }
-                            expect(vars["a1"]).toBe(true);
-                            expect(vars["a3"]).toBe(true);
-                            expect(vars["a5"]).toBe(true);
-                            done();
-                        });
-                    },
-                );
-            });
+            );
+
+            var results = await store.promises.execute(query);
+
+            expect(results.length).toBe(3);
+            var vars = {};
+            for (var i = 0; i < results.length; i++) {
+                vars[results[i]["s"].value] = true;
+            }
+            expect(vars["a1"]).toBe(true);
+            expect(vars["a3"]).toBe(true);
+            expect(vars["a5"]).toBe(true);
         });
 
-        it("should evaluate filters on variables and URIs", function (done) {
-            new Store.Store({ name: "test", overwrite: true }, function (err, store) {
-                var rdf =
-                    "@prefix test: <http://test.com/> .\
+        it("should evaluate filters on variables and URIs", async function () {
+            var store = await Store.promises.create({ name: "test", overwrite: true });
+
+            var rdf =
+                "@prefix test: <http://test.com/> .\
                        test:A test:prop 5.\
                        test:B test:prop 4.\
                        test:A test:prop 1.\
                        test:D test:prop 3.";
 
-                store.load("text/turtle", rdf, function (s, d) {
-                    var query = `SELECT ?s ?p ?o WHERE {
+            await store.promises.load("text/turtle", rdf);
+
+            var query = `SELECT ?s ?p ?o WHERE {
                     ?s ?p ?o.
              FILTER (?s=<http://test.com/A>)
              } `;
 
-                    store.execute(query, function (err, results) {
-                        expect(err).toBeNull();
-                        expect(results.length).toBe(2);
-                        done();
-                    });
-                });
-            });
+            var results = await store.promises.execute(query);
+
+            expect(results.length).toBe(2);
         });
     });
 });
