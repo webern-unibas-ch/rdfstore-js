@@ -2,7 +2,7 @@ var Store = require("../src/store");
 
 describe("Store", function () {
     describe("execute", function () {
-        it("inserts a triple and selects it", function (done) {
+        it("should insert a triple and select it", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 expect(err).toBeNull();
                 store.execute(
@@ -24,7 +24,7 @@ describe("Store", function () {
             });
         });
 
-        it("inserts a triple and selects it with B-tree order 50", function (done) {
+        it("should insert a triple and select it with B-tree order 50", function (done) {
             new Store.Store({ treeOrder: 50, name: "test", overwrite: true }, function (err, store) {
                 expect(err).toBe(null);
                 store.execute(
@@ -47,7 +47,7 @@ describe("Store", function () {
             });
         });
 
-        it("stores a triple inserted twice once (DuplicatedInsert)", function (done) {
+        it("should store a triple inserted twice once (DuplicatedInsert)", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 store.execute(
                     "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
@@ -73,7 +73,7 @@ describe("Store", function () {
             });
         });
 
-        it("returns one blank node per solution from a CONSTRUCT template (ConstructBlankNodes)", function (done) {
+        it("should return one blank node per solution from a CONSTRUCT template (ConstructBlankNodes)", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 var uriGraph = "http://www.example.com/data.ttl";
                 var triplesTTL =
@@ -125,7 +125,7 @@ describe("Store", function () {
             });
         });
 
-        it("matches a variable used twice in a pattern only to equal terms (RedundantVars1)", function (done) {
+        it("should match a variable used twice in a pattern only to equal terms (RedundantVars1)", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 store.load("text/n3", "<http://A> <http://B> <http://C>.", function (err) {
                     store.execute("SELECT *  WHERE { ?x ?p ?x }", function (err, results) {
@@ -136,7 +136,7 @@ describe("Store", function () {
             });
         });
 
-        it("selects the triples whose subject equals their object (RedundantVars2)", function (done) {
+        it("should select the triples whose subject equals their object (RedundantVars2)", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 store.load(
                     "text/n3",
@@ -152,7 +152,7 @@ describe("Store", function () {
             });
         });
 
-        it("constructs nothing when a repeated variable matches no triple (RedundantVars3)", function (done) {
+        it("should construct nothing when a repeated variable matches no triple (RedundantVars3)", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 store.load("text/n3", "<http://A> <http://B> <http://C>.", function (err) {
                     store.execute("CONSTRUCT { ?x ?p ?x }  WHERE { ?x ?p ?x }", function (err, results) {
@@ -168,7 +168,7 @@ describe("Store", function () {
             });
         });
 
-        it("constructs the triples whose subject equals their object (RedundantVars4)", function (done) {
+        it("should construct the triples whose subject equals their object (RedundantVars4)", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 store.load(
                     "text/n3",
@@ -189,7 +189,7 @@ describe("Store", function () {
             });
         });
 
-        it("executes requests that end in whitespace", async function () {
+        it("should execute requests that end in whitespace", async function () {
             var store = await Store.promises.create();
             var requests = [
                 "INSERT DATA { <http://example/s> <http://example/p> <http://example/o> }\n",
@@ -206,7 +206,7 @@ describe("Store", function () {
             }
         });
 
-        it("reports a VALUES block after the query as not supported, not as a syntax error", async function () {
+        it("should report a VALUES block after the query as not supported, not as a syntax error", async function () {
             var store = await Store.promises.create();
             await store.promises.execute(
                 "INSERT DATA { <http://example/a> <http://example/p> 1 . <http://example/b> <http://example/p> 2 }",
@@ -224,7 +224,7 @@ describe("Store", function () {
     });
 
     describe("graphs and nodes", function () {
-        it("returns the default graph and filters it", function (done) {
+        it("should return the default graph and filter it", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 expect(err).toBe(null);
                 var query =
@@ -268,7 +268,7 @@ describe("Store", function () {
             });
         });
 
-        it("returns the default graph and a named graph", function (done) {
+        it("should return the default graph and a named graph", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 expect(err).toBe(null);
                 var query =
@@ -320,7 +320,7 @@ describe("Store", function () {
             });
         });
 
-        it("returns the triples of a node", function (done) {
+        it("should return the triples of a node", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 expect(err).toBe(null);
                 var query =
@@ -355,7 +355,7 @@ describe("Store", function () {
             });
         });
 
-        it("returns the triples of a node in a named graph", function (done) {
+        it("should return the triples of a node in a named graph", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 expect(err).toBe(null);
                 var query =
@@ -412,7 +412,7 @@ describe("Store", function () {
             });
         });
 
-        it("lists the registered graphs (RegisteredGraph)", function (done) {
+        it("should list the registered graphs (RegisteredGraph)", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 var query =
                     'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
@@ -464,7 +464,7 @@ describe("Store", function () {
             });
         });
 
-        it("binds GRAPH variables to the graph names", function (done) {
+        it("should bind GRAPH variables to the graph names", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 store.load(
                     "text/n3",
@@ -528,7 +528,7 @@ describe("Store", function () {
     });
 
     describe("prefixes", function () {
-        it("resolves CURIEs with the prefixes set by setPrefix", function (done) {
+        it("should resolve CURIEs with the prefixes set by setPrefix", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 expect(err).toBe(null);
                 var query =
@@ -583,7 +583,7 @@ describe("Store", function () {
             });
         });
 
-        it("resolves CURIEs with the default prefix", function (done) {
+        it("should resolve CURIEs with the default prefix", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 expect(err).toBe(null);
                 var query =
@@ -638,7 +638,7 @@ describe("Store", function () {
             });
         });
 
-        it("registers the default profile namespaces (DefaultPrefixes)", function (done) {
+        it("should register the default profile namespaces (DefaultPrefixes)", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 store.execute(
                     'INSERT DATA {  <http://example/person1> <http://xmlns.com/foaf/0.1/name> "Celia" }',
@@ -665,7 +665,7 @@ describe("Store", function () {
     });
 
     describe("insert, delete and clear", function () {
-        it("inserts a graph into the default graph (Insert1)", function (done) {
+        it("should insert a graph into the default graph (Insert1)", function (done) {
             Store.create({ name: "test", overwrite: true }, function (err, store) {
                 store.setPrefix("ex", "http://example.org/people/");
 
@@ -697,7 +697,7 @@ describe("Store", function () {
             });
         });
 
-        it("inserts a graph into a named graph (Insert2)", function (done) {
+        it("should insert a graph into a named graph (Insert2)", function (done) {
             Store.create({ name: "test", overwrite: true }, function (err, store) {
                 store.setPrefix("ex", "http://example.org/people/");
 
@@ -729,7 +729,7 @@ describe("Store", function () {
             });
         });
 
-        it("deletes a graph from the default graph (Delete1)", function (done) {
+        it("should delete a graph from the default graph (Delete1)", function (done) {
             Store.create({ name: "test", overwrite: true }, function (err, store) {
                 store.setPrefix("ex", "http://example.org/people/");
 
@@ -766,7 +766,7 @@ describe("Store", function () {
             });
         });
 
-        it("deletes a graph from a named graph (Delete2)", function (done) {
+        it("should delete a graph from a named graph (Delete2)", function (done) {
             Store.create({ name: "test", overwrite: true }, function (err, store) {
                 store.setPrefix("ex", "http://example.org/people/");
 
@@ -803,7 +803,7 @@ describe("Store", function () {
             });
         });
 
-        it("clears the default graph (Clear)", function (done) {
+        it("should clear the default graph (Clear)", function (done) {
             Store.create({ name: "test", overwrite: true }, function (err, store) {
                 store.setPrefix("ex", "http://example.org/people/");
 
@@ -842,7 +842,7 @@ describe("Store", function () {
     });
 
     describe("load", function () {
-        it("loads JSON-LD into a named graph (Load1)", function (done) {
+        it("should load JSON-LD into a named graph (Load1)", function (done) {
             Store.create({ name: "test", overwrite: true }, function (err, store) {
                 store.setPrefix("ex", "http://example.org/people/");
 
@@ -871,7 +871,7 @@ describe("Store", function () {
             });
         });
 
-        it("loads N3 into a named graph (Load3)", function (done) {
+        it("should load N3 into a named graph (Load3)", function (done) {
             Store.create({ name: "test", overwrite: true }, function (err, store) {
                 store.setPrefix("ex", "http://example.org/examples/");
 
@@ -901,7 +901,7 @@ describe("Store", function () {
             });
         });
 
-        it("loads N3 into the graph given in the options (Load5)", function (done) {
+        it("should load N3 into the graph given in the options (Load5)", function (done) {
             Store.create({ name: "test", overwrite: true }, function (err, store) {
                 store.setPrefix("ex", "http://example.org/examples/");
 
@@ -931,7 +931,7 @@ describe("Store", function () {
             });
         });
 
-        it("resolves relative IRIs against the baseURI option (Load5b)", function (done) {
+        it("should resolve relative IRIs against the baseURI option (Load5b)", function (done) {
             Store.create({ name: "test", overwrite: true }, function (err, store) {
                 store.setPrefix("ex", "http://example.org/examples/");
 
@@ -957,7 +957,7 @@ describe("Store", function () {
             });
         });
 
-        it("loads N3 with the baseURI and graph options (Load5c)", function (done) {
+        it("should load N3 with the baseURI and graph options (Load5c)", function (done) {
             Store.create({ name: "test", overwrite: true }, function (err, store) {
                 store.setPrefix("ex", "http://example.org/examples/");
 
@@ -995,7 +995,7 @@ describe("Store", function () {
             });
         });
 
-        it("stores a JSON-LD triple loaded twice once (DuplicatedParsing)", function (done) {
+        it("should store a JSON-LD triple loaded twice once (DuplicatedParsing)", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 var data = { "@id": "http://test.com/me", "http://somproperty.org/prop": "data" };
                 store.load("application/json", data, function (result, msg) {
@@ -1013,7 +1013,7 @@ describe("Store", function () {
             });
         });
 
-        it("loads JSON-LD with every JSON-LD media type (ShouldLoadJSONLDWithAllMediaTypes)", function (done) {
+        it("should load JSON-LD with every JSON-LD media type (ShouldLoadJSONLDWithAllMediaTypes)", function (done) {
             var input = {
                 "@type": "foaf:Person",
                 "foaf:name": "Manu Sporny",
@@ -1051,7 +1051,7 @@ describe("Store", function () {
     });
 
     describe("events API", function () {
-        it("notifies a node observer of changes (EventsAPI1)", function (done) {
+        it("should notify a node observer of changes (EventsAPI1)", function (done) {
             var counter = 0;
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 store.execute(
@@ -1090,7 +1090,7 @@ describe("Store", function () {
             });
         });
 
-        it("notifies a node observer of changes in a named graph (EventsAPI2)", function (done) {
+        it("should notify a node observer of changes in a named graph (EventsAPI2)", function (done) {
             var counter = 0;
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 store.execute(
@@ -1129,7 +1129,7 @@ describe("Store", function () {
             });
         });
 
-        it("notifies a subscription of matching changes (EventsAPI3)", function (done) {
+        it("should notify a subscription of matching changes (EventsAPI3)", function (done) {
             var counter = 0;
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 store.subscribe(
@@ -1191,7 +1191,7 @@ describe("Store", function () {
     });
 
     describe("custom functions", function () {
-        it("calls a registered custom function in a FILTER (RegisterCustomFunction)", function (done) {
+        it("should call a registered custom function in a FILTER (RegisterCustomFunction)", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 store.load(
                     "text/n3",
@@ -1223,7 +1223,7 @@ describe("Store", function () {
             });
         });
 
-        it("calls a custom function registered under a URI", function (done) {
+        it("should call a custom function registered under a URI", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 store.load(
                     "text/n3",
@@ -1255,7 +1255,7 @@ describe("Store", function () {
             });
         });
 
-        it("calls a custom function registered under a CURIE", function (done) {
+        it("should call a custom function registered under a CURIE", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 store.load(
                     "text/n3",
@@ -1287,7 +1287,7 @@ describe("Store", function () {
             });
         });
 
-        it("calls a custom function inside an aggregate", function (done) {
+        it("should call a custom function inside an aggregate", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 store.load(
                     "text/n3",
@@ -1325,7 +1325,7 @@ describe("Store", function () {
     });
 
     describe("filters", function () {
-        it("evaluates EXISTS and NOT EXISTS filters", function (done) {
+        it("should evaluate EXISTS and NOT EXISTS filters", function (done) {
             var query =
                 "SELECT ?s WHERE { \
                      FILTER NOT EXISTS {\
@@ -1365,7 +1365,7 @@ describe("Store", function () {
             });
         });
 
-        it("evaluates regex filters", function (done) {
+        it("should evaluate regex filters", function (done) {
             var query =
                 'SELECT ?s { \
                      ?s ?p ?o .\
@@ -1399,7 +1399,7 @@ describe("Store", function () {
             });
         });
 
-        it("evaluates numeric filters", function (done) {
+        it("should evaluate numeric filters", function (done) {
             var query =
                 'PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\
                    SELECT ?s { \
@@ -1434,7 +1434,7 @@ describe("Store", function () {
             });
         });
 
-        it("evaluates filters on variables and URIs", function (done) {
+        it("should evaluate filters on variables and URIs", function (done) {
             new Store.Store({ name: "test", overwrite: true }, function (err, store) {
                 var rdf =
                     "@prefix test: <http://test.com/> .\
@@ -1458,7 +1458,7 @@ describe("Store", function () {
             });
         });
 
-        it("evaluates custom functions in BIND expressions", function (done) {
+        it("should evaluate custom functions in BIND expressions", function (done) {
             new Store.Store({ name: "test", overwrite: false }, function (err, store) {
                 store.load(
                     "text/n3",

@@ -2,7 +2,7 @@ var RDFModel = require("../src/rdf_model");
 var { newEngine } = require("./helpers/engine");
 
 describe("RDFModel", function () {
-    it("filters graphs", function (done) {
+    it("should filter graphs", function (done) {
         newEngine(function (engine) {
             var query =
                 'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
@@ -67,7 +67,7 @@ describe("RDFModel", function () {
         });
     });
 
-    it("adds actions to a graph", function () {
+    it("should add actions to a graph", function () {
         var rdf = RDFModel.rdf;
         var graph = rdf.createGraph();
         graph.addAction(
@@ -107,7 +107,7 @@ describe("RDFModel", function () {
         expect(triples[0].object.valueOf()).toBe("http://example.org/people/Bob");
     });
 
-    it("serializes a graph to N-Triples", function () {
+    it("should serialize a graph to N-Triples", function () {
         var rdf = RDFModel.rdf;
         var graph = new rdf.createGraph();
 
@@ -149,13 +149,13 @@ describe("RDFModel", function () {
         expect(parts[3]).toBe("");
     });
 
-    it("serializes a literal", function () {
+    it("should serialize a literal", function () {
         var rdf = RDFModel.rdf;
         var literal = rdf.createLiteral("alice", null, "http://www.w3.org/2001/XMLSchema#string");
         expect(literal.toString()).toBe('"alice"^^<http://www.w3.org/2001/XMLSchema#string>');
     });
 
-    it("resolves URIs with the default namespace", function () {
+    it("should resolve URIs with the default namespace", function () {
         var rdf = RDFModel.rdf;
         rdf.prefixes.defaultNs = undefined;
         expect(rdf.prefixes.defaultNs).toBe(undefined);
@@ -166,7 +166,7 @@ describe("RDFModel", function () {
         expect(rdf.prefixes.resolve(":test")).toBe("http://something.com/vocab/test");
     });
 
-    it("serializes a named node", function () {
+    it("should serialize a named node", function () {
         var node = RDFModel.rdf.createNamedNode("http://www.w3.org/People/Berners-Lee/card#i");
         expect(node.toString()).toBe("http://www.w3.org/People/Berners-Lee/card#i");
     });

@@ -2,7 +2,7 @@ var AbstractQueryTree = require("../src/abstract_query_tree").AbstractQueryTree;
 var aqt = new AbstractQueryTree();
 
 describe("Parser", function () {
-    it("parses 'SELECT * { ?s ?p ?o }'", function () {
+    it("should parse 'SELECT * { ?s ?p ?o }'", function () {
         var query = "SELECT * { ?s ?p ?o }";
 
         query = aqt.parseQueryString(query);
@@ -11,7 +11,7 @@ describe("Parser", function () {
         expect(result.pattern.value.length).toBe(1);
     });
 
-    it("parses 'SELECT * { ?s :p1 ?v1 ; :p2 ?v2 }'", function () {
+    it("should parse 'SELECT * { ?s :p1 ?v1 ; :p2 ?v2 }'", function () {
         var query = "SELECT * { ?s :p1 ?v1 ; :p2 ?v2 }";
 
         query = aqt.parseQueryString(query);
@@ -20,7 +20,7 @@ describe("Parser", function () {
         expect(result.pattern.value.length).toBe(2);
     });
 
-    it("parses 'SELECT * { { ?s :p1 ?v1 } UNION {?s :p2 ?v2 } }'", function () {
+    it("should parse 'SELECT * { { ?s :p1 ?v1 } UNION {?s :p2 ?v2 } }'", function () {
         var query = "SELECT * { { ?s :p1 ?v1 } UNION {?s :p2 ?v2 } }";
 
         query = aqt.parseQueryString(query);
@@ -33,7 +33,7 @@ describe("Parser", function () {
         expect(result.pattern.value[1].value.length).toBe(1);
     });
 
-    it("parses 'SELECT * { { ?s :p1 ?v1 } UNION {?s :p2 ?v2 } UNION {?s :p3 ?v3 } }'", function () {
+    it("should parse 'SELECT * { { ?s :p1 ?v1 } UNION {?s :p2 ?v2 } UNION {?s :p3 ?v3 } }'", function () {
         var query = "SELECT * { { ?s :p1 ?v1 } UNION {?s :p2 ?v2 } UNION {?s :p3 ?v3 } }";
 
         query = aqt.parseQueryString(query);
@@ -58,7 +58,7 @@ describe("Parser", function () {
         expect(result.pattern.value[0].value[1].value[0].object.value).toBe("v2");
     });
 
-    it("parses 'SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 } }'", function () {
+    it("should parse 'SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 } }'", function () {
         var query = "SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 } }";
 
         query = aqt.parseQueryString(query);
@@ -72,7 +72,7 @@ describe("Parser", function () {
         expect(result.pattern.rvalue.value.length).toBe(1);
     });
 
-    it("parses 'SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 } OPTIONAL { ?s :p3 ?v3 } }'", function () {
+    it("should parse 'SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 } OPTIONAL { ?s :p3 ?v3 } }'", function () {
         var query = "SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 } OPTIONAL { ?s :p3 ?v3 } }";
 
         query = aqt.parseQueryString(query);
@@ -85,7 +85,7 @@ describe("Parser", function () {
         expect(result.pattern.rvalue.kind).toBe("BGP");
     });
 
-    it("parses 'SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 FILTER(?v1<3) } }'", function () {
+    it("should parse 'SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 FILTER(?v1<3) } }'", function () {
         var query = "SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 FILTER(?v1<3) } }";
 
         query = aqt.parseQueryString(query);
@@ -97,7 +97,7 @@ describe("Parser", function () {
         expect(result.pattern.rvalue.kind).toBe("BGP");
     });
 
-    it("parses 'SELECT * { {?s :p1 ?v1} UNION {?s :p2 ?v2} OPTIONAL {?s :p3 ?v3} }'", function () {
+    it("should parse 'SELECT * { {?s :p1 ?v1} UNION {?s :p2 ?v2} OPTIONAL {?s :p3 ?v3} }'", function () {
         var query = "SELECT * { {?s :p1 ?v1} UNION {?s :p2 ?v2} OPTIONAL {?s :p3 ?v3} }";
 
         query = aqt.parseQueryString(query);
@@ -108,7 +108,7 @@ describe("Parser", function () {
         expect(result.pattern.rvalue.kind).toBe("BGP");
     });
 
-    it("parses a complex expression", function () {
+    it("should parse a complex expression", function () {
         var query =
             "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
                  SELECT ?nameX ?nameY ?nickY\
@@ -125,7 +125,7 @@ describe("Parser", function () {
         expect(result.pattern.rvalue.kind).toBe("BGP");
     });
 
-    it("collects the triples of 'SELECT * { ?s ?p ?o }'", function () {
+    it("should collect the triples of 'SELECT * { ?s ?p ?o }'", function () {
         var query = "SELECT * { ?s ?p ?o }";
 
         query = aqt.parseQueryString(query);
@@ -135,7 +135,7 @@ describe("Parser", function () {
         expect(patterns.length).toBe(1);
     });
 
-    it("collects the triples of 'SELECT * { ?s :p1 ?v1 ; :p2 ?v2 }'", function () {
+    it("should collect the triples of 'SELECT * { ?s :p1 ?v1 ; :p2 ?v2 }'", function () {
         var query = "SELECT * { ?s :p1 ?v1 ; :p2 ?v2 }";
 
         query = aqt.parseQueryString(query);
@@ -146,7 +146,7 @@ describe("Parser", function () {
         expect(patterns.length).toBe(2);
     });
 
-    it("collects the triples of a complex expression", function () {
+    it("should collect the triples of a complex expression", function () {
         var query =
             "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
                  SELECT ?nameX ?nameY ?nickY\
@@ -163,7 +163,7 @@ describe("Parser", function () {
         expect(patterns.length).toBe(4);
     });
 
-    it("collects the basic triples of 'SELECT * { GRAPH ?g { ?s ?p ?o } }'", function () {
+    it("should collect the basic triples of 'SELECT * { GRAPH ?g { ?s ?p ?o } }'", function () {
         var query =
             "PREFIX : <http://example/>\
                  SELECT * { GRAPH ?g { ?s ?p ?o } }";
@@ -176,7 +176,7 @@ describe("Parser", function () {
         expect(patterns[0].graph != null).toBe(true);
     });
 
-    it("collects the basic triples of 'SELECT * { GRAPH <http://test.com/graph1> { ?s ?p ?o } }'", function () {
+    it("should collect the basic triples of 'SELECT * { GRAPH <http://test.com/graph1> { ?s ?p ?o } }'", function () {
         var query =
             "PREFIX : <http://example/>\
                  SELECT * { GRAPH <http://test.com/graph1> { ?s ?p ?o } }";
@@ -189,7 +189,7 @@ describe("Parser", function () {
         expect(patterns[0].graph.value).toBe("http://test.com/graph1");
     });
 
-    it("binds variables in a query", function () {
+    it("should bind variables in a query", function () {
         var query = "SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 FILTER(?v1<3) } }";
 
         query = aqt.parseQueryString(query);
@@ -206,7 +206,7 @@ describe("Parser", function () {
         expect(result.pattern.lvalue.value[0].object.value).toBe("http://test.com/somevalue");
     });
 
-    it("binds variables in a query with complex filter expressions", function () {
+    it("should bind variables in a query with complex filter expressions", function () {
         var query = "SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 ?v2 FILTER(?v1<3 && (?v1+?v1) < (5*?v1) && STR(?v1)) } }";
 
         query = aqt.parseQueryString(query);
@@ -230,7 +230,7 @@ describe("Parser", function () {
         expect(result.pattern.filter[0].value.operands[2].args[0].value.value).toBe("http://test.com/somevalue");
     });
 
-    it("parses URIs with unescaped blank spaces", function () {
+    it("should parse URIs with unescaped blank spaces", function () {
         var query =
             "SELECT * { ?s :p1 ?v1 OPTIONAL {?s :p2 <http://prauw.cs.vu.nl/foaf/Jan Top.rdf> FILTER(?v1<3 && (?v1+?v1) < (5*?v1) && STR(?v1)) } }";
 
@@ -255,7 +255,7 @@ describe("Parser", function () {
         expect(result.pattern.filter[0].value.operands[2].args[0].value.value).toBe("http://test.com/somevalue");
     });
 
-    it("parses a simple path expression", function () {
+    it("should parse a simple path expression", function () {
         var query = "SELECT * { ?s :p1/:p2/:p3 ?v1 }";
 
         query = aqt.parseQueryString(query);
@@ -273,7 +273,7 @@ describe("Parser", function () {
         expect(result.pattern.value[2].predicate.suffix).toBe("p3");
     });
 
-    it("parses a custom function", function () {
+    it("should parse a custom function", function () {
         var query = "SELECT ?givenName WHERE { ?x foaf:givenName  ?givenName . filter(custom:hey(3,?date)) }";
 
         query = aqt.parseQueryString(query);
@@ -285,7 +285,7 @@ describe("Parser", function () {
         expect(result.pattern.filter[0].value.args.length).toBe(2);
     });
 
-    it("parses the isUri, isURI and ISURI functions", function () {
+    it("should parse the isUri, isURI and ISURI functions", function () {
         expect(function () {
             var query1 = "SELECT ?givenName WHERE { ?x foaf:givenName  ?givenName . filter(isURI(?x)) }";
             var query2 = "SELECT ?givenName WHERE { ?x foaf:givenName  ?givenName . filter(isuri(?x)) }";
@@ -297,7 +297,7 @@ describe("Parser", function () {
         }).not.toThrow();
     });
 
-    it("parses HAVING clauses", function () {
+    it("should parse HAVING clauses", function () {
         var query =
             "SELECT ?s (COUNT(?o) AS ?count) { ?s ?p ?o } GROUP BY ?s HAVING (COUNT(?o) > 1) (?count < 10) ORDER BY ?count LIMIT 5";
 
@@ -314,7 +314,7 @@ describe("Parser", function () {
         expect(result.having.length).toBe(1);
     });
 
-    it("parses double literals", function () {
+    it("should parse double literals", function () {
         var doubles = ["1e0", "1.5E2", ".5e-3", "2E+1"];
         for (var i = 0; i < doubles.length; i++) {
             var result = aqt.parseSelect(aqt.parseQueryString("SELECT ?s { ?s ?p " + doubles[i] + " }").units[0]);
@@ -324,7 +324,7 @@ describe("Parser", function () {
         }
     });
 
-    it("matches keywords in any case", function () {
+    it("should match keywords in any case", function () {
         var queries = [
             'Select Distinct ?s Where { ?s ?p ?o Optional { ?s ?q ?x } Filter(Regex(Str(?o), "a") && Bound(?s)) } Group By ?s Having (Count(?o) > 0) Order By Desc(?s) Limit 1 Offset 0',
             "prefix ex: <http://example/> Insert Data { ex:s ex:p ex:o }",
@@ -346,7 +346,7 @@ describe("Parser", function () {
 describe("SparqlParserError", function () {
     var SparqlParserError = require("../src/abstract_query_tree").SparqlParserError;
 
-    it("creates a SparqlParserError", function () {
+    it("should create a SparqlParserError", function () {
         var error = new SparqlParserError("Error parsing graph pattern");
         expect(error instanceof Error).toBe(true);
         expect(error.name).toBe("SparqlParserError");

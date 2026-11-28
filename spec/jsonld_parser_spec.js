@@ -1,7 +1,7 @@
 var JSONLDParser = require("../src/jsonld_parser").JSONLDParser;
 
 describe("JSONLDParser#parse", function () {
-    it("coerces values to IRIs by the default context", function (done) {
+    it("should coerce values to IRIs by the default context", function (done) {
         var input = {
             "@type": "foaf:Person",
             "foaf:name": "Manu Sporny",
@@ -39,7 +39,7 @@ describe("JSONLDParser#parse", function () {
         });
     });
 
-    it("coerces values to IRIs by the @id coercion of the context", function (done) {
+    it("should coerce values to IRIs by the @id coercion of the context", function (done) {
         var input = {
             "@context": {
                 foaf: "http://xmlns.com/foaf/0.1/",
@@ -85,7 +85,7 @@ describe("JSONLDParser#parse", function () {
         });
     });
 
-    it("relabels blank nodes and keeps compact IRIs without a context", function (done) {
+    it("should relabel blank nodes and keep compact IRIs without a context", function (done) {
         var input = [
             {
                 "@id": "_:bnode1",
@@ -135,7 +135,7 @@ describe("JSONLDParser#parse", function () {
         });
     });
 
-    it("parses a blank node subject with a context", function (done) {
+    it("should parse a blank node subject with a context", function (done) {
         var input = {
             "@context": {
                 vcard: "http://microformats.org/profile/hcard#vcard",
@@ -164,7 +164,7 @@ describe("JSONLDParser#parse", function () {
         });
     });
 
-    it("parses an array of objects with their own contexts", function (done) {
+    it("should parse an array of objects with their own contexts", function (done) {
         var input = [
             {
                 "@id": "http://purl.oreilly.com/works/45U8QJGZSQKDH8N",
@@ -214,7 +214,7 @@ describe("JSONLDParser#parse", function () {
         });
     });
 
-    it("parses IRIs and language-tagged and typed literals", function (done) {
+    it("should parse IRIs and language-tagged and typed literals", function (done) {
         var input = { "http://xmlns.com/foaf/0.1/name": "Manu Sporny" };
         JSONLDParser.parser.parse(input, null, {}, function (err, result) {
             expect(result.length).toBe(1);

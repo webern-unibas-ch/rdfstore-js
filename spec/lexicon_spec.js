@@ -2,7 +2,7 @@ var Lexicon = require("../src/lexicon").Lexicon;
 var async = require("async");
 
 describe("Lexicon", function () {
-    it("parses literals", function (done) {
+    it("should parse literals", function (done) {
         new Lexicon(function (lexicon) {
             var literal1 = '"this is a test"';
             var parsed = lexicon.parseLiteral(literal1);
@@ -22,7 +22,7 @@ describe("Lexicon", function () {
         });
     });
 
-    it("registers tokens and retrieves them", function (done) {
+    it("should register tokens and retrieve them", function (done) {
         new Lexicon(function (lexicon) {
             var oid1, oid2;
             var uri = "http://test.com/1";
@@ -65,7 +65,7 @@ describe("Lexicon", function () {
         });
     });
 
-    it("unregisters tokens", function (done) {
+    it("should unregister tokens", function (done) {
         new Lexicon(function (lexicon) {
             var oid1;
             var uri = "http://test.com/1";

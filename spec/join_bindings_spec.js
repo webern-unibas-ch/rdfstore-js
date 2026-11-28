@@ -85,7 +85,7 @@ var copyRows = function (rows) {
 };
 
 describe("QueryPlan joins", function () {
-    it("returns the same rows in the same order as the nested loop", function () {
+    it("should return the same rows in the same order as the nested loop", function () {
         var random = makeRandom(4711);
         var varSets = [["s", "x"], ["x", "y"], ["x", "y", "z"], ["s"], []];
         for (var n = 0; n < 3000; n++) {
@@ -103,14 +103,14 @@ describe("QueryPlan joins", function () {
         }
     });
 
-    it("treats an unbound variable as compatible on either side", function () {
+    it("should treat an unbound variable as compatible on either side", function () {
         expect(QueryPlan.joinBindings([{ x: null }], [{ x: 5 }])).toEqual([{ x: 5 }]);
         // a bound value is not overwritten by an unbound one
         expect(QueryPlan.joinBindings([{ x: 5 }], [{ x: null, y: 1 }])).toEqual([{ x: 5, y: 1 }]);
         expect(QueryPlan.leftOuterJoinBindings([{ s: 1, x: null }], [{ s: 1, x: 7 }])).toEqual([{ s: 1, x: 7 }]);
     });
 
-    it("compares values that are no OIDs as RDF terms", function () {
+    it("should compare values that are no OIDs as RDF terms", function () {
         expect(QueryPlan.joinBindings([{ k: objA }], [{ k: objB, s: 1 }])).toEqual([{ k: objB, s: 1 }]);
         expect(QueryPlan.joinBindings([{ k: objA }], [{ k: { token: "literal", value: "a", lang: "en" } }])).toEqual(
             [],
@@ -124,7 +124,7 @@ describe("QueryPlan joins", function () {
         ).toEqual([]);
     });
 
-    it("adds every variable of the right side to an unmatched left solution", function () {
+    it("should add every variable of the right side to an unmatched left solution", function () {
         var result = QueryPlan.leftOuterJoinBindings(
             [{ s: 1 }],
             [
@@ -135,7 +135,7 @@ describe("QueryPlan joins", function () {
         expect(result).toEqual([{ s: 1, x: null, y: null }]);
     });
 
-    it("compares bound rows only with the rows sharing their key", function () {
+    it("should compare bound rows only with the rows sharing their key", function () {
         var left = [];
         var right = [];
         for (var i = 0; i < 2000; i++) {

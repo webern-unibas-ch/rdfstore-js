@@ -28,7 +28,7 @@ var countTriples = function (store, graph, cb) {
 
 describe("RDFLoader", function () {
     describe("setNetworkTransport", function () {
-        it("makes LOAD fetch through the given transport", function (done) {
+        it("should make LOAD fetch through the given transport", function (done) {
             withStore(function (store) {
                 var requests = [];
                 var transport = {
@@ -51,7 +51,7 @@ describe("RDFLoader", function () {
             });
         });
 
-        it("resolves a prefixed or relative source IRI of LOAD", function (done) {
+        it("should resolve a prefixed or relative source IRI of LOAD", function (done) {
             withStore(function (store) {
                 var requests = [];
                 store.setNetworkTransport({
@@ -71,7 +71,7 @@ describe("RDFLoader", function () {
             });
         });
 
-        it("makes LOAD add to the default graph, or to the graph INTO GRAPH names", function (done) {
+        it("should make LOAD add to the default graph, or to the graph INTO GRAPH names", function (done) {
             withStore(function (store) {
                 store.setNetworkTransport({
                     load: function (uri, accept, callback) {
@@ -97,7 +97,7 @@ describe("RDFLoader", function () {
             });
         });
 
-        it("makes store.load('remote', …) fetch into the default graph, or into the given graph", function (done) {
+        it("should make store.load('remote', …) fetch into the default graph, or into the given graph", function (done) {
             withStore(function (store) {
                 var requests = [];
                 store.setNetworkTransport({
@@ -123,7 +123,7 @@ describe("RDFLoader", function () {
             });
         });
 
-        it("applies to that store only", function (done) {
+        it("should apply to that store only", function (done) {
             withStore(function (store) {
                 store.setNetworkTransport({ load: function () {} });
                 withStore(function (other) {
@@ -133,7 +133,7 @@ describe("RDFLoader", function () {
             });
         });
 
-        it("reports a result without Content-Type via the callback", function (done) {
+        it("should report a result without Content-Type via the callback", function (done) {
             withStore(function (store) {
                 store.setNetworkTransport({
                     load: function (uri, accept, callback) {
@@ -148,7 +148,7 @@ describe("RDFLoader", function () {
             });
         });
 
-        it("reports a missing transport via the callback", function (done) {
+        it("should report a missing transport via the callback", function (done) {
             withStore(function (store) {
                 store.setNetworkTransport(null);
                 store.execute("LOAD <http://example.org/data>", function (err) {
@@ -204,7 +204,7 @@ describe("RDFLoader", function () {
             server.close(done);
         });
 
-        it("requests the path with its query string", function (done) {
+        it("should request the path with its query string", function (done) {
             withStore(function (store) {
                 store.execute("LOAD <" + base + "/dir/data.ttl?x=1>", function (err) {
                     expect(err).toBe(null);
@@ -217,7 +217,7 @@ describe("RDFLoader", function () {
             });
         });
 
-        it("follows a relative redirect", function (done) {
+        it("should follow a relative redirect", function (done) {
             withStore(function (store) {
                 store.execute("LOAD <" + base + "/dir/moved>", function (err) {
                     expect(err).toBe(null);
@@ -230,7 +230,7 @@ describe("RDFLoader", function () {
             });
         });
 
-        it("decodes a character split across chunks", function (done) {
+        it("should decode a character split across chunks", function (done) {
             withStore(function (store) {
                 store.execute("LOAD <" + base + "/split>", function (err) {
                     expect(err).toBe(null);
@@ -243,7 +243,7 @@ describe("RDFLoader", function () {
             });
         });
 
-        it("reports a connection closed during the response via the callback", function (done) {
+        it("should report a connection closed during the response via the callback", function (done) {
             withStore(function (store) {
                 store.execute("LOAD <" + base + "/aborted>", function (err) {
                     expect(err instanceof Error).toBe(true);
@@ -252,7 +252,7 @@ describe("RDFLoader", function () {
             });
         });
 
-        it("reports an HTTP error via the callback", function (done) {
+        it("should report an HTTP error via the callback", function (done) {
             withStore(function (store) {
                 store.execute("LOAD <" + base + "/missing>", function (err) {
                     expect(err instanceof Error).toBe(true);
@@ -262,7 +262,7 @@ describe("RDFLoader", function () {
             });
         });
 
-        it("reports an unsupported protocol via the callback", function (done) {
+        it("should report an unsupported protocol via the callback", function (done) {
             withStore(function (store) {
                 store.execute("LOAD <ftp://example.org/data.ttl>", function (err) {
                     expect(err instanceof Error).toBe(true);
@@ -289,11 +289,11 @@ describe("RDFLoader", function () {
             });
         };
 
-        it("keeps an escaped quote in Turtle a quote", function (done) {
+        it("should keep an escaped quote in Turtle a quote", function (done) {
             loadsQuotedLiteral("text/turtle", '<http://s> <http://p> "say \\u0022hi\\u0022" .', done);
         });
 
-        it("keeps an escaped quote in JSON-LD a quote", function (done) {
+        it("should keep an escaped quote in JSON-LD a quote", function (done) {
             loadsQuotedLiteral("application/ld+json", '{"@id": "http://s", "http://p": "say \\u0022hi\\u0022"}', done);
         });
     });
@@ -309,7 +309,7 @@ describe("RDFLoader", function () {
             fs.rmSync(dir, { recursive: true, force: true });
         });
 
-        it("loads a local file given as a file:// URL", function (done) {
+        it("should load a local file given as a file:// URL", function (done) {
             var file = path.join(dir, "data.ttl");
             fs.writeFileSync(file, TURTLE);
             withStore(function (store) {

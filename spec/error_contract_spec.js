@@ -67,7 +67,7 @@ var expectNoError = function (err) {
 
 describe("Error contract", function () {
     describe("query errors", function () {
-        it("reports a syntax error via the callback", function (done) {
+        it("should report a syntax error via the callback", function (done) {
             withStore(null, function (store) {
                 callsBackOnce(
                     function (cb) {
@@ -79,7 +79,7 @@ describe("Error contract", function () {
             });
         });
 
-        it("reports a syntax error in an update via the callback", function (done) {
+        it("should report a syntax error in an update via the callback", function (done) {
             withStore(null, function (store) {
                 callsBackOnce(
                     function (cb) {
@@ -91,7 +91,7 @@ describe("Error contract", function () {
             });
         });
 
-        it("reports an unsupported feature via the callback", function (done) {
+        it("should report an unsupported feature via the callback", function (done) {
             withStore('<http://a> <http://p> "1"', function (store) {
                 callsBackOnce(
                     function (cb) {
@@ -106,7 +106,7 @@ describe("Error contract", function () {
             });
         });
 
-        it("reports a query error issued from inside a load callback", function (done) {
+        it("should report a query error issued from inside a load callback", function (done) {
             withStore(null, function (store) {
                 store.load("text/turtle", '<http://a> <http://p> "1" .', function (err) {
                     expectNoError(err);
@@ -121,7 +121,7 @@ describe("Error contract", function () {
             });
         });
 
-        it("resets the pending graph modification when an update fails", function (done) {
+        it("should reset the pending graph modification when an update fails", function (done) {
             withStore('<http://a> <http://p> "1"', function (store) {
                 callsBackOnce(
                     function (cb) {
@@ -136,7 +136,7 @@ describe("Error contract", function () {
             });
         });
 
-        it("does not call back a second time when the user callback throws", async function () {
+        it("should not call back a second time when the user callback throws", async function () {
             var store = await new Promise(function (resolve) {
                 withStore('<http://a> <http://p> "1"', resolve);
             });
@@ -167,7 +167,7 @@ describe("Error contract", function () {
 
     describe("event handlers", function () {
         // graph_callbacks.js catches exceptions from subscribe/observe handlers; the update must still succeed
-        it("reports the update as successful when an event handler throws", function (done) {
+        it("should report the update as successful when an event handler throws", function (done) {
             withStore(null, function (store) {
                 var handlerCalls = 0;
                 store.subscribe(
@@ -201,7 +201,7 @@ describe("Error contract", function () {
     });
 
     describe("OPTIONAL with a filter", function () {
-        it("keeps the left rows when the optional part's filter fails", function (done) {
+        it("should keep the left rows when the optional part's filter fails", function (done) {
             withStore(
                 '<http://a> <http://p> "1" . <http://a> <http://q> "2" . <http://b> <http://p> "3"',
                 function (store) {
@@ -233,7 +233,7 @@ describe("Error contract", function () {
     });
 
     describe("events around CLEAR", function () {
-        it("announces the triples removed by CLEAR and keeps announcing later updates", function (done) {
+        it("should announce the triples removed by CLEAR and keep announcing later updates", function (done) {
             withStore('<http://a> <http://p> "1"', function (store) {
                 var events = [];
                 store.subscribe(
@@ -262,7 +262,7 @@ describe("Error contract", function () {
     describe("update operations", function () {
         var namedData = '<http://a> <http://p> "1" . GRAPH <http://g> { <http://b> <http://p> "2" }';
 
-        it("CREATE GRAPH calls back with (null, true)", function (done) {
+        it("should call back with (null, true) for CREATE GRAPH", function (done) {
             withStore(null, function (store) {
                 callsBackOnce(
                     function (cb) {
@@ -287,7 +287,7 @@ describe("Error contract", function () {
             "DROP NAMED",
             "DROP ALL",
         ].forEach(function (query) {
-            it(query + " calls back once without an error", function (done) {
+            it("should call back once without an error for " + query, function (done) {
                 withStore(namedData, function (store) {
                     callsBackOnce(
                         function (cb) {
@@ -300,7 +300,7 @@ describe("Error contract", function () {
             });
         });
 
-        it("INSERT ... WHERE calls back with (null, true)", function (done) {
+        it("should call back with (null, true) for INSERT ... WHERE", function (done) {
             withStore('<http://a> <http://p> "1"', function (store) {
                 callsBackOnce(
                     function (cb) {
@@ -315,7 +315,7 @@ describe("Error contract", function () {
             });
         });
 
-        it("continues a multi-operation update after CLEAR DEFAULT", function (done) {
+        it("should continue a multi-operation update after CLEAR DEFAULT", function (done) {
             withStore('<http://a> <http://p> "1"', function (store) {
                 callsBackOnce(
                     function (cb) {
@@ -337,7 +337,7 @@ describe("Error contract", function () {
             });
         });
 
-        it("runs a multi-operation update in order and calls back once", function (done) {
+        it("should run a multi-operation update in order and call back once", function (done) {
             withStore('<http://a> <http://p> "1"', function (store) {
                 callsBackOnce(
                     function (cb) {
@@ -364,7 +364,7 @@ describe("Error contract", function () {
     });
 
     describe("loading", function () {
-        it("reports unparseable data via the callback", function (done) {
+        it("should report unparseable data via the callback", function (done) {
             withStore(null, function (store) {
                 callsBackOnce(
                     function (cb) {
@@ -376,7 +376,7 @@ describe("Error contract", function () {
             });
         });
 
-        it("reports invalid JSON-LD via the callback", function (done) {
+        it("should report invalid JSON-LD via the callback", function (done) {
             withStore(null, function (store) {
                 callsBackOnce(
                     function (cb) {
@@ -388,7 +388,7 @@ describe("Error contract", function () {
             });
         });
 
-        it("reports a missing file via the callback", function (done) {
+        it("should report a missing file via the callback", function (done) {
             withStore(null, function (store) {
                 callsBackOnce(
                     function (cb) {
@@ -404,7 +404,7 @@ describe("Error contract", function () {
             });
         });
 
-        it("reports a failure while storing parsed quads via the callback", function (done) {
+        it("should report a failure while storing parsed quads via the callback", function (done) {
             withStore(null, function (store) {
                 // a parser that produces a quad without predicate and object
                 store.registerParser("x-test/broken", {
@@ -422,7 +422,7 @@ describe("Error contract", function () {
             });
         });
 
-        it("stores nothing when one quad of the batch is broken", function (done) {
+        it("should store nothing when one quad of the batch is broken", function (done) {
             withStore(null, function (store) {
                 store.registerParser("x-test/half-broken", {
                     parse: function (data, graph, options, callback) {
@@ -452,7 +452,7 @@ describe("Error contract", function () {
             });
         });
 
-        it("reports an unknown media type via the callback", function (done) {
+        it("should report an unknown media type via the callback", function (done) {
             withStore(null, function (store) {
                 callsBackOnce(
                     function (cb) {
@@ -469,7 +469,7 @@ describe("Error contract", function () {
     describe("FILTER expression errors", function () {
         var data = manyTriples;
 
-        it("drops the rows when a builtin fails on an unbound variable", function (done) {
+        it("should drop the rows when a builtin fails on an unbound variable", function (done) {
             withStore(data, function (store) {
                 callsBackOnce(
                     function (cb) {
@@ -484,7 +484,7 @@ describe("Error contract", function () {
             });
         });
 
-        it("drops the rows when a custom function throws", function (done) {
+        it("should drop the rows when a custom function throws", function (done) {
             withStore(data, function (store) {
                 store.registerCustomFunction("broken", function () {
                     throw new TypeError("bug in a custom function");
@@ -502,7 +502,7 @@ describe("Error contract", function () {
             });
         });
 
-        it("reports an unsupported builtin as an error", function (done) {
+        it("should report an unsupported builtin as an error", function (done) {
             withStore(data, function (store) {
                 callsBackOnce(
                     function (cb) {
@@ -517,7 +517,7 @@ describe("Error contract", function () {
             });
         });
 
-        it("reports an unsupported builtin in a BIND as an error", function (done) {
+        it("should report an unsupported builtin in a BIND as an error", function (done) {
             withStore(data, function (store) {
                 callsBackOnce(
                     function (cb) {
@@ -552,7 +552,7 @@ describe("Error contract", function () {
         };
 
         Object.keys(noErrorCases).forEach(function (name) {
-            it("calls back without an error " + name, function (done) {
+            it("should call back without an error " + name, function (done) {
                 withBrokenFunction(function (store) {
                     callsBackOnce(
                         function (cb) {
@@ -566,7 +566,7 @@ describe("Error contract", function () {
         });
 
         // SPARQL 1.1 §17.2: true || error is true
-        it("keeps a row when the other operand of || is true", function (done) {
+        it("should keep a row when the other operand of || is true", function (done) {
             withBrokenFunction(function (store) {
                 callsBackOnce(
                     function (cb) {
@@ -591,7 +591,7 @@ describe("Error contract", function () {
         };
 
         Object.keys(unsupportedCases).forEach(function (name) {
-            it("reports an unsupported builtin " + name, function (done) {
+            it("should report an unsupported builtin " + name, function (done) {
                 withStore(manyTriples, function (store) {
                     callsBackOnce(
                         function (cb) {
@@ -630,7 +630,7 @@ describe("Error contract", function () {
         };
 
         Object.keys(cases).forEach(function (name) {
-            it("keeps the rows and leaves the variable unbound " + name, function (done) {
+            it("should keep the rows and leave the variable unbound " + name, function (done) {
                 withStore(data, function (store) {
                     callsBackOnce(
                         function (cb) {

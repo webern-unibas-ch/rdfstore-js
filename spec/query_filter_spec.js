@@ -1,7 +1,7 @@
 var QueryFilters = require("../src/query_filters").QueryFilters;
 
 describe("QueryFilters", function () {
-    it("runs the equality function", function (done) {
+    it("should run the equality function", function (done) {
         var op1 = createLiteral("123");
         var op2 = createLiteral("1234");
         var result = QueryFilters.runEqualityFunction(op1, op2, {}, null, null, null);
@@ -9,7 +9,7 @@ describe("QueryFilters", function () {
         done();
     });
 
-    it("runs the lt function", function (done) {
+    it("should run the lt function", function (done) {
         var op1 = createLiteral("1");
         var op2 = createLiteral("2");
         var result = QueryFilters.runLtFunction(op1, op2, {});
@@ -17,7 +17,7 @@ describe("QueryFilters", function () {
         done();
     });
 
-    it("runs a relational filter (runRelationalFilter)", function (done) {
+    it("should run a relational filter (runRelationalFilter)", function (done) {
         var op1 = createLiteral("1");
         var op2 = createLiteral("2");
         var result = QueryFilters.runRelationalFilter({ operator: ">" }, op1, op2, {}, null, null, null);
@@ -25,7 +25,7 @@ describe("QueryFilters", function () {
         done();
     });
 
-    it("runs a relational filter (runFilter)", function (done) {
+    it("should run a relational filter (runFilter)", function (done) {
         var op1 = createLiteralExpression("1");
         var op2 = createLiteralExpression("2");
         var expr = { expressionType: "relationalexpression", op1: op1, operator: ">", op2: op2 };
@@ -34,7 +34,7 @@ describe("QueryFilters", function () {
         done();
     });
 
-    it("runs the or function", function (done) {
+    it("should run the or function", function (done) {
         var expr = {
             expressionType: "conditionalor",
             operands: [createLiteralExpression(false), createLiteralExpression(true)],
@@ -44,7 +44,7 @@ describe("QueryFilters", function () {
         done();
     });
 
-    it("runs the and function", function (done) {
+    it("should run the and function", function (done) {
         var expr = {
             expressionType: "conditionaland",
             operands: [createLiteralExpression(true), createLiteralExpression(false)],
@@ -54,7 +54,7 @@ describe("QueryFilters", function () {
         done();
     });
 
-    it("runs addition", function (done) {
+    it("should run addition", function (done) {
         var expr = {
             expressionType: "additiveexpression",
             summand: createIntegerExpression(1),
@@ -65,7 +65,7 @@ describe("QueryFilters", function () {
         done();
     });
 
-    it("runs multiplication", function (done) {
+    it("should run multiplication", function (done) {
         var expr = {
             expressionType: "multiplicativeexpression",
             factor: createIntegerExpression(2),
@@ -76,7 +76,7 @@ describe("QueryFilters", function () {
         done();
     });
 
-    it("reports a type error in arithmetic as an error", function () {
+    it("should report a type error in arithmetic as an error", function () {
         var string = createLiteralExpression("a", null);
         var arithmetic = function (type, first, operator, second) {
             var expr = { expressionType: type };
@@ -114,7 +114,7 @@ describe("QueryFilters", function () {
         ).toBe(true);
     });
 
-    it("reports the negation of an error as an error", function () {
+    it("should report the negation of an error as an error", function () {
         var expr = {
             expressionType: "unaryexpression",
             unaryexpression: "!",
@@ -127,7 +127,7 @@ describe("QueryFilters", function () {
         expect(QueryFilters.isEbvError(QueryFilters.runFilter(expr, {}, null, null, null))).toBe(true);
     });
 
-    it("divides as op:numeric-divide", function () {
+    it("should divide as op:numeric-divide", function () {
         var divide = function (a, b) {
             return QueryFilters.runFilter(
                 {
@@ -158,7 +158,7 @@ describe("QueryFilters", function () {
         expect(divide(createLiteralExpression("1", xsd + "double"), createIntegerExpression("0")).value).toBe(Infinity);
     });
 
-    it("compares only comparable values", function () {
+    it("should compare only comparable values", function () {
         var xsd = "http://www.w3.org/2001/XMLSchema#";
         var one = createLiteral("1", xsd + "integer");
         var english = { token: "literal", value: "x", lang: "en" };
@@ -202,7 +202,7 @@ describe("QueryFilters", function () {
         ).toBe(true);
     });
 
-    it("runs regex filters", function (done) {
+    it("should run regex filters", function (done) {
         var text = {
             expressionType: "atomic",
             primaryexpression: "var",
@@ -231,7 +231,7 @@ describe("QueryFilters", function () {
         done();
     });
 
-    it("runs another relational expression", function (done) {
+    it("should run another relational expression", function (done) {
         var expr = {
             token: "expression",
             expressionType: "relationalexpression",
@@ -260,7 +260,7 @@ describe("QueryFilters", function () {
         done();
     });
 
-    it("runs an IRI or ref function", function (done) {
+    it("should run an IRI or ref function", function (done) {
         /** @todo */
         //expect("not implemented").toBe("implemented");
         done();

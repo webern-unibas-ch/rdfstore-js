@@ -83,7 +83,7 @@ describe("QueryEngine", function () {
     };
 
     describe("parsing and prologue", function () {
-        it("resolves an empty prefix against BASE", function (done) {
+        it("should resolve an empty prefix against BASE", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     'PREFIX ns: <http://example.org/ns#>  PREFIX x:  <http://example.org/x/> PREFIX z:  <http://example.org/x/#> INSERT DATA { x:x ns:p  "d:x ns:p" . x:x x:p   "x:x x:p" . z:x z:p   "z:x z:p" . }',
@@ -113,7 +113,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("expands prefixed names in INSERT DATA (PrefixInsertion)", function (done) {
+        it("should expand prefixed names in INSERT DATA (PrefixInsertion)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     'PREFIX ns: <http://example.org/ns#>  PREFIX x:  <http://example.org/x/> PREFIX z:  <http://example.org/x/#> INSERT DATA { x:x ns:p  "d:x ns:p" . x:x x:p   "x:x x:p" . z:x z:p   "z:x z:p" . }',
@@ -145,7 +145,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("accepts BASE and PREFIX in any order (PrologueOrder)", function (done) {
+        it("should accept BASE and PREFIX in any order (PrologueOrder)", function (done) {
             // BASE and PREFIX in any order (checkQueries puts PREFIX declarations first); the IRIs after the last BASE resolve against it
             checkQueries(
                 ":a :p 1",
@@ -161,7 +161,7 @@ describe("QueryEngine", function () {
             );
         });
 
-        it("matches keywords in any case (MixedCaseKeywords)", function (done) {
+        it("should match keywords in any case (MixedCaseKeywords)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     "prefix : <http://example/> insert data { :b :p 2 . :c :p 3 . :c :q 4 }",
@@ -180,7 +180,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("reads double literals and computes with them (DoubleLiterals)", function (done) {
+        it("should read double literals and compute with them (DoubleLiterals)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     "PREFIX : <http://example/> INSERT DATA { :a :p 2e1 . :b :p 1.0e0 }",
@@ -212,7 +212,7 @@ describe("QueryEngine", function () {
 
     describe("graph patterns", function () {
         describe("basic patterns and joins", function () {
-            it("joins two triple patterns on their subject (SimpleJoin1)", function (done) {
+            it("should join two triple patterns on their subject (SimpleJoin1)", function (done) {
                 newEngine(function (engine) {
                     engine.execute(
                         "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example>; <http://example.com/vocab#pages> 95 . <http://example/book4> <http://example.com/vocab#title> <http://test.com/example>; <http://example.com/vocab#pages> 96 . }",
@@ -234,7 +234,7 @@ describe("QueryEngine", function () {
                 });
             });
 
-            it("treats an unbound variable as compatible in a join (JoinUnboundVariables)", function (done) {
+            it("should treat an unbound variable as compatible in a join (JoinUnboundVariables)", function (done) {
                 checkQueries(
                     ":a :p :b . :b :p :c . :a :q 1 . :t1 :r 1 . :t2 :r 2",
                     [
@@ -260,7 +260,7 @@ describe("QueryEngine", function () {
                 );
             });
 
-            it("gives the empty group one solution without variables (EmptyGroupPattern)", function (done) {
+            it("should give the empty group one solution without variables (EmptyGroupPattern)", function (done) {
                 // the empty group has one solution, without variables
                 checkQueries(
                     ":x :p 1",
@@ -280,7 +280,7 @@ describe("QueryEngine", function () {
                 );
             });
 
-            it("matches a blank node in a pattern like a variable that is not returned (BlankNodesInPatterns)", function (done) {
+            it("should match a blank node in a pattern like a variable that is not returned (BlankNodesInPatterns)", function (done) {
                 // a blank node in a query pattern matches like a variable that is not returned
                 checkQueries(
                     ":a :p :b . :b :p :c . :b :q :d . :e :q :d",
@@ -305,7 +305,7 @@ describe("QueryEngine", function () {
         });
 
         describe("UNION", function () {
-            it("returns the solutions of both alternatives (UnionBasic1)", function (done) {
+            it("should return the solutions of both alternatives (UnionBasic1)", function (done) {
                 newEngine(function (engine) {
                     engine.execute(
                         " PREFIX dc10:  <http://purl.org/dc/elements/1.0/> PREFIX dc11:  <http://purl.org/dc/elements/1.1/> INSERT DATA { _:a  dc10:title     'SPARQL Query Language Tutorial' .\
@@ -340,7 +340,7 @@ describe("QueryEngine", function () {
                 });
             });
 
-            it("binds a different variable in each alternative (UnionBasic2)", function (done) {
+            it("should bind a different variable in each alternative (UnionBasic2)", function (done) {
                 newEngine(function (engine) {
                     engine.execute(
                         " PREFIX dc10:  <http://purl.org/dc/elements/1.0/> PREFIX dc11:  <http://purl.org/dc/elements/1.1/> INSERT DATA { \
@@ -385,7 +385,7 @@ describe("QueryEngine", function () {
                 });
             });
 
-            it("matches several triple patterns in each alternative (UnionBasic3)", function (done) {
+            it("should match several triple patterns in each alternative (UnionBasic3)", function (done) {
                 newEngine(function (engine) {
                     engine.execute(
                         " PREFIX dc10:  <http://purl.org/dc/elements/1.0/> PREFIX dc11:  <http://purl.org/dc/elements/1.1/> INSERT DATA { \
@@ -425,7 +425,7 @@ describe("QueryEngine", function () {
                 });
             });
 
-            it("returns blank nodes as blank node terms (UnionBasic4)", function (done) {
+            it("should return blank nodes as blank node terms (UnionBasic4)", function (done) {
                 newEngine(function (engine) {
                     engine.execute(
                         " PREFIX dc10:  <http://purl.org/dc/elements/1.0/> PREFIX dc11:  <http://purl.org/dc/elements/1.1/> INSERT DATA { _:a  dc10:title     'SPARQL Query Language Tutorial' .\
@@ -449,7 +449,7 @@ describe("QueryEngine", function () {
                 });
             });
 
-            it("leaves the variables of the other alternative unbound (DisjointUnion)", function (done) {
+            it("should leave the variables of the other alternative unbound (DisjointUnion)", function (done) {
                 newEngine({ treeOrder: 15 }, function (engine) {
                     var query =
                         "PREFIX ex:  <http://www.w3.org/2009/sparql/docs/tests/data-sparql11/negation#> \
@@ -505,7 +505,7 @@ describe("QueryEngine", function () {
                     .sort();
             };
 
-            it("keeps a solution without a match for the optional part (OptionalBasic1)", function (done) {
+            it("should keep a solution without a match for the optional part (OptionalBasic1)", function (done) {
                 newEngine(function (engine) {
                     engine.execute(
                         "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -549,7 +549,7 @@ describe("QueryEngine", function () {
                 });
             });
 
-            it("evaluates two OPTIONALs without a pattern before them (OptionalBasic2)", function (done) {
+            it("should evaluate two OPTIONALs without a pattern before them (OptionalBasic2)", function (done) {
                 newEngine(function (engine) {
                     engine.execute(
                         "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -578,7 +578,7 @@ describe("QueryEngine", function () {
                 });
             });
 
-            it("unbinds the optional variables of a solution that fails the filter (OptionalFilterUnmatchedSolution)", function (done) {
+            it("should unbind the optional variables of a solution that fails the filter (OptionalFilterUnmatchedSolution)", function (done) {
                 // the store's default tree order, which yields :a's solution first
                 newEngine({ treeOrder: 15 }, function (engine) {
                     // :a has no :q, so the left join adds ?x to its solution; ?x must still be
@@ -605,7 +605,7 @@ describe("QueryEngine", function () {
                 });
             });
 
-            it("unbinds every variable of a UNION that fails the filter (OptionalFilterUnionVariables)", function (done) {
+            it("should unbind every variable of a UNION that fails the filter (OptionalFilterUnionVariables)", function (done) {
                 newEngine(function (engine) {
                     // the UNION's solutions bind different variables: all of them must be unbound
                     // again when a solution fails the OPTIONAL's filter, not only the first one's
@@ -637,7 +637,7 @@ describe("QueryEngine", function () {
                 });
             });
 
-            it("unbinds a variable bound only by the optional part when it fails the filter (OptionalFilterVariableBoundOnlyInSomeLeftSolutions)", function (done) {
+            it("should unbind a variable bound only by the optional part when it fails the filter (OptionalFilterVariableBoundOnlyInSomeLeftSolutions)", function (done) {
                 newEngine(function (engine) {
                     // the left UNION binds ?x for :a only: :b's ?x comes from the OPTIONAL alone
                     // and must be unbound again when it fails the OPTIONAL's filter
@@ -663,7 +663,7 @@ describe("QueryEngine", function () {
                 });
             });
 
-            it("keeps the value of a BIND after an OPTIONAL whose filter fails (OptionalFilterKeepsOuterBind)", function (done) {
+            it("should keep the value of a BIND after an OPTIONAL whose filter fails (OptionalFilterKeepsOuterBind)", function (done) {
                 newEngine(function (engine) {
                     // the BIND after the OPTIONAL is evaluated on the joined solutions: a solution
                     // whose OPTIONAL part fails the filter keeps the BIND's value
@@ -689,7 +689,7 @@ describe("QueryEngine", function () {
                 });
             });
 
-            it("keeps a left solution once if no optional match passes the filter (OptionalFilterKeepsLeftSolutionOnceIfNoneMatches)", function (done) {
+            it("should keep a left solution once if no optional match passes the filter (OptionalFilterKeepsLeftSolutionOnceIfNoneMatches)", function (done) {
                 newEngine(function (engine) {
                     // :b has a passing and a failing ?x: only the passing one is kept, also with a BIND after the OPTIONAL
                     var query =
@@ -726,7 +726,7 @@ describe("QueryEngine", function () {
                 });
             });
 
-            it("keeps duplicate left solutions (OptionalFilterKeepsDuplicateLeftSolutions)", function (done) {
+            it("should keep duplicate left solutions (OptionalFilterKeepsDuplicateLeftSolutions)", function (done) {
                 newEngine(function (engine) {
                     // the UNION yields every left solution twice (a bag): the OPTIONAL keeps both copies
                     var query =
@@ -751,7 +751,7 @@ describe("QueryEngine", function () {
         });
 
         describe("GRAPH and datasets", function () {
-            it("evaluates BIND inside GRAPH (BindInGraph)", function (done) {
+            it("should evaluate BIND inside GRAPH (BindInGraph)", function (done) {
                 checkQueries(
                     "GRAPH :g1 { :a :p 1 }",
                     [
@@ -770,7 +770,7 @@ describe("QueryEngine", function () {
                 );
             });
 
-            it("matches an empty group in GRAPH like a triple pattern (GraphEmptyGroup)", function (done) {
+            it("should match an empty group in GRAPH like a triple pattern (GraphEmptyGroup)", function (done) {
                 // like GRAPH over triple patterns: a variable takes each named graph of the dataset, an IRI must be a graph of the store
                 checkQueries(
                     "GRAPH :g1 { :x :y :z }",
@@ -784,7 +784,7 @@ describe("QueryEngine", function () {
                 );
             });
 
-            it("matches every nested pattern against the active graph (GraphNestedPatterns)", function (done) {
+            it("should match every nested pattern against the active graph (GraphNestedPatterns)", function (done) {
                 // every pattern inside GRAPH matches the active graph, and EXISTS inside GRAPH does too
                 var named =
                     "FROM NAMED <http://example/g1> FROM NAMED <http://example/g2> FROM NAMED <http://example/g3> ";
@@ -862,7 +862,7 @@ describe("QueryEngine", function () {
                 );
             });
 
-            it("passes the W3C GRAPH and EXISTS cases (GraphW3C)", function (done) {
+            it("should pass the W3C GRAPH and EXISTS cases (GraphW3C)", function (done) {
                 // W3C rdf-tests sparql10/graph (graph-nested-1…4, graph-variable-scope, graph-variable-join, graph-optional)
                 // and sparql11/exists (exists03, exists-graph-variable), with graph names in http://example/
                 var nested = "FROM NAMED <http://example/n1> FROM NAMED <http://example/n2> ";
@@ -925,7 +925,7 @@ describe("QueryEngine", function () {
                 );
             });
 
-            it("restricts GRAPH <iri> to the named graphs of FROM NAMED (GraphIriInDataset)", function (done) {
+            it("should restrict GRAPH <iri> to the named graphs of FROM NAMED (GraphIriInDataset)", function (done) {
                 // if the query names named graphs, GRAPH <iri> matches only one of them; without, any graph of the store
                 var g1 = "FROM NAMED <http://example/g1> ",
                     g2 = "FROM NAMED <http://example/g2> ";
@@ -954,7 +954,7 @@ describe("QueryEngine", function () {
                 );
             });
 
-            it("restricts GRAPH <iri> to the named graphs passed to execute (GraphIriInDatasetArguments)", function (done) {
+            it("should restrict GRAPH <iri> to the named graphs passed to execute (GraphIriInDatasetArguments)", function (done) {
                 // the named graphs passed to execute restrict GRAPH <iri> like FROM NAMED
                 newEngine(function (engine) {
                     engine.execute(
@@ -988,7 +988,7 @@ describe("QueryEngine", function () {
         });
 
         describe("BIND", function () {
-            it("binds a term of the store as that term (BindStoredTerms)", function (done) {
+            it("should bind a term of the store as that term (BindStoredTerms)", function (done) {
                 // a BIND result that is a term of the store is the same term as one matched by a triple pattern
                 checkQueries(
                     ':a :p :b . :a :p :c . :b :p "x" . :c :p "x"@en . :d :p 1',
@@ -1015,7 +1015,7 @@ describe("QueryEngine", function () {
                 );
             });
 
-            it("extends only the patterns before the BIND (BindPosition)", function (done) {
+            it("should extend only the patterns before the BIND (BindPosition)", function (done) {
                 // BIND extends the patterns before it in its group; FILTERs apply to the whole group
                 checkQueries(
                     ":a :p 1 . :a :q 3 . :b :p 2 . :b :q 7 . :c :p 4",
@@ -1064,7 +1064,7 @@ describe("QueryEngine", function () {
                 );
             });
 
-            it("rejects a BIND variable that is already in scope (BindScope)", function (done) {
+            it("should reject a BIND variable that is already in scope (BindScope)", function (done) {
                 // the variable of a BIND must not be in scope of the patterns before it (W3C syntax-BINDscope1-8)
                 var w3c = function (n) {
                     return fs.readFileSync(__dirname + "/w3c/syntax-query/syntax-BINDscope" + n + ".rq").toString();
@@ -1136,7 +1136,7 @@ describe("QueryEngine", function () {
                 });
             });
 
-            it("joins a blank node from a BIND with the same blank node from a pattern (BoundBlankNodes)", function (done) {
+            it("should join a blank node from a BIND with the same blank node from a pattern (BoundBlankNodes)", function (done) {
                 // a blank node of the store from a BIND joins with the same blank node from a triple pattern, and
                 // one bound into an EXISTS pattern matches only itself
                 checkQueries(
@@ -1155,7 +1155,7 @@ describe("QueryEngine", function () {
                 );
             });
 
-            it("lets a BIND use the variables of the BINDs before it (ChainedBinds)", function (done) {
+            it("should let a BIND use the variables of the BINDs before it (ChainedBinds)", function (done) {
                 newEngine(function (engine) {
                     var query = "PREFIX : <http://example/> INSERT DATA { :b :p 2 }";
 
@@ -1173,7 +1173,7 @@ describe("QueryEngine", function () {
                 });
             });
 
-            it("filters on a value computed by BIND (BIND)", function (done) {
+            it("should filter on a value computed by BIND (BIND)", function (done) {
                 newEngine({ treeOrder: 15 }, function (engine) {
                     var query =
                         'BASE <http://example.org/book/>\
@@ -1213,7 +1213,7 @@ describe("QueryEngine", function () {
     });
 
     describe("expressions and filters", function () {
-        it("leaves a projected expression with an error unbound and keeps the solution (ProjectedExpressions)", function (done) {
+        it("should leave a projected expression with an error unbound and keep the solution (ProjectedExpressions)", function (done) {
             newEngine(function (engine) {
                 var query = 'PREFIX : <http://example/> INSERT DATA { :a :p "x"@en . :b :p 2 . :c :p :u }';
 
@@ -1246,7 +1246,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("computes arithmetic results and errors (ArithmeticResults)", function (done) {
+        it("should compute arithmetic results and errors (ArithmeticResults)", function (done) {
             newEngine(function (engine) {
                 var query = "PREFIX : <http://example/> INSERT DATA { :b :p 2 . :c :p :u }";
 
@@ -1285,7 +1285,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("reads computed infinities and large integers back (ComputedLiteralForms)", function (done) {
+        it("should read computed infinities and large integers back (ComputedLiteralForms)", function (done) {
             newEngine(function (engine) {
                 var query = "PREFIX : <http://example/> INSERT DATA { :b :p 2 . :c :p 3 }";
                 var xsd = "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> ";
@@ -1327,7 +1327,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("reports unsupported property paths (UnsupportedPropertyPaths)", function (done) {
+        it("should report unsupported property paths (UnsupportedPropertyPaths)", function (done) {
             newEngine(function (engine) {
                 // the other paths are supported, see property_paths_spec.js
                 var patterns = [
@@ -1372,7 +1372,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("evaluates IN and NOT IN with IRIs (InWithIris)", function (done) {
+        it("should evaluate IN and NOT IN with IRIs (InWithIris)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     "PREFIX : <http://example/> INSERT DATA { :a :p :b . :a :p :c . :a :p :d . :a :p 2 }",
@@ -1402,7 +1402,7 @@ describe("QueryEngine", function () {
             ':a :v 1 . :b :v 2 . :c :v "x"@en . :e :v "y" . :f :v :iri . :g :v "z"^^:custom . ' +
             ':a :d "2020-01-01"^^xsd:date ; :t "2020-01-01T00:00:00Z"^^xsd:dateTime';
 
-        it("gives an error for values that can't be compared (RelationalTypeErrors)", function (done) {
+        it("should give an error for values that can't be compared (RelationalTypeErrors)", function (done) {
             checkQueries(
                 mixedTypes,
                 [
@@ -1431,7 +1431,7 @@ describe("QueryEngine", function () {
             );
         });
 
-        it("compares literals of different types as unequal or as an error (MixedTypeEquality)", function (done) {
+        it("should compare literals of different types as unequal or as an error (MixedTypeEquality)", function (done) {
             checkQueries(
                 mixedTypes,
                 [
@@ -1450,7 +1450,7 @@ describe("QueryEngine", function () {
             );
         });
 
-        it("resolves prefixed IRIs in expressions, also when grouped (IriConstantsAndGroupedExpressions)", function (done) {
+        it("should resolve prefixed IRIs in expressions, also when grouped (IriConstantsAndGroupedExpressions)", function (done) {
             checkQueries(
                 ":a :p 1 , 2 . :b :p 3",
                 [
@@ -1496,7 +1496,7 @@ describe("QueryEngine", function () {
             );
         });
 
-        it("creates blank nodes with BNODE() (BNodeFunction)", function (done) {
+        it("should create blank nodes with BNODE() (BNodeFunction)", function (done) {
             checkQueries(
                 ":a :p 1 . :b :p 2",
                 [
@@ -1553,7 +1553,7 @@ describe("QueryEngine", function () {
             );
         });
 
-        it("keeps the internal path variables inside EXISTS apart from the outer ones (PathsInExists)", function (done) {
+        it("should keep the internal path variables inside EXISTS apart from the outer ones (PathsInExists)", function (done) {
             // the internal variables of a path sequence inside EXISTS don't take the values of the outer ones
             checkQueries(
                 ":a :p :m . :m :q :b . :c :r :n . :n :s :d",
@@ -1565,7 +1565,7 @@ describe("QueryEngine", function () {
             );
         });
 
-        it("filters with EXISTS (FILTER EXISTS)", function (done) {
+        it("should filter with EXISTS (FILTER EXISTS)", function (done) {
             newEngine({ treeOrder: 15 }, function (engine) {
                 var query =
                     'BASE <http://example.org/book/>\
@@ -1600,7 +1600,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("combines EXISTS with other conditions (FILTER EXISTS composition)", function (done) {
+        it("should combine EXISTS with other conditions (FILTER EXISTS composition)", function (done) {
             newEngine({ treeOrder: 15 }, function (engine) {
                 var query =
                     'BASE <http://example.org/book/>\
@@ -1635,7 +1635,7 @@ describe("QueryEngine", function () {
     });
 
     describe("solution modifiers", function () {
-        it("removes duplicate solutions with DISTINCT (OptionalDistinct1)", function (done) {
+        it("should remove duplicate solutions with DISTINCT (OptionalDistinct1)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -1662,7 +1662,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("returns at most LIMIT solutions (Limit1)", function (done) {
+        it("should return at most LIMIT solutions (Limit1)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -1690,7 +1690,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("orders solutions ascending (OrderBy1)", function (done) {
+        it("should order solutions ascending (OrderBy1)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -1719,7 +1719,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("orders solutions descending (OrderBy2)", function (done) {
+        it("should order solutions descending (OrderBy2)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -1748,7 +1748,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("orders IRIs with ASC (OrderBy3)", function (done) {
+        it("should order IRIs with ASC (OrderBy3)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -1777,7 +1777,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("orders by several keys (OrderBy4)", function (done) {
+        it("should order by several keys (OrderBy4)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -1806,7 +1806,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("orders by a projected expression (OrderByProjectedExpression)", function (done) {
+        it("should order by a projected expression (OrderByProjectedExpression)", function (done) {
             newEngine(function (engine) {
                 var query = "PREFIX : <http://example/> INSERT DATA { :b :p 2 . :c :p 3 . :d :p :u }";
 
@@ -1850,7 +1850,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("orders typed literals by value (OrderByTypedValues)", function (done) {
+        it("should order typed literals by value (OrderByTypedValues)", function (done) {
             checkQueries(
                 ':a :s "ab"^^xsd:string , "b" , "a"^^xsd:string . :a :x "foo"^^xsd:date , "2020-01-01"^^xsd:date , "bar"^^xsd:date . :a :b "1"^^xsd:boolean , "false"^^xsd:boolean . ' +
                     ':a :t "2020-01-01T10:00:00+05:00"^^xsd:dateTime , "2020-01-01T06:00:00Z"^^xsd:dateTime',
@@ -1872,7 +1872,7 @@ describe("QueryEngine", function () {
     });
 
     describe("aggregates and grouping", function () {
-        it("projects a grouped variable under an alias (AliasedVar)", function (done) {
+        it("should project a grouped variable under an alias (AliasedVar)", function (done) {
             newEngine(function (engine) {
                 var query =
                     "PREFIX : <http://example/>\
@@ -1895,7 +1895,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("computes MAX per group (GroupMax1)", function (done) {
+        it("should compute MAX per group (GroupMax1)", function (done) {
             newEngine(function (engine) {
                 var query =
                     "PREFIX : <http://example/>\
@@ -1919,7 +1919,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("computes MIN per group (GroupMin1)", function (done) {
+        it("should compute MIN per group (GroupMin1)", function (done) {
             newEngine(function (engine) {
                 var query =
                     "PREFIX : <http://example/>\
@@ -1943,7 +1943,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("computes COUNT per group (GroupCount1)", function (done) {
+        it("should compute COUNT per group (GroupCount1)", function (done) {
             newEngine(function (engine) {
                 var query =
                     "PREFIX : <http://example/>\
@@ -1969,7 +1969,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("computes COUNT(DISTINCT) per group (GroupCountDistinct1)", function (done) {
+        it("should compute COUNT(DISTINCT) per group (GroupCountDistinct1)", function (done) {
             newEngine(function (engine) {
                 var query =
                     "PREFIX : <http://example/>\
@@ -1995,7 +1995,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("computes AVG(DISTINCT) per group (GroupAvg1)", function (done) {
+        it("should compute AVG(DISTINCT) per group (GroupAvg1)", function (done) {
             newEngine(function (engine) {
                 var query =
                     "PREFIX : <http://example/>\
@@ -2021,7 +2021,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("computes AVG per group (GroupAvg2)", function (done) {
+        it("should compute AVG per group (GroupAvg2)", function (done) {
             newEngine(function (engine) {
                 var query =
                     "PREFIX : <http://example/>\
@@ -2045,7 +2045,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("computes SUM(DISTINCT) per group (GroupSum1)", function (done) {
+        it("should compute SUM(DISTINCT) per group (GroupSum1)", function (done) {
             newEngine(function (engine) {
                 var query =
                     "PREFIX : <http://example/>\
@@ -2071,7 +2071,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("computes SUM per group (GroupSum2)", function (done) {
+        it("should compute SUM per group (GroupSum2)", function (done) {
             newEngine(function (engine) {
                 var query =
                     "PREFIX : <http://example/>\
@@ -2095,7 +2095,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("groups by a function call (GroupByFunctionCall)", function (done) {
+        it("should group by a function call (GroupByFunctionCall)", function (done) {
             newEngine(function (engine) {
                 var query =
                     "PREFIX : <http://example/>\
@@ -2119,7 +2119,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("keeps a group key whose first value is an error (GroupByFunctionCallFirstSolutionError)", function (done) {
+        it("should keep a group key whose first value is an error (GroupByFunctionCallFirstSolutionError)", function (done) {
             newEngine(function (engine) {
                 // LANG() of an IRI is an error. With this data an IRI solution comes first,
                 // and it must not drop the clause from the group key
@@ -2147,7 +2147,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("keeps the group keys of several expressions apart (GroupByKeysDoNotCollide)", function (done) {
+        it("should keep the group keys of several expressions apart (GroupByKeysDoNotCollide)", function (done) {
             newEngine(function (engine) {
                 var query =
                     'PREFIX : <http://example/>\
@@ -2172,7 +2172,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("groups by an aliased expression (GroupByAliasedExpression)", function (done) {
+        it("should group by an aliased expression (GroupByAliasedExpression)", function (done) {
             newEngine(function (engine) {
                 var query =
                     "PREFIX : <http://example/>\
@@ -2199,7 +2199,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("aggregates over all solutions without GROUP BY (AggregatesWithoutGroupBy)", function (done) {
+        it("should aggregate over all solutions without GROUP BY (AggregatesWithoutGroupBy)", function (done) {
             newEngine(function (engine) {
                 var query =
                     "PREFIX : <http://example/>\
@@ -2238,7 +2238,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("groups by a bracketed expression without an alias (GroupByBracketedExpressionWithoutAlias)", function (done) {
+        it("should group by a bracketed expression without an alias (GroupByBracketedExpressionWithoutAlias)", function (done) {
             newEngine(function (engine) {
                 var query =
                     "PREFIX : <http://example/>\
@@ -2262,7 +2262,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("rejects a projected variable that is neither grouped nor aggregated (AggregateWithUngroupedVariable)", function (done) {
+        it("should reject a projected variable that is neither grouped nor aggregated (AggregateWithUngroupedVariable)", function (done) {
             newEngine(function (engine) {
                 var query =
                     "PREFIX : <http://example/>\
@@ -2304,7 +2304,7 @@ describe("QueryEngine", function () {
             });
         };
 
-        it("applies LIMIT and OFFSET to groups (GroupByWithSolutionModifiers)", function (done) {
+        it("should apply LIMIT and OFFSET to groups (GroupByWithSolutionModifiers)", function (done) {
             newEngine(function (engine) {
                 var query =
                     "PREFIX : <http://example/>\
@@ -2348,7 +2348,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("orders groups by an aggregate (GroupByOrderBy)", function (done) {
+        it("should order groups by an aggregate (GroupByOrderBy)", function (done) {
             newEngine(function (engine) {
                 var select =
                     "PREFIX : <http://example/> SELECT ?class (COUNT(?s) AS ?count) { ?s a ?class } GROUP BY ?class ";
@@ -2387,7 +2387,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("filters groups with HAVING (GroupByHaving)", function (done) {
+        it("should filter groups with HAVING (GroupByHaving)", function (done) {
             newEngine(function (engine) {
                 var select =
                     "PREFIX : <http://example/> SELECT ?class (COUNT(?s) AS ?count) { ?s a ?class } GROUP BY ?class ";
@@ -2434,7 +2434,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("rejects invalid grouped queries (GroupByInvalidQueries)", function (done) {
+        it("should reject invalid grouped queries (GroupByInvalidQueries)", function (done) {
             newEngine(function (engine) {
                 engine.execute(groupCountData(), function (err, result) {
                     // SELECT * can't be grouped
@@ -2495,7 +2495,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("evaluates aggregates inside the expressions of a grouped query (GroupByAggregatesInsideExpressions)", function (done) {
+        it("should evaluate aggregates inside the expressions of a grouped query (GroupByAggregatesInsideExpressions)", function (done) {
             newEngine(function (engine) {
                 engine.execute(groupCountData(), function (err, result) {
                     engine.execute(
@@ -2514,7 +2514,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("keeps a user variable named like an internal aggregate (GroupByAggregateNamesDoNotCollide)", function (done) {
+        it("should keep a user variable named like an internal aggregate (GroupByAggregateNamesDoNotCollide)", function (done) {
             newEngine(function (engine) {
                 engine.execute(groupCountData(), function (err, result) {
                     // a user variable named like an internal one keeps its own value
@@ -2534,7 +2534,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("evaluates an aggregate inside an expression (AggregateInsideExpression)", function (done) {
+        it("should evaluate an aggregate inside an expression (AggregateInsideExpression)", function (done) {
             newEngine(function (engine) {
                 var query =
                     "PREFIX : <http://example/>\
@@ -2556,7 +2556,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("concatenates the values of each group with GROUP_CONCAT (GroupConcat1)", function (done) {
+        it("should concatenate the values of each group with GROUP_CONCAT (GroupConcat1)", function (done) {
             newEngine(function (engine) {
                 var query =
                     'PREFIX : <http://example/>\
@@ -2585,7 +2585,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("uses the SEPARATOR of GROUP_CONCAT (GroupConcat2)", function (done) {
+        it("should use the SEPARATOR of GROUP_CONCAT (GroupConcat2)", function (done) {
             newEngine(function (engine) {
                 var query =
                     'PREFIX : <http://example/>\
@@ -2616,7 +2616,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("concatenates distinct values with GROUP_CONCAT(DISTINCT) (GroupConcatDistinct)", function (done) {
+        it("should concatenate distinct values with GROUP_CONCAT(DISTINCT) (GroupConcatDistinct)", function (done) {
             newEngine(function (engine) {
                 var query =
                     'PREFIX : <http://example/>\
@@ -2640,7 +2640,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("counts distinct solutions with COUNT(DISTINCT *) (CountDistinctStar)", function (done) {
+        it("should count distinct solutions with COUNT(DISTINCT *) (CountDistinctStar)", function (done) {
             checkQueries(
                 ":a :p 1 . :a :p 2 . :b :p 1",
                 [
@@ -2659,7 +2659,7 @@ describe("QueryEngine", function () {
             );
         });
 
-        it("leaves SUM and AVG unbound for values that are no numbers (SumAvgTypeErrors)", function (done) {
+        it("should leave SUM and AVG unbound for values that are no numbers (SumAvgTypeErrors)", function (done) {
             checkQueries(
                 ':a :v 1 , 2 , "a" . :b :v 3 , 4 . :c :k 1 ; :n 3 . :d :k 1 ; :n 5 . :e :k 1',
                 [
@@ -2682,7 +2682,7 @@ describe("QueryEngine", function () {
             );
         });
 
-        it("skips unbound values in GROUP_CONCAT (GroupConcatUnbound)", function (done) {
+        it("should skip unbound values in GROUP_CONCAT (GroupConcatUnbound)", function (done) {
             // an unbound value is skipped (it crashed the process)
             checkQueries(
                 ':c :k 1 ; :n "x" . :e :k 1',
@@ -2691,7 +2691,7 @@ describe("QueryEngine", function () {
             );
         });
 
-        it("orders mixed types for MIN and MAX like ORDER BY (MinMaxMixedTypes)", function (done) {
+        it("should order mixed types for MIN and MAX like ORDER BY (MinMaxMixedTypes)", function (done) {
             // MIN and MAX follow the ORDER BY order (IRIs before literals without a datatype before typed literals), whatever the insertion order
             var query = "SELECT (MIN(?o) AS ?min) (MAX(?o) AS ?max) { ?s :v ?o }";
             checkQueries(
@@ -2715,7 +2715,7 @@ describe("QueryEngine", function () {
     });
 
     describe("update", function () {
-        it("inserts a triple with INSERT DATA (InsertDataTrivialRecovery)", function (done) {
+        it("should insert a triple with INSERT DATA (InsertDataTrivialRecovery)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
@@ -2734,7 +2734,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("inserts triples with a shared subject (InsertDataTrivialRecovery2)", function (done) {
+        it("should insert triples with a shared subject (InsertDataTrivialRecovery2)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example>; <http://example.com/vocab#pages> 95 }",
@@ -2772,7 +2772,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("inserts data in two requests (InsertDataTrivialRecovery3)", function (done) {
+        it("should insert data in two requests (InsertDataTrivialRecovery3)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example>; <http://example.com/vocab#pages> 95 }",
@@ -2813,7 +2813,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("deletes an inserted triple with DELETE DATA (InsertionDeletionTrivial1)", function (done) {
+        it("should delete an inserted triple with DELETE DATA (InsertionDeletionTrivial1)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
@@ -2844,7 +2844,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("deletes a triple from one named graph only (InsertionDeletion2)", function (done) {
+        it("should delete a triple from one named graph only (InsertionDeletion2)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     "INSERT DATA {  GRAPH <a> { <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> } }",
@@ -2923,7 +2923,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("modifies a named graph with WITH, DELETE and INSERT (Modify1)", function (done) {
+        it("should modify a named graph with WITH, DELETE and INSERT (Modify1)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -2977,7 +2977,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("modifies the default graph with DELETE and INSERT (ModifyDefaultGraph)", function (done) {
+        it("should modify the default graph with DELETE and INSERT (ModifyDefaultGraph)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -3026,7 +3026,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("inserts into another graph with WITH and USING (ModifyOnlyInsert)", function (done) {
+        it("should insert into another graph with WITH and USING (ModifyOnlyInsert)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -3073,7 +3073,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("deletes with WITH and USING (ModifyOnlyDelete)", function (done) {
+        it("should delete with WITH and USING (ModifyOnlyDelete)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -3113,7 +3113,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("clears one named graph with CLEAR GRAPH (ClearGraph1)", function (done) {
+        it("should clear one named graph with CLEAR GRAPH (ClearGraph1)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -3158,7 +3158,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("clears the default graph with CLEAR DEFAULT (ClearGraph2)", function (done) {
+        it("should clear the default graph with CLEAR DEFAULT (ClearGraph2)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -3216,7 +3216,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("clears all named graphs with CLEAR NAMED (ClearGraph3)", function (done) {
+        it("should clear all named graphs with CLEAR NAMED (ClearGraph3)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -3275,7 +3275,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("clears all graphs with CLEAR ALL (ClearGraph4)", function (done) {
+        it("should clear all graphs with CLEAR ALL (ClearGraph4)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -3340,7 +3340,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("accepts CREATE GRAPH (Create)", function (done) {
+        it("should accept CREATE GRAPH (Create)", function (done) {
             newEngine(function (engine) {
                 engine.execute("CREATE GRAPH <a>", function (err, result) {
                     expect(err).toBe(null);
@@ -3351,7 +3351,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("drops one named graph with DROP GRAPH (Drop1)", function (done) {
+        it("should drop one named graph with DROP GRAPH (Drop1)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -3396,7 +3396,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("drops the default graph with DROP DEFAULT (Drop2)", function (done) {
+        it("should drop the default graph with DROP DEFAULT (Drop2)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -3454,7 +3454,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("drops all named graphs with DROP NAMED (Drop3)", function (done) {
+        it("should drop all named graphs with DROP NAMED (Drop3)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -3513,7 +3513,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("drops all graphs with DROP ALL (Drop4)", function (done) {
+        it("should drop all graphs with DROP ALL (Drop4)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -3578,7 +3578,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("deletes the matching triples with DELETE WHERE (DeleteWhere1)", function (done) {
+        it("should delete the matching triples with DELETE WHERE (DeleteWhere1)", function (done) {
             newEngine(function (engine) {
                 engine.execute(
                     'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
@@ -3614,7 +3614,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("creates new blank nodes per solution from an INSERT template (InsertTemplateBlankNodes)", function (done) {
+        it("should create new blank nodes per solution from an INSERT template (InsertTemplateBlankNodes)", function (done) {
             // a blank node of an INSERT template is a new blank node per solution, shared by the quads of one solution
             checkQueries(
                 ":a :p 1 . :b :p 2 . :c :p 3",
@@ -3640,7 +3640,7 @@ describe("QueryEngine", function () {
             );
         });
 
-        it("creates a new blank node for a template label that the store already has (InsertTemplateBlankLabels)", function (done) {
+        it("should create a new blank node for a template label that the store already has (InsertTemplateBlankLabels)", function (done) {
             // a template label equal to the label of a blank node of the store is still a new blank node
             newEngine(function (engine) {
                 var prefix = "PREFIX : <http://example/> ";
@@ -3670,7 +3670,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("uses a blank node bound by WHERE as that blank node in the templates (ModifyBoundBlankNodes)", function (done) {
+        it("should use a blank node bound by WHERE as that blank node in the templates (ModifyBoundBlankNodes)", function (done) {
             // a blank node of the store bound by WHERE is that blank node in the templates, also after a BIND, and
             // deleting one of its quads keeps it for the others
             checkQueries(
@@ -3695,7 +3695,7 @@ describe("QueryEngine", function () {
             );
         });
 
-        it("leaves no terms behind after deleting quads the store does not have (DeleteMissingQuadsLeaveNoTerms)", function (done) {
+        it("should leave no terms behind after deleting quads the store does not have (DeleteMissingQuadsLeaveNoTerms)", function (done) {
             // deleting quads the store does not have leaves no graph and no blank node in the lexicon
             newEngine(function (engine) {
                 var lexicon = engine.lexicon;
@@ -3734,7 +3734,7 @@ describe("QueryEngine", function () {
             });
         });
 
-        it("handles several GRAPH blocks in one update (QuadsWithSeveralGraphs)", function (done) {
+        it("should handle several GRAPH blocks in one update (QuadsWithSeveralGraphs)", function (done) {
             // every GRAPH block of INSERT DATA, DELETE DATA and update templates counts, and so do the triples between them
             var named = "FROM NAMED <http://example/g1> FROM NAMED <http://example/g2> FROM NAMED <http://example/g3> ";
             checkQueries(

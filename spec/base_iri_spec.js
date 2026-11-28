@@ -51,7 +51,7 @@ describe("Relative IRIs", function () {
             "http:g": "http:g",
         };
 
-        it("resolves the examples of RFC 3986", function () {
+        it("should resolve the examples of RFC 3986", function () {
             Object.keys(examples).forEach(function (reference) {
                 expect(reference + " -> " + Utils.resolveIri(base, reference)).toBe(
                     reference + " -> " + examples[reference],
@@ -59,7 +59,7 @@ describe("Relative IRIs", function () {
             });
         });
 
-        it("keeps IRIs as written", function () {
+        it("should keep IRIs as written", function () {
             // no percent-encoding, no case change (unlike WHATWG URL)
             expect(Utils.resolveIri("http://Example.org/dir/", "ä b")).toBe("http://Example.org/dir/ä b");
             expect(Utils.resolveIri("http://example.org/", "HTTP://Example.org/../x")).toBe("HTTP://Example.org/../x");
@@ -92,7 +92,7 @@ describe("Relative IRIs", function () {
                 .sort();
         };
 
-        it("resolve against a BASE that does not end with /", async function () {
+        it("should resolve against a BASE that does not end with /", async function () {
             var base = "BASE <http://x/dir/q.rq> ";
             expect(await values(base + "SELECT ?o { <s> <p> ?o }", "o")).toEqual(["http://x/o"]);
             expect(await values(base + "SELECT ?o { GRAPH <g.ttl> { <s> <p> ?o } }", "o")).toEqual([
@@ -105,7 +105,7 @@ describe("Relative IRIs", function () {
             expect(await values(base + "SELECT (<#frag> AS ?x) {}", "x")).toEqual(["http://x/dir/q.rq#frag"]);
         });
 
-        it("resolve each BASE and PREFIX against the BASE before it", async function () {
+        it("should resolve each BASE and PREFIX against the BASE before it", async function () {
             expect(await values("BASE <http://x/> BASE <dir/> SELECT ?o { <s> <p> ?o }", "o")).toEqual(["http://x/o"]);
             expect(await values("BASE <http://x/> PREFIX : <dir/> SELECT ?o { :s :p ?o }", "o")).toEqual([
                 "http://x/o",
@@ -116,7 +116,7 @@ describe("Relative IRIs", function () {
             ).toEqual(["http://x/o"]);
         });
 
-        it("resolve in updates", async function () {
+        it("should resolve in updates", async function () {
             await store.promises.execute("BASE <http://x/dir/q.rq> INSERT DATA { <s> <q> <../new> }");
             expect(await values("SELECT ?o { <http://x/dir/s> <http://x/dir/q> ?o }", "o")).toEqual(["http://x/new"]);
             // the declarations of an operation also apply to the ones after it, not to those before
@@ -131,12 +131,12 @@ describe("Relative IRIs", function () {
             expect(await values("SELECT ?o { <http://x/a> <http://x/b> ?o }", "o")).toEqual(["first"]);
         });
 
-        it("keep an undeclared prefixed name as written", async function () {
+        it("should keep an undeclared prefixed name as written", async function () {
             await store.promises.execute("BASE <http://x/dir/> INSERT DATA { <s> my_ns:p <o> }");
             expect(await values("SELECT ?p { <http://x/dir/s> ?p <http://x/dir/o> }", "p")).toEqual(["my_ns:p"]);
         });
 
-        it("are not resolved again when a stored IRI is cast to xsd:string", async function () {
+        it("should not be resolved again when a stored IRI is cast to xsd:string", async function () {
             await store.promises.execute("INSERT DATA { <http://x/dir/s> <http://x/dir/r> <a/../c> }");
             var results = await store.promises.execute(
                 "BASE <http://other/> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> " +

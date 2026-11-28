@@ -23,7 +23,7 @@ var declaredMethods = function (header) {
 };
 
 describe("TypeScript declarations", function () {
-    it("declare every public Store method", function () {
+    it("should declare every public Store method", function () {
         var runtime = Object.getOwnPropertyNames(rdfstore.Store.prototype)
             .filter(function (name) {
                 var descriptor = Object.getOwnPropertyDescriptor(rdfstore.Store.prototype, name);
@@ -33,7 +33,7 @@ describe("TypeScript declarations", function () {
         expect(declaredMethods("export declare class Store")).toEqual(runtime);
     });
 
-    it("declare every store.promises method", function (done) {
+    it("should declare every store.promises method", function (done) {
         rdfstore.create(function (err, store) {
             expect(err).toBe(null);
             expect(declaredMethods("export interface StorePromises")).toEqual(Object.keys(store.promises).sort());

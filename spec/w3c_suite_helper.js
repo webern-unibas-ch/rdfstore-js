@@ -90,7 +90,7 @@ var defineW3CSyntaxSpecs = function (manifestPath) {
     });
 
     tests.forEach(function (test) {
-        it((test.isPositive ? "accepts " : "rejects ") + test.file, function () {
+        it((test.isPositive ? "should accept " : "should reject ") + test.file, function () {
             var error = checkQuery(test.queryText);
             // an unsupported feature says nothing about the syntax a negative test checks
             var unsupported = error != null && error.name === "NonSupportedSparqlFeatureError";

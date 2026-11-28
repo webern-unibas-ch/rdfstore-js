@@ -22,7 +22,7 @@ var insertAB = function (store, cb) {
 };
 
 describe("Events API unsubscribing", function () {
-    it("keeps notifying the other queries after stopObservingQuery", function (done) {
+    it("should keep notifying the other queries after stopObservingQuery", function (done) {
         withStore(function (store) {
             var queryA = "SELECT ?o { <http://a> <http://p> ?o }";
             var queryB = "SELECT ?o { <http://b> <http://p> ?o }";
@@ -57,7 +57,7 @@ describe("Events API unsubscribing", function () {
         });
     });
 
-    it("keeps notifying the other nodes after stopObservingNode", function (done) {
+    it("should keep notifying the other nodes after stopObservingNode", function (done) {
         withStore(function (store) {
             var nodesA = [];
             var nodesB = [];
@@ -87,7 +87,7 @@ describe("Events API unsubscribing", function () {
         });
     });
 
-    it("removes only the given listener when listeners share their source text", function (done) {
+    it("should remove only the given listener when listeners share their source text", function (done) {
         withStore(function (store) {
             var makeListener = function (log) {
                 return function (event, triples) {
@@ -112,7 +112,7 @@ describe("Events API unsubscribing", function () {
     });
 
     describe("a listener registered more than once", function () {
-        it("unsubscribe removes it from every pattern", function (done) {
+        it("should be removed from every pattern by unsubscribe", function (done) {
             withStore(function (store) {
                 var events = [];
                 var listener = function (event) {
@@ -130,7 +130,7 @@ describe("Events API unsubscribing", function () {
             });
         });
 
-        it("stopObservingNode removes it from every node", function (done) {
+        it("should be removed from every node by stopObservingNode", function (done) {
             withStore(function (store) {
                 var calls = 0;
                 var listener = function () {
@@ -149,7 +149,7 @@ describe("Events API unsubscribing", function () {
             });
         });
 
-        it("stopObservingQuery removes every callback of the query", function (done) {
+        it("should be removed by stopObservingQuery, with every callback of the query", function (done) {
             withStore(function (store) {
                 var query = "SELECT ?o { <http://a> <http://p> ?o }";
                 var calls = [];
@@ -181,7 +181,7 @@ describe("Events API unsubscribing", function () {
 });
 
 describe("Events API deleted events", function () {
-    it("reports only quads the store had", function (done) {
+    it("should report only quads the store had", function (done) {
         withStore(function (store) {
             var events = [];
             insertAB(store, function () {
@@ -213,7 +213,7 @@ describe("Events API deleted events", function () {
 });
 
 describe("Events API observed queries", function () {
-    it("calls the ready callback after the initial result", function (done) {
+    it("should call the ready callback after the initial result", function (done) {
         withStore(function (store) {
             // more solutions than the iteration helpers handle without yielding
             var triples = [];
@@ -237,7 +237,7 @@ describe("Events API observed queries", function () {
         });
     });
 
-    it("calls the ready callback when the listener throws on the initial result", async function () {
+    it("should call the ready callback when the listener throws on the initial result", async function () {
         var store = await new Promise(withStore);
         await jasmine.spyOnGlobalErrorsAsync(async function (globalErrorSpy) {
             var sentinel = new Error("thrown by the listener");
@@ -262,7 +262,7 @@ describe("Events API observed queries", function () {
         });
     });
 
-    it("passes the error of the initial query to the ready callback", function (done) {
+    it("should pass the error of the initial query to the ready callback", function (done) {
         withStore(function (store) {
             insertAB(store, function () {
                 var calls = 0;
@@ -292,7 +292,7 @@ describe("Events API observed queries", function () {
         });
     });
 
-    it("notifies a query with PREFIX and BASE declarations", function (done) {
+    it("should notify a query with PREFIX and BASE declarations", function (done) {
         withStore(function (store) {
             var query = "BASE <http://a/dir/> PREFIX ex: <http://example/> SELECT ?o { <s> ex:p ?o }";
             var calls = [];

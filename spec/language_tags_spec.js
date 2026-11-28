@@ -15,7 +15,7 @@ describe("Language tags", function () {
         });
     };
 
-    it("parses stored literals whose tag has digits or several subtags", function (done) {
+    it("should parse stored literals whose tag has digits or several subtags", function (done) {
         new Lexicon(function (lexicon) {
             var parsed = lexicon.parseLiteral('"y"@es-419');
             expect(parsed.value).toBe("y");
@@ -35,7 +35,7 @@ describe("Language tags", function () {
         });
     });
 
-    it("returns loaded literals with a tag that has digits", function (done) {
+    it("should return loaded literals with a tag that has digits", function (done) {
         withStore('<http://b> <http://p> "y"@es-419 .', function (store) {
             store.execute("SELECT ?o (LANG(?o) AS ?l) { ?s <http://p> ?o }", function (err, results) {
                 expect(err).toBe(null);
@@ -48,7 +48,7 @@ describe("Language tags", function () {
         });
     });
 
-    it("keeps every subtag of a tag in a query", function (done) {
+    it("should keep every subtag of a tag in a query", function (done) {
         withStore('<http://b> <http://p> "y"@sr-Latn-RS .', function (store) {
             store.execute('SELECT ?s { ?s <http://p> "y"@sr-Latn-RS }', function (err, results) {
                 expect(err).toBe(null);
@@ -66,7 +66,7 @@ describe("Language tags", function () {
         });
     });
 
-    it("LANGMATCHES matches the range or the range followed by '-'", function (done) {
+    it("should match the range or the range followed by '-' with LANGMATCHES", function (done) {
         withStore(
             '<http://a> <http://p> "a"@en . <http://b> <http://p> "b"@en-GB . ' +
                 '<http://c> <http://p> "c"@eng . <http://d> <http://p> "d" .',
@@ -98,7 +98,7 @@ describe("Language tags", function () {
         );
     });
 
-    it("stores a tag from a custom parser in lower case", function (done) {
+    it("should store a tag from a custom parser in lower case", function (done) {
         withStore(null, function (store) {
             store.registerParser("x-test/lang", {
                 parse: function (data, graph, options, callback) {
@@ -127,7 +127,7 @@ describe("Language tags", function () {
         });
     });
 
-    it("keeps tag and datatype of token-form literals from a custom parser", function (done) {
+    it("should keep tag and datatype of token-form literals from a custom parser", function (done) {
         withStore(null, function (store) {
             store.registerParser("x-test/token", {
                 parse: function (data, graph, options, callback) {
@@ -169,7 +169,7 @@ describe("Language tags", function () {
         });
     });
 
-    it("finds a loaded xsd:hexBinary value in any case", function (done) {
+    it("should find a loaded xsd:hexBinary value in any case", function (done) {
         withStore('<http://b> <http://h> "0A"^^<http://www.w3.org/2001/XMLSchema#hexBinary> .', function (store) {
             store.execute(
                 'SELECT ?s { ?s <http://h> "0a"^^<http://www.w3.org/2001/XMLSchema#hexBinary> }',

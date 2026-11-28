@@ -62,7 +62,7 @@ var released = async function (store, method, arg) {
 };
 
 describe("Lexicon references", function () {
-    it("removes the terms of many deleted triples, also those in inner B-tree nodes", async function () {
+    it("should remove the terms of many deleted triples, also those in inner B-tree nodes", async function () {
         var store = await newStore();
         await store.promises.execute("INSERT DATA { " + triples(20) + " }");
         expect(await termCount(store)).toBeGreaterThan(0);
@@ -70,7 +70,7 @@ describe("Lexicon references", function () {
         expect(await termCount(store)).toBe(0);
     });
 
-    it("does not count a duplicate INSERT DATA as a reference", async function () {
+    it("should not count a duplicate INSERT DATA as a reference", async function () {
         var store = await newStore();
         await store.promises.execute("INSERT DATA { <http://s> <http://p> <http://o> }");
         await store.promises.execute("INSERT DATA { <http://s> <http://p> <http://o> }");
@@ -78,7 +78,7 @@ describe("Lexicon references", function () {
         expect(await termCount(store)).toBe(0);
     });
 
-    it("does not count a duplicate loaded triple as a reference", async function () {
+    it("should not count a duplicate loaded triple as a reference", async function () {
         var store = await newStore();
         var data = '<http://s> <http://p> "o" .\n<http://s> <http://p> "o" .';
         await store.promises.load("text/turtle", data);
@@ -87,7 +87,7 @@ describe("Lexicon references", function () {
         expect(await termCount(store)).toBe(0);
     });
 
-    it("keeps the terms another triple still uses", async function () {
+    it("should keep the terms another triple still uses", async function () {
         var store = await newStore();
         await store.promises.execute('INSERT DATA { <http://s> <http://p> "a" . <http://s> <http://p> "b" }');
         await store.promises.execute('DELETE DATA { <http://s> <http://p> "a" }');
@@ -98,7 +98,7 @@ describe("Lexicon references", function () {
         expect(await termCount(store)).toBe(0);
     });
 
-    it("does not use up an OID when it removes a literal", async function () {
+    it("should not use up an OID when it removes a literal", async function () {
         var store = await newStore();
         await store.promises.execute('INSERT DATA { <http://s> <http://p> "a" }');
         var before = store.engine.lexicon.oidCounter;
@@ -115,7 +115,7 @@ describe("Lexicon references", function () {
             return parts.join(" ");
         };
 
-        it("registers a graph once, and removes it with its last triple", async function () {
+        it("should register a graph once, and remove it with its last triple", async function () {
             var store = await newStore();
             await store.promises.execute("INSERT DATA { " + graphData(10) + " }");
             await store.promises.execute("INSERT DATA { " + graphData(10, "http://o2") + " }");
@@ -128,7 +128,7 @@ describe("Lexicon references", function () {
             expect(await termCount(store)).toBe(0);
         });
 
-        it("keeps an empty graph listed while its IRI is used elsewhere", async function () {
+        it("should keep an empty graph listed while its IRI is used elsewhere", async function () {
             var store = await newStore();
             await store.promises.execute(
                 "INSERT DATA { <http://g> <http://p> <http://o> . GRAPH <http://g> { <http://s> <http://p> <http://o> } }",
@@ -137,7 +137,7 @@ describe("Lexicon references", function () {
             expect(await registeredGraphs(store)).toEqual(["http://g"]);
         });
 
-        it("does not register the graph of a DELETE DATA that removes nothing", async function () {
+        it("should not register the graph of a DELETE DATA that removes nothing", async function () {
             var store = await newStore();
             await store.promises.execute("INSERT DATA { <http://x> <http://p> <http://o> }");
             await store.promises.execute("DELETE DATA { GRAPH <http://x> { <http://s> <http://p> <http://o> } }");
@@ -146,7 +146,7 @@ describe("Lexicon references", function () {
         });
 
         ["CLEAR NAMED", "CLEAR ALL", "DROP ALL"].forEach(function (update) {
-            it("runs " + update + " on graphs whose IRIs it removes", async function () {
+            it("should run " + update + " on graphs whose IRIs it removes", async function () {
                 var store = await newStore();
                 await store.promises.execute("INSERT DATA { " + graphData(5) + " }");
                 await store.promises.execute(update);
@@ -157,7 +157,7 @@ describe("Lexicon references", function () {
     });
 
     describe("of subscriptions", function () {
-        it("keeps a subscribed IRI, so the subscription matches after its triple is deleted and re-inserted", async function () {
+        it("should keep a subscribed IRI, so the subscription matches after its triple is deleted and re-inserted", async function () {
             var store = await newStore();
             var events = [];
             await new Promise(function (resolve) {
@@ -178,7 +178,7 @@ describe("Lexicon references", function () {
             expect(events).toEqual(["added", "deleted", "added"]);
         });
 
-        it("keeps an observed query's IRIs, so it sees a triple re-inserted after its delete", async function () {
+        it("should keep an observed query's IRIs, so it sees a triple re-inserted after its delete", async function () {
             var store = await newStore();
             var results = [];
             await new Promise(function (resolve) {
@@ -196,7 +196,7 @@ describe("Lexicon references", function () {
             expect(results[results.length - 1]).toBe(1);
         });
 
-        it("releases a subscribed IRI on unsubscribe", async function () {
+        it("should release a subscribed IRI on unsubscribe", async function () {
             var store = await newStore();
             var listener = function () {};
             await subscribe(store, "http://s", listener);
@@ -205,7 +205,7 @@ describe("Lexicon references", function () {
             expect(await termCount(store)).toBe(0);
         });
 
-        it("keeps an IRI another listener still subscribes to", async function () {
+        it("should keep an IRI another listener still subscribes to", async function () {
             var store = await newStore();
             var events = [];
             var first = function () {};
@@ -223,7 +223,7 @@ describe("Lexicon references", function () {
             expect(await termCount(store)).toBe(0);
         });
 
-        it("keeps the terms of a stored triple after unsubscribe", async function () {
+        it("should keep the terms of a stored triple after unsubscribe", async function () {
             var store = await newStore();
             var listener = function () {};
             await subscribe(store, "http://s", listener);
@@ -235,7 +235,7 @@ describe("Lexicon references", function () {
             expect(await termCount(store)).toBe(0);
         });
 
-        it("releases the terms of an observed query, also when it is observed twice", async function () {
+        it("should release the terms of an observed query, also when it is observed twice", async function () {
             var store = await newStore();
             var query = 'SELECT ?s { ?s <http://p> "a" . ?s <http://q> <http://o> }';
             await observeQuery(store, query);
@@ -245,7 +245,7 @@ describe("Lexicon references", function () {
             expect(await termCount(store)).toBe(0);
         });
 
-        it("releases the IRI of an observed node", async function () {
+        it("should release the IRI of an observed node", async function () {
             var store = await newStore();
             var listener = await observeNode(store, "http://s");
             expect(await termCount(store)).toBeGreaterThan(0);
@@ -253,7 +253,7 @@ describe("Lexicon references", function () {
             expect(await termCount(store)).toBe(0);
         });
 
-        it("releases nothing more when a listener is removed twice", async function () {
+        it("should release nothing more when a listener is removed twice", async function () {
             var store = await newStore();
             var listener = function () {};
             var query = "SELECT ?o { <http://s> <http://p> ?o }";
@@ -271,7 +271,7 @@ describe("Lexicon references", function () {
             expect(await termCount(store)).toBe(0);
         });
 
-        it("keeps a stopped listener's terms until the next update or load", async function () {
+        it("should keep a stopped listener's terms until the next update or load", async function () {
             var store = await newStore();
             var listener = function () {};
             await subscribe(store, "http://s", listener);
@@ -281,7 +281,7 @@ describe("Lexicon references", function () {
             expect(await termCount(store)).toBe(0);
         });
 
-        it("drops a subscription that is unsubscribed before it is set up", async function () {
+        it("should drop a subscription that is unsubscribed before it is set up", async function () {
             var store = await newStore();
             var events = [];
             var listener = function (event) {
@@ -300,7 +300,7 @@ describe("Lexicon references", function () {
             expect(events).toEqual([]);
         });
 
-        it("keeps the term of an INSERT right after unsubscribe", async function () {
+        it("should keep the term of an INSERT right after unsubscribe", async function () {
             // the tree sizes vary the B-tree depth, and with it how the two operations would interleave
             for (var size of [0, 1, 3, 7, 15, 30, 60, 120]) {
                 var store = await newStore();
