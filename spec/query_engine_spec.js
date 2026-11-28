@@ -259,11 +259,8 @@ describe("QueryEngine", function () {
                 await execute(engine, "PREFIX : <http://example/> INSERT DATA { :a :p :b . :b :p :c }");
 
                 for (var pattern of patterns) {
-                    var err = null;
-                    await execute(engine, "PREFIX : <http://example/> SELECT ?s ?o { " + pattern + " }").catch(
-                        function (e) {
-                            err = e;
-                        },
+                    var err = await rejection(
+                        execute(engine, "PREFIX : <http://example/> SELECT ?s ?o { " + pattern + " }"),
                     );
                     expect(pattern + ": " + (err == null ? "no error" : err.name)).toBe(
                         pattern + ": NonSupportedSparqlFeatureError",
@@ -2104,13 +2101,13 @@ describe("QueryEngine", function () {
             var err = await rejection(
                 execute(engine, "PREFIX : <http://example/> SELECT * { ?s a ?class } GROUP BY ?class"),
             );
-            expect(err.message).toBe("Incompatible Group and Projection variables");
+            expect(err && err.message).toBe("Incompatible Group and Projection variables");
 
             // an aggregate in ORDER BY groups the solutions, so ?class must be grouped
             err = await rejection(
                 execute(engine, "PREFIX : <http://example/> SELECT ?class { ?s a ?class } ORDER BY DESC(COUNT(?s))"),
             );
-            expect(err.message).toBe("Incompatible Group and Projection variables");
+            expect(err && err.message).toBe("Incompatible Group and Projection variables");
 
             // ?s is neither grouped nor aggregated
             err = await rejection(
@@ -2119,17 +2116,17 @@ describe("QueryEngine", function () {
                     "PREFIX : <http://example/> SELECT ?class { ?s a ?class } GROUP BY ?class HAVING (BOUND(?s))",
                 ),
             );
-            expect(err.message).toBe("Variable ?s is neither grouped nor aggregated");
+            expect(err && err.message).toBe("Variable ?s is neither grouped nor aggregated");
 
             err = await rejection(
                 execute(engine, "PREFIX : <http://example/> SELECT ?class { ?s a ?class } GROUP BY ?class ORDER BY ?s"),
             );
-            expect(err.message).toBe("Variable ?s is neither grouped nor aggregated");
+            expect(err && err.message).toBe("Variable ?s is neither grouped nor aggregated");
 
             err = await rejection(
                 execute(engine, "PREFIX : <http://example/> SELECT (STR(?s) AS ?x) { ?s a ?class } GROUP BY ?class"),
             );
-            expect(err.message).toBe("Variable ?s is neither grouped nor aggregated");
+            expect(err && err.message).toBe("Variable ?s is neither grouped nor aggregated");
 
             err = await rejection(
                 execute(
@@ -2137,7 +2134,7 @@ describe("QueryEngine", function () {
                     "PREFIX : <http://example/> CONSTRUCT { ?class a ?class } WHERE { ?s a ?class } GROUP BY ?class HAVING (COUNT(?s) > 100)",
                 ),
             );
-            expect(err.name).toBe("NonSupportedSparqlFeatureError");
+            expect(err && err.name).toBe("NonSupportedSparqlFeatureError");
 
             err = await rejection(
                 execute(
@@ -2145,7 +2142,7 @@ describe("QueryEngine", function () {
                     "PREFIX : <http://example/> CONSTRUCT { ?class a ?class } WHERE { ?s a ?class } GROUP BY ?class",
                 ),
             );
-            expect(err.name).toBe("NonSupportedSparqlFeatureError");
+            expect(err && err.name).toBe("NonSupportedSparqlFeatureError");
         });
 
         it("should evaluate aggregates inside the expressions of a grouped query (GroupByAggregatesInsideExpressions)", async function () {

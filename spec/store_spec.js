@@ -1060,6 +1060,8 @@ describe("Store", function () {
             await store.promises.execute(
                 "INSERT DATA {  <http://example/book> <http://example.com/vocab#title2> <http://test.com/example3> }",
             );
+            expect(counter).toBe(3);
+
             await store.promises.close();
         });
     });
