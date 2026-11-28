@@ -3,8 +3,6 @@ var fs = require("fs");
 var _ = require("lodash");
 var async = require("async");
 
-// basic
-
 describe("QueryEngine", function () {
     // "local name=value^^type" (type only for typed literals, "-" for unbound) for the given variables, in result order
     var termRows = function (results, vars) {
@@ -301,6 +299,51 @@ describe("QueryEngine", function () {
                     ],
                     done,
                 );
+            });
+
+            it("should report unsupported property paths (UnsupportedPropertyPaths)", function (done) {
+                newEngine(function (engine) {
+                    // the other paths are supported, see property_paths_spec.js
+                    var patterns = [
+                        "?s :p{2} ?o",
+                        "?s !:p ?o",
+                        "?s (:p/:p){1,2} ?o",
+                        // inside EXISTS
+                        "?s :p ?o FILTER EXISTS { ?o :p{2} ?x }",
+                    ];
+
+                    engine.execute(
+                        "PREFIX : <http://example/> INSERT DATA { :a :p :b . :b :p :c }",
+                        function (err, result) {
+                            expect(err).toBeNull();
+                            async.eachSeries(
+                                patterns,
+                                function (pattern, k) {
+                                    engine.execute(
+                                        "PREFIX : <http://example/> SELECT ?s ?o { " + pattern + " }",
+                                        function (err, results) {
+                                            expect(pattern + ": " + (err == null ? "no error" : err.name)).toBe(
+                                                pattern + ": NonSupportedSparqlFeatureError",
+                                            );
+                                            k();
+                                        },
+                                    );
+                                },
+                                function () {
+                                    // sequences, also with groups, are supported
+                                    engine.execute(
+                                        "PREFIX : <http://example/> SELECT ?s ?o { ?s :p/(:p) ?o }",
+                                        function (err, results) {
+                                            expect(err).toBeNull();
+                                            expect(termRows(results || [], ["s", "o"])).toEqual(["s=a o=c"]);
+                                            done();
+                                        },
+                                    );
+                                },
+                            );
+                        },
+                    );
+                });
             });
         });
 
@@ -1324,51 +1367,6 @@ describe("QueryEngine", function () {
                         },
                     );
                 });
-            });
-        });
-
-        it("should report unsupported property paths (UnsupportedPropertyPaths)", function (done) {
-            newEngine(function (engine) {
-                // the other paths are supported, see property_paths_spec.js
-                var patterns = [
-                    "?s :p{2} ?o",
-                    "?s !:p ?o",
-                    "?s (:p/:p){1,2} ?o",
-                    // inside EXISTS
-                    "?s :p ?o FILTER EXISTS { ?o :p{2} ?x }",
-                ];
-
-                engine.execute(
-                    "PREFIX : <http://example/> INSERT DATA { :a :p :b . :b :p :c }",
-                    function (err, result) {
-                        expect(err).toBeNull();
-                        async.eachSeries(
-                            patterns,
-                            function (pattern, k) {
-                                engine.execute(
-                                    "PREFIX : <http://example/> SELECT ?s ?o { " + pattern + " }",
-                                    function (err, results) {
-                                        expect(pattern + ": " + (err == null ? "no error" : err.name)).toBe(
-                                            pattern + ": NonSupportedSparqlFeatureError",
-                                        );
-                                        k();
-                                    },
-                                );
-                            },
-                            function () {
-                                // sequences, also with groups, are supported
-                                engine.execute(
-                                    "PREFIX : <http://example/> SELECT ?s ?o { ?s :p/(:p) ?o }",
-                                    function (err, results) {
-                                        expect(err).toBeNull();
-                                        expect(termRows(results || [], ["s", "o"])).toEqual(["s=a o=c"]);
-                                        done();
-                                    },
-                                );
-                            },
-                        );
-                    },
-                );
             });
         });
 

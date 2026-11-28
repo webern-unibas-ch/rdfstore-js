@@ -1322,6 +1322,38 @@ describe("Store", function () {
                 );
             });
         });
+
+        it("should evaluate a custom function in a BIND expression", function (done) {
+            new Store.Store({ name: "test", overwrite: false }, function (err, store) {
+                store.load(
+                    "text/n3",
+                    "@prefix test: <http://test.com/> .\
+                 test:A test:prop 5.\
+                 test:B test:prop 4.\
+                 test:C test:prop 1.\
+                 test:D test:prop 3.",
+                    function (err) {
+                        store.registerCustomFunction("http://test.com/my_default_value", function (engine, args) {
+                            return {
+                                token: "literal",
+                                value: "test_value",
+                                type: "http://www.w3.org/2001/XMLSchema#string",
+                            };
+                        });
+                        store.execute(
+                            "PREFIX test: <http://test.com/> SELECT * { OPTIONAL { ?x test:prop ?v1 . BIND(test:my_default_value(?v1) AS ?default_value) } }",
+                            function (err, results) {
+                                expect(results.length).toBe(4);
+                                for (var i = 0; i < results.length; i++) {
+                                    expect(results[i].default_value.value).toBe("test_value");
+                                }
+                                done();
+                            },
+                        );
+                    },
+                );
+            });
+        });
     });
 
     describe("filters", function () {
@@ -1455,38 +1487,6 @@ describe("Store", function () {
                         done();
                     });
                 });
-            });
-        });
-
-        it("should evaluate custom functions in BIND expressions", function (done) {
-            new Store.Store({ name: "test", overwrite: false }, function (err, store) {
-                store.load(
-                    "text/n3",
-                    "@prefix test: <http://test.com/> .\
-                 test:A test:prop 5.\
-                 test:B test:prop 4.\
-                 test:C test:prop 1.\
-                 test:D test:prop 3.",
-                    function (err) {
-                        store.registerCustomFunction("http://test.com/my_default_value", function (engine, args) {
-                            return {
-                                token: "literal",
-                                value: "test_value",
-                                type: "http://www.w3.org/2001/XMLSchema#string",
-                            };
-                        });
-                        store.execute(
-                            "PREFIX test: <http://test.com/> SELECT * { OPTIONAL { ?x test:prop ?v1 . BIND(test:my_default_value(?v1) AS ?default_value) } }",
-                            function (err, results) {
-                                expect(results.length).toBe(4);
-                                for (var i = 0; i < results.length; i++) {
-                                    expect(results[i].default_value.value).toBe("test_value");
-                                }
-                                done();
-                            },
-                        );
-                    },
-                );
             });
         });
     });

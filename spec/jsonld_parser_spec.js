@@ -1,7 +1,7 @@
 var JSONLDParser = require("../src/jsonld_parser").JSONLDParser;
 
 describe("JSONLDParser#parse", function () {
-    it("should coerce values to IRIs by the default context", function (done) {
+    it("should coerce values to IRIs by the context placed after the properties", function (done) {
         var input = {
             "@type": "foaf:Person",
             "foaf:name": "Manu Sporny",
@@ -27,7 +27,7 @@ describe("JSONLDParser#parse", function () {
                 } else if (triple.predicate.value === "http://xmlns.com/foaf/0.1/name") {
                     expect(triple.object.literal).toBe('"Manu Sporny"^^<http://www.w3.org/2001/XMLSchema#string>');
                 } else if (triple.predicate.value === "http://xmlns.com/foaf/0.1/homepage") {
-                    // uri because of default context coercion
+                    // uri because of the context's @id coercion
                     expect(triple.object.value).toBe("http://manu.sporny.org/");
                 } else if (triple.predicate.value === "http://rdfs.org/sioc/ns#avatar") {
                     expect(triple.object.value).toBe("http://twitter.com/account/profile_image/manusporny");
@@ -39,7 +39,7 @@ describe("JSONLDParser#parse", function () {
         });
     });
 
-    it("should coerce values to IRIs by the @id coercion of the context", function (done) {
+    it("should coerce values to IRIs and keep an uncoerced property a literal", function (done) {
         var input = {
             "@context": {
                 foaf: "http://xmlns.com/foaf/0.1/",
