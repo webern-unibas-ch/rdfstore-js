@@ -3,6 +3,7 @@
 const QueryEngine = require("../../src/query_engine").QueryEngine;
 const QuadBackend = require("../../src/quad_backend").QuadBackend;
 const Lexicon = require("../../src/lexicon").Lexicon;
+const Utils = require("../../src/utils");
 
 /**
  * Builds an in-memory query engine (Lexicon + QuadBackend) and hands it to the callback.
@@ -42,4 +43,31 @@ function countLexiconTerms(lexicon, callback) {
     })(0);
 }
 
-module.exports = { newEngine, countLexiconTerms };
+/**
+ * Promise form of newEngine: resolves with a new in-memory query engine.
+ */
+function createEngine(options) {
+    return new Promise(function (resolve) {
+        newEngine(options || {}, resolve);
+    });
+}
+
+/**
+ * Runs engine.execute and resolves with its result, or rejects with its error.
+ */
+function execute(engine, query, defaultDataset, namedDataset) {
+    return Utils.toPromise(function (cb) {
+        engine.execute(query, cb, defaultDataset, namedDataset);
+    });
+}
+
+/**
+ * Promise form of countLexiconTerms.
+ */
+function lexiconTermCount(lexicon) {
+    return new Promise(function (resolve) {
+        countLexiconTerms(lexicon, resolve);
+    });
+}
+
+module.exports = { newEngine, countLexiconTerms, createEngine, execute, lexiconTermCount };

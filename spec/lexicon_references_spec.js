@@ -1,5 +1,5 @@
 var rdfstore = require("../src/store");
-var countLexiconTerms = require("./helpers/engine").countLexiconTerms;
+var lexiconTermCount = require("./helpers/engine").lexiconTermCount;
 
 // The lexicon counts how many quads (and subscriptions) use each URI and literal, and removes a term
 // once nothing uses it anymore. Its B-trees have order 2, so after a few inserts most terms sit in inner nodes.
@@ -9,9 +9,7 @@ var newStore = function (options) {
 };
 
 var termCount = function (store) {
-    return new Promise(function (resolve) {
-        countLexiconTerms(store.engine.lexicon, resolve);
-    });
+    return lexiconTermCount(store.engine.lexicon);
 };
 
 var registeredGraphs = function (store) {
