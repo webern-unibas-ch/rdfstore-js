@@ -1,11 +1,12 @@
 var RDFModel = require("../src/rdf_model");
-var { newEngine } = require("./helpers/engine");
+var { createEngine, execute } = require("./helpers/engine");
 
 describe("RDFModel", function () {
-    it("should filter graphs", function (done) {
-        newEngine(function (engine) {
-            var query =
-                'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
+    it("should filter graphs", async function () {
+        var engine = await createEngine();
+
+        var query =
+            'PREFIX foaf: <http://xmlns.com/foaf/0.1/>\
                          PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
                          PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
                          PREFIX : <http://example.org/people/>\
@@ -24,47 +25,42 @@ describe("RDFModel", function () {
                              foaf:mbox       <mailto:bob@home> \
                              .\
                          }';
-            engine.execute(query, function (err, result) {
-                expect(err).toBe(null);
-                engine.execute(
-                    "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
+        await execute(engine, query);
+
+        var graph = await execute(
+            engine,
+            "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
                                 PREFIX  foaf:       <http://xmlns.com/foaf/0.1/>\
                                 CONSTRUCT { ?s ?p ?o . }\
                                 WHERE {\
                                   ?s ?p ?o .\
                                 }",
-                    function (err, graph) {
-                        expect(err).toBe(null);
-                        expect(graph.length).toBe(9);
+        );
+        expect(graph.length).toBe(9);
 
-                        var rdf = RDFModel.rdf;
+        var rdf = RDFModel.rdf;
 
-                        var results = graph.filter(rdf.filters.describes("http://example.org/people/alice"));
+        var results = graph.filter(rdf.filters.describes("http://example.org/people/alice"));
 
-                        var resultsCount = results.toArray().length;
+        var resultsCount = results.toArray().length;
 
-                        var resultsSubject = results.filter(rdf.filters.s("http://example.org/people/alice"));
-                        var resultsObject = results.filter(rdf.filters.o("http://example.org/people/alice"));
+        var resultsSubject = results.filter(rdf.filters.s("http://example.org/people/alice"));
+        var resultsObject = results.filter(rdf.filters.o("http://example.org/people/alice"));
 
-                        expect(resultsObject.toArray().length).toBe(1);
-                        expect(resultsObject.toArray().length + resultsSubject.toArray().length).toBe(resultsCount);
+        expect(resultsObject.toArray().length).toBe(1);
+        expect(resultsObject.toArray().length + resultsSubject.toArray().length).toBe(resultsCount);
 
-                        // filter the graph to find all subjects with an "rdf:type" of "foaf:Person"
-                        var filter = rdf.filters.type(rdf.resolve("foaf:Person"));
-                        results = graph.filter(filter);
-                        var people = [];
-                        results.forEach(function (t) {
-                            // iterate over the results, creating a filtered graph for each subject found
-                            // and pass that graph to a display function
-                            people.push(graph.filter(rdf.filters.s(t.subject)));
-                        });
-
-                        expect(people.length).toBe(2);
-                        done();
-                    },
-                );
-            });
+        // filter the graph to find all subjects with an "rdf:type" of "foaf:Person"
+        var filter = rdf.filters.type(rdf.resolve("foaf:Person"));
+        results = graph.filter(filter);
+        var people = [];
+        results.forEach(function (t) {
+            // iterate over the results, creating a filtered graph for each subject found
+            // and pass that graph to a display function
+            people.push(graph.filter(rdf.filters.s(t.subject)));
         });
+
+        expect(people.length).toBe(2);
     });
 
     it("should add actions to a graph", function () {

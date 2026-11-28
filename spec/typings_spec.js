@@ -33,11 +33,8 @@ describe("TypeScript declarations", function () {
         expect(declaredMethods("export declare class Store")).toEqual(runtime);
     });
 
-    it("should declare every store.promises method", function (done) {
-        rdfstore.create(function (err, store) {
-            expect(err).toBe(null);
-            expect(declaredMethods("export interface StorePromises")).toEqual(Object.keys(store.promises).sort());
-            done();
-        });
+    it("should declare every store.promises method", async function () {
+        var store = await rdfstore.promises.create();
+        expect(declaredMethods("export interface StorePromises")).toEqual(Object.keys(store.promises).sort());
     });
 });

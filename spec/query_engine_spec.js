@@ -1,7 +1,5 @@
-var { newEngine, countLexiconTerms } = require("./helpers/engine");
+var { createEngine, execute, lexiconTermCount, rejection } = require("./helpers/engine");
 var fs = require("fs");
-var _ = require("lodash");
-var async = require("async");
 
 describe("QueryEngine", function () {
     // "local name=value^^type" (type only for typed literals, "-" for unbound) for the given variables, in result order
@@ -27,39 +25,33 @@ describe("QueryEngine", function () {
     // inserts the data into a new engine, then runs each [query, variables, expected termRows] in order;
     // without variables (null) the raw result is compared, a function instead of variables checks the results,
     // a query alone is only run
-    var checkQueries = function (data, cases, done) {
-        newEngine(function (engine) {
-            engine.execute(
-                "PREFIX : <http://example/> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> INSERT DATA { " +
-                    data +
-                    " }",
-                function (err, result) {
-                    expect(err).toBeNull();
-                    async.eachSeries(
-                        cases,
-                        function (testCase, k) {
-                            engine.execute(
-                                "PREFIX : <http://example/> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> " +
-                                    testCase[0],
-                                function (err, results) {
-                                    expect(err).withContext(testCase[0]).toBeNull();
-                                    if (typeof testCase[1] === "function") {
-                                        testCase[1](results || [], testCase[0]);
-                                    } else if (testCase.length > 1) {
-                                        expect(testCase[1] == null ? results : termRows(results || [], testCase[1]))
-                                            .withContext(testCase[0])
-                                            .toEqual(testCase[2]);
-                                    }
-                                    k();
-                                },
-                            );
-                        },
-                        function () {
-                            done();
-                        },
-                    );
-                },
-            );
+    var checkQueries = async function (data, cases) {
+        var engine = await createEngine();
+        await execute(
+            engine,
+            "PREFIX : <http://example/> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> INSERT DATA { " + data + " }",
+        );
+        for (var testCase of cases) {
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> " + testCase[0],
+            ).catch(function (err) {
+                fail(testCase[0] + ": " + err);
+            });
+            if (typeof testCase[1] === "function") {
+                testCase[1](results || [], testCase[0]);
+            } else if (testCase.length > 1) {
+                expect(testCase[1] == null ? results : termRows(results || [], testCase[1]))
+                    .withContext(testCase[0])
+                    .toEqual(testCase[2]);
+            }
+        }
+    };
+
+    // resolves with the registered graphs of the lexicon
+    var registeredGraphs = function (lexicon) {
+        return new Promise(function (resolve) {
+            lexicon.registeredGraphs(true, resolve);
         });
     };
 
@@ -76,317 +68,251 @@ describe("QueryEngine", function () {
                     labels.push(result[v] && result[v].value);
                 });
             });
-            expect(_.uniq(labels).length).withContext(query).toBe(labels.length);
+            expect(new Set(labels).size).withContext(query).toBe(labels.length);
         };
     };
 
     describe("parsing and prologue", function () {
-        it("should resolve an empty prefix against BASE", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    'PREFIX ns: <http://example.org/ns#>  PREFIX x:  <http://example.org/x/> PREFIX z:  <http://example.org/x/#> INSERT DATA { x:x ns:p  "d:x ns:p" . x:x x:p   "x:x x:p" . z:x z:p   "z:x z:p" . }',
-                    function (err, result) {
-                        expect(err).toBeNull();
-                        engine.execute(
-                            "BASE <http://example.org/x/> PREFIX : <> SELECT * WHERE { :x ?p ?v }",
-                            function (err, results) {
-                                expect(err).toBeNull();
-                                expect(results.length).toBe(2);
+        it("should resolve an empty prefix against BASE", async function () {
+            var engine = await createEngine();
 
-                                for (var i = 0; i < results.length; i++) {
-                                    var result = results[i];
-                                    if (result.p.value === "http://example.org/ns#p") {
-                                        expect(result.v.value).toBe("d:x ns:p");
-                                    } else if (result.p.value === "http://example.org/x/p") {
-                                        expect(result.v.value).toBe("x:x x:p");
-                                    } else {
-                                        fail("unexpected predicate " + result.p.value);
-                                    }
-                                }
-                                done();
-                            },
-                        );
-                    },
-                );
-            });
-        });
-
-        it("should expand prefixed names in INSERT DATA (PrefixInsertion)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    'PREFIX ns: <http://example.org/ns#>  PREFIX x:  <http://example.org/x/> PREFIX z:  <http://example.org/x/#> INSERT DATA { x:x ns:p  "d:x ns:p" . x:x x:p   "x:x x:p" . z:x z:p   "z:x z:p" . }',
-                    function (err, result) {
-                        engine.execute("SELECT * { ?s ?p ?o }", function (err, results) {
-                            expect(results.length).toBe(3);
-
-                            for (var i = 0; i < results.length; i++) {
-                                if (results[i].s.value === "http://example.org/x/x") {
-                                    if (results[i].p.value === "http://example.org/ns#p") {
-                                        expect(results[i].o.value).toBe("d:x ns:p");
-                                    } else if (results[i].p.value === "http://example.org/x/p") {
-                                        expect(results[i].o.value).toBe("x:x x:p");
-                                    } else {
-                                        fail("unexpected solution");
-                                    }
-                                } else if (results[i].s.value === "http://example.org/x/#x") {
-                                    expect(results[i].p.value).toBe("http://example.org/x/#p");
-                                    expect(results[i].o.value).toBe("z:x z:p");
-                                } else {
-                                    fail("unexpected solution");
-                                }
-                            }
-
-                            done();
-                        });
-                    },
-                );
-            });
-        });
-
-        it("should accept BASE and PREFIX in any order (PrologueOrder)", function (done) {
-            // BASE and PREFIX in any order (checkQueries puts PREFIX declarations first); the IRIs after the last BASE resolve against it
-            checkQueries(
-                ":a :p 1",
-                [
-                    ["BASE <http://example/> SELECT ?o { <a> :p ?o }", ["o"], ["o=1^^integer"]],
-                    [
-                        "BASE <http://other/> PREFIX q: <http://example/> BASE <http://example/> SELECT ?o { <a> q:p ?o }",
-                        ["o"],
-                        ["o=1^^integer"],
-                    ],
-                ],
-                done,
+            await execute(
+                engine,
+                'PREFIX ns: <http://example.org/ns#>  PREFIX x:  <http://example.org/x/> PREFIX z:  <http://example.org/x/#> INSERT DATA { x:x ns:p  "d:x ns:p" . x:x x:p   "x:x x:p" . z:x z:p   "z:x z:p" . }',
             );
+
+            var results = await execute(engine, "BASE <http://example.org/x/> PREFIX : <> SELECT * WHERE { :x ?p ?v }");
+            expect(results.length).toBe(2);
+
+            for (var i = 0; i < results.length; i++) {
+                var result = results[i];
+                if (result.p.value === "http://example.org/ns#p") {
+                    expect(result.v.value).toBe("d:x ns:p");
+                } else if (result.p.value === "http://example.org/x/p") {
+                    expect(result.v.value).toBe("x:x x:p");
+                } else {
+                    fail("unexpected predicate " + result.p.value);
+                }
+            }
         });
 
-        it("should match keywords in any case (MixedCaseKeywords)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    "prefix : <http://example/> insert data { :b :p 2 . :c :p 3 . :c :q 4 }",
-                    function (err, result) {
-                        expect(err).toBeNull();
-                        engine.execute(
-                            "Prefix : <http://example/> Select Distinct ?s (Count(?v) As ?n) Where { ?s :p ?v Optional { ?s :q ?w } Filter(?v > 1) } Group By ?s Having (Count(?v) > 0) Order By Desc(?s) Limit 5",
-                            function (err, results) {
-                                expect(err).toBeNull();
-                                expect(termRows(results, ["s", "n"])).toEqual(["s=c n=1^^integer", "s=b n=1^^integer"]);
-                                done();
-                            },
-                        );
-                    },
-                );
-            });
+        it("should expand prefixed names in INSERT DATA (PrefixInsertion)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                'PREFIX ns: <http://example.org/ns#>  PREFIX x:  <http://example.org/x/> PREFIX z:  <http://example.org/x/#> INSERT DATA { x:x ns:p  "d:x ns:p" . x:x x:p   "x:x x:p" . z:x z:p   "z:x z:p" . }',
+            );
+
+            var results = await execute(engine, "SELECT * { ?s ?p ?o }");
+            expect(results.length).toBe(3);
+
+            for (var i = 0; i < results.length; i++) {
+                if (results[i].s.value === "http://example.org/x/x") {
+                    if (results[i].p.value === "http://example.org/ns#p") {
+                        expect(results[i].o.value).toBe("d:x ns:p");
+                    } else if (results[i].p.value === "http://example.org/x/p") {
+                        expect(results[i].o.value).toBe("x:x x:p");
+                    } else {
+                        fail("unexpected solution");
+                    }
+                } else if (results[i].s.value === "http://example.org/x/#x") {
+                    expect(results[i].p.value).toBe("http://example.org/x/#p");
+                    expect(results[i].o.value).toBe("z:x z:p");
+                } else {
+                    fail("unexpected solution");
+                }
+            }
         });
 
-        it("should read double literals and compute with them (DoubleLiterals)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    "PREFIX : <http://example/> INSERT DATA { :a :p 2e1 . :b :p 1.0e0 }",
-                    function (err, result) {
-                        expect(err).toBeNull();
-                        engine.execute(
-                            "PREFIX : <http://example/> SELECT ?s ?v (?v + 1e0 AS ?x) { ?s :p ?v } ORDER BY ?s",
-                            function (err, results) {
-                                expect(err).toBeNull();
-                                expect(termRows(results, ["s", "v", "x"])).toEqual([
-                                    "s=a v=2e1^^double x=21^^double",
-                                    "s=b v=1.0e0^^double x=2^^double",
-                                ]);
-                                engine.execute(
-                                    "PREFIX : <http://example/> SELECT ?s { ?s :p 1.0e0 }",
-                                    function (err, results) {
-                                        expect(err).toBeNull();
-                                        expect(termRows(results, ["s"])).toEqual(["s=b"]);
-                                        done();
-                                    },
-                                );
-                            },
-                        );
-                    },
-                );
-            });
+        it("should accept BASE and PREFIX in any order (PrologueOrder)", async function () {
+            // BASE and PREFIX in any order (checkQueries puts PREFIX declarations first); the IRIs after the last BASE resolve against it
+            await checkQueries(":a :p 1", [
+                ["BASE <http://example/> SELECT ?o { <a> :p ?o }", ["o"], ["o=1^^integer"]],
+                [
+                    "BASE <http://other/> PREFIX q: <http://example/> BASE <http://example/> SELECT ?o { <a> q:p ?o }",
+                    ["o"],
+                    ["o=1^^integer"],
+                ],
+            ]);
+        });
+
+        it("should match keywords in any case (MixedCaseKeywords)", async function () {
+            var engine = await createEngine();
+
+            await execute(engine, "prefix : <http://example/> insert data { :b :p 2 . :c :p 3 . :c :q 4 }");
+
+            var results = await execute(
+                engine,
+                "Prefix : <http://example/> Select Distinct ?s (Count(?v) As ?n) Where { ?s :p ?v Optional { ?s :q ?w } Filter(?v > 1) } Group By ?s Having (Count(?v) > 0) Order By Desc(?s) Limit 5",
+            );
+            expect(termRows(results, ["s", "n"])).toEqual(["s=c n=1^^integer", "s=b n=1^^integer"]);
+        });
+
+        it("should read double literals and compute with them (DoubleLiterals)", async function () {
+            var engine = await createEngine();
+
+            await execute(engine, "PREFIX : <http://example/> INSERT DATA { :a :p 2e1 . :b :p 1.0e0 }");
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT ?s ?v (?v + 1e0 AS ?x) { ?s :p ?v } ORDER BY ?s",
+            );
+            expect(termRows(results, ["s", "v", "x"])).toEqual([
+                "s=a v=2e1^^double x=21^^double",
+                "s=b v=1.0e0^^double x=2^^double",
+            ]);
+
+            results = await execute(engine, "PREFIX : <http://example/> SELECT ?s { ?s :p 1.0e0 }");
+            expect(termRows(results, ["s"])).toEqual(["s=b"]);
         });
     });
 
     describe("graph patterns", function () {
         describe("basic patterns and joins", function () {
-            it("should join two triple patterns on their subject (SimpleJoin1)", function (done) {
-                newEngine(function (engine) {
-                    engine.execute(
-                        "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example>; <http://example.com/vocab#pages> 95 . <http://example/book4> <http://example.com/vocab#title> <http://test.com/example>; <http://example.com/vocab#pages> 96 . }",
-                        function (err, result) {
-                            expect(err).toBe(null);
+            it("should join two triple patterns on their subject (SimpleJoin1)", async function () {
+                var engine = await createEngine();
 
-                            engine.execute(
-                                "SELECT * { ?s <http://example.com/vocab#title> ?o . ?s <http://example.com/vocab#pages> 95 }",
-                                function (err, result) {
-                                    expect(err).toBe(null);
-                                    expect(result.length).toBe(1);
-
-                                    expect(result[0]["s"].value).toBe("http://example/book3");
-                                    done();
-                                },
-                            );
-                        },
-                    );
-                });
-            });
-
-            it("should treat an unbound variable as compatible in a join (JoinUnboundVariables)", function (done) {
-                checkQueries(
-                    ":a :p :b . :b :p :c . :a :q 1 . :t1 :r 1 . :t2 :r 2",
-                    [
-                        // an unbound variable is compatible with any value, on either side
-                        [
-                            "SELECT ?s ?x ?t { { ?s :p ?o OPTIONAL { ?s :q ?x } } { ?t :r ?x } } ORDER BY ?s ?t",
-                            ["s", "x", "t"],
-                            ["s=a x=1^^integer t=t1", "s=b x=1^^integer t=t1", "s=b x=2^^integer t=t2"],
-                        ],
-                        [
-                            "SELECT ?s ?x { { ?s :q ?x } { ?s :p ?o OPTIONAL { ?s :zz ?x } } }",
-                            ["s", "x"],
-                            ["s=a x=1^^integer"],
-                        ],
-                        // BIND results join as RDF terms
-                        [
-                            "SELECT ?k { { :a :p ?o BIND(STR(?o) AS ?k) } { ?s :p ?o2 BIND(STR(?o2) AS ?k) } }",
-                            ["k"],
-                            ["k=b"],
-                        ],
-                    ],
-                    done,
+                await execute(
+                    engine,
+                    "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example>; <http://example.com/vocab#pages> 95 . <http://example/book4> <http://example.com/vocab#title> <http://test.com/example>; <http://example.com/vocab#pages> 96 . }",
                 );
+
+                var result = await execute(
+                    engine,
+                    "SELECT * { ?s <http://example.com/vocab#title> ?o . ?s <http://example.com/vocab#pages> 95 }",
+                );
+                expect(result.length).toBe(1);
+
+                expect(result[0]["s"].value).toBe("http://example/book3");
             });
 
-            it("should give the empty group one solution without variables (EmptyGroupPattern)", function (done) {
+            it("should treat an unbound variable as compatible in a join (JoinUnboundVariables)", async function () {
+                await checkQueries(":a :p :b . :b :p :c . :a :q 1 . :t1 :r 1 . :t2 :r 2", [
+                    // an unbound variable is compatible with any value, on either side
+                    [
+                        "SELECT ?s ?x ?t { { ?s :p ?o OPTIONAL { ?s :q ?x } } { ?t :r ?x } } ORDER BY ?s ?t",
+                        ["s", "x", "t"],
+                        ["s=a x=1^^integer t=t1", "s=b x=1^^integer t=t1", "s=b x=2^^integer t=t2"],
+                    ],
+                    [
+                        "SELECT ?s ?x { { ?s :q ?x } { ?s :p ?o OPTIONAL { ?s :zz ?x } } }",
+                        ["s", "x"],
+                        ["s=a x=1^^integer"],
+                    ],
+                    // BIND results join as RDF terms
+                    [
+                        "SELECT ?k { { :a :p ?o BIND(STR(?o) AS ?k) } { ?s :p ?o2 BIND(STR(?o2) AS ?k) } }",
+                        ["k"],
+                        ["k=b"],
+                    ],
+                ]);
+            });
+
+            it("should give the empty group one solution without variables (EmptyGroupPattern)", async function () {
                 // the empty group has one solution, without variables
-                checkQueries(
-                    ":x :p 1",
-                    [
-                        ["ASK {}", null, true],
-                        ["SELECT * {}", [], [""]],
-                        ["SELECT ?x { FILTER(true) }", ["x"], ["x=-"]],
-                        ["SELECT ?x { FILTER(false) }", ["x"], []],
-                        // ?v is not in scope inside the inner group (W3C algebra/filter-nested-2)
-                        ["SELECT ?v { :x :p ?v . { FILTER(?v = 1) } }", ["v"], []],
-                        ["SELECT * { OPTIONAL { :nothing :p ?o } }", ["o"], ["o=-"]],
-                        ["SELECT ?x { BIND(1 AS ?x) }", ["x"], ["x=1^^integer"]],
-                        ["INSERT { :n :p :m } WHERE {}"],
-                        ["SELECT ?o { :n :p ?o }", ["o"], ["o=m"]],
-                    ],
-                    done,
-                );
+                await checkQueries(":x :p 1", [
+                    ["ASK {}", null, true],
+                    ["SELECT * {}", [], [""]],
+                    ["SELECT ?x { FILTER(true) }", ["x"], ["x=-"]],
+                    ["SELECT ?x { FILTER(false) }", ["x"], []],
+                    // ?v is not in scope inside the inner group (W3C algebra/filter-nested-2)
+                    ["SELECT ?v { :x :p ?v . { FILTER(?v = 1) } }", ["v"], []],
+                    ["SELECT * { OPTIONAL { :nothing :p ?o } }", ["o"], ["o=-"]],
+                    ["SELECT ?x { BIND(1 AS ?x) }", ["x"], ["x=1^^integer"]],
+                    ["INSERT { :n :p :m } WHERE {}"],
+                    ["SELECT ?o { :n :p ?o }", ["o"], ["o=m"]],
+                ]);
             });
 
-            it("should match a blank node in a pattern like a variable that is not returned (BlankNodesInPatterns)", function (done) {
+            it("should match a blank node in a pattern like a variable that is not returned (BlankNodesInPatterns)", async function () {
                 // a blank node in a query pattern matches like a variable that is not returned
-                checkQueries(
-                    ":a :p :b . :b :p :c . :b :q :d . :e :q :d",
+                await checkQueries(":a :p :b . :b :p :c . :b :q :d . :e :q :d", [
+                    ["SELECT ?o { [ :p ?s ] :p ?o } ORDER BY ?o", ["o"], ["o=b", "o=c"]],
+                    ["SELECT ?o { _:x :p ?o } ORDER BY ?o", ["o"], ["o=b", "o=c"]],
                     [
-                        ["SELECT ?o { [ :p ?s ] :p ?o } ORDER BY ?o", ["o"], ["o=b", "o=c"]],
-                        ["SELECT ?o { _:x :p ?o } ORDER BY ?o", ["o"], ["o=b", "o=c"]],
+                        "SELECT * { _:x :q ?o }",
+                        null,
                         [
-                            "SELECT * { _:x :q ?o }",
-                            null,
-                            [
-                                { o: { token: "uri", value: "http://example/d" } },
-                                { o: { token: "uri", value: "http://example/d" } },
-                            ],
+                            { o: { token: "uri", value: "http://example/d" } },
+                            { o: { token: "uri", value: "http://example/d" } },
                         ],
-                        // only ?o is in scope, also for COUNT(DISTINCT *)
-                        ["SELECT (COUNT(DISTINCT *) AS ?c) { _:x :q ?o }", ["c"], ["c=1^^integer"]],
-                        ["SELECT ?y ?z { _:x :p ?y . _:x :q ?z }", ["y", "z"], ["y=c z=d"]],
                     ],
-                    done,
-                );
+                    // only ?o is in scope, also for COUNT(DISTINCT *)
+                    ["SELECT (COUNT(DISTINCT *) AS ?c) { _:x :q ?o }", ["c"], ["c=1^^integer"]],
+                    ["SELECT ?y ?z { _:x :p ?y . _:x :q ?z }", ["y", "z"], ["y=c z=d"]],
+                ]);
             });
 
-            it("should report unsupported property paths (UnsupportedPropertyPaths)", function (done) {
-                newEngine(function (engine) {
-                    // the other paths are supported, see property_paths_spec.js
-                    var patterns = [
-                        "?s :p{2} ?o",
-                        "?s !:p ?o",
-                        "?s (:p/:p){1,2} ?o",
-                        // inside EXISTS
-                        "?s :p ?o FILTER EXISTS { ?o :p{2} ?x }",
-                    ];
+            it("should report unsupported property paths (UnsupportedPropertyPaths)", async function () {
+                var engine = await createEngine();
 
-                    engine.execute(
-                        "PREFIX : <http://example/> INSERT DATA { :a :p :b . :b :p :c }",
-                        function (err, result) {
-                            expect(err).toBeNull();
-                            async.eachSeries(
-                                patterns,
-                                function (pattern, k) {
-                                    engine.execute(
-                                        "PREFIX : <http://example/> SELECT ?s ?o { " + pattern + " }",
-                                        function (err, results) {
-                                            expect(pattern + ": " + (err == null ? "no error" : err.name)).toBe(
-                                                pattern + ": NonSupportedSparqlFeatureError",
-                                            );
-                                            k();
-                                        },
-                                    );
-                                },
-                                function () {
-                                    // sequences, also with groups, are supported
-                                    engine.execute(
-                                        "PREFIX : <http://example/> SELECT ?s ?o { ?s :p/(:p) ?o }",
-                                        function (err, results) {
-                                            expect(err).toBeNull();
-                                            expect(termRows(results || [], ["s", "o"])).toEqual(["s=a o=c"]);
-                                            done();
-                                        },
-                                    );
-                                },
-                            );
-                        },
+                // the other paths are supported, see property_paths_spec.js
+                var patterns = [
+                    "?s :p{2} ?o",
+                    "?s !:p ?o",
+                    "?s (:p/:p){1,2} ?o",
+                    // inside EXISTS
+                    "?s :p ?o FILTER EXISTS { ?o :p{2} ?x }",
+                ];
+
+                await execute(engine, "PREFIX : <http://example/> INSERT DATA { :a :p :b . :b :p :c }");
+
+                for (var pattern of patterns) {
+                    var err = await rejection(
+                        execute(engine, "PREFIX : <http://example/> SELECT ?s ?o { " + pattern + " }"),
                     );
-                });
+                    expect(pattern + ": " + (err == null ? "no error" : err.name)).toBe(
+                        pattern + ": NonSupportedSparqlFeatureError",
+                    );
+                }
+
+                // sequences, also with groups, are supported
+                var results = await execute(engine, "PREFIX : <http://example/> SELECT ?s ?o { ?s :p/(:p) ?o }");
+                expect(termRows(results || [], ["s", "o"])).toEqual(["s=a o=c"]);
             });
         });
 
         describe("UNION", function () {
-            it("should return the solutions of both alternatives (UnionBasic1)", function (done) {
-                newEngine(function (engine) {
-                    engine.execute(
-                        " PREFIX dc10:  <http://purl.org/dc/elements/1.0/> PREFIX dc11:  <http://purl.org/dc/elements/1.1/> INSERT DATA { _:a  dc10:title     'SPARQL Query Language Tutorial' .\
+            it("should return the solutions of both alternatives (UnionBasic1)", async function () {
+                var engine = await createEngine();
+
+                await execute(
+                    engine,
+                    " PREFIX dc10:  <http://purl.org/dc/elements/1.0/> PREFIX dc11:  <http://purl.org/dc/elements/1.1/> INSERT DATA { _:a  dc10:title     'SPARQL Query Language Tutorial' .\
                                 _:a  dc10:creator   'Alice' .\
                                 _:b  dc11:title     'SPARQL Protocol Tutorial' .\
                                 _:b  dc11:creator   'Bob' .\
                                 _:c  dc10:title     'SPARQL' .\
                                 _:c  dc11:title     'SPARQL (updated)' .\
                                 }",
-                        function (err, result) {
-                            engine.execute(
-                                "PREFIX dc10:  <http://purl.org/dc/elements/1.0/>\
+                );
+
+                var results = await execute(
+                    engine,
+                    "PREFIX dc10:  <http://purl.org/dc/elements/1.0/>\
                                     PREFIX dc11:  <http://purl.org/dc/elements/1.1/>\
                                     SELECT ?title WHERE  { { ?book dc10:title  ?title } UNION { ?book dc11:title  ?title } }",
-                                function (err, results) {
-                                    expect(results.length).toBe(4);
+                );
+                expect(results.length).toBe(4);
 
-                                    var titles = [];
-                                    for (var i = 0; i < results.length; i++) {
-                                        titles.push(results[i].title.value);
-                                    }
-                                    titles.sort();
-                                    expect(titles[0]).toBe("SPARQL");
-                                    expect(titles[1]).toBe("SPARQL (updated)");
-                                    expect(titles[2]).toBe("SPARQL Protocol Tutorial");
-                                    expect(titles[3]).toBe("SPARQL Query Language Tutorial");
-                                    done();
-                                },
-                            );
-                        },
-                    );
-                });
+                var titles = [];
+                for (var i = 0; i < results.length; i++) {
+                    titles.push(results[i].title.value);
+                }
+                titles.sort();
+                expect(titles[0]).toBe("SPARQL");
+                expect(titles[1]).toBe("SPARQL (updated)");
+                expect(titles[2]).toBe("SPARQL Protocol Tutorial");
+                expect(titles[3]).toBe("SPARQL Query Language Tutorial");
             });
 
-            it("should bind a different variable in each alternative (UnionBasic2)", function (done) {
-                newEngine(function (engine) {
-                    engine.execute(
-                        " PREFIX dc10:  <http://purl.org/dc/elements/1.0/> PREFIX dc11:  <http://purl.org/dc/elements/1.1/> INSERT DATA { \
+            it("should bind a different variable in each alternative (UnionBasic2)", async function () {
+                var engine = await createEngine();
+
+                await execute(
+                    engine,
+                    " PREFIX dc10:  <http://purl.org/dc/elements/1.0/> PREFIX dc11:  <http://purl.org/dc/elements/1.1/> INSERT DATA { \
                                 _:a  dc10:title     'SPARQL Query Language Tutorial' .\
                                 _:a  dc10:creator   'Alice' .\
                                 _:b  dc11:title     'SPARQL Protocol Tutorial' .\
@@ -394,44 +320,42 @@ describe("QueryEngine", function () {
                                 _:c  dc10:title     'SPARQL' .\
                                 _:c  dc11:title     'SPARQL (updated)' .\
                                 }",
-                        function (err, result) {
-                            engine.execute(
-                                "PREFIX dc10:  <http://purl.org/dc/elements/1.0/>\
+                );
+
+                var results = await execute(
+                    engine,
+                    "PREFIX dc10:  <http://purl.org/dc/elements/1.0/>\
                                                     PREFIX dc11:  <http://purl.org/dc/elements/1.1/>\
                                                     SELECT ?x ?y\
                                                     WHERE  { { ?book dc10:title ?x } UNION { ?book dc11:title  ?y } }",
-                                function (err, results) {
-                                    expect(results.length).toBe(4);
+                );
+                expect(results.length).toBe(4);
 
-                                    var xs = [];
-                                    var ys = [];
-                                    for (var i = 0; i < results.length; i++) {
-                                        if (results[i].x == null) {
-                                            ys.push(results[i].y.value);
-                                        } else {
-                                            xs.push(results[i].x.value);
-                                        }
-                                    }
+                var xs = [];
+                var ys = [];
+                for (var i = 0; i < results.length; i++) {
+                    if (results[i].x == null) {
+                        ys.push(results[i].y.value);
+                    } else {
+                        xs.push(results[i].x.value);
+                    }
+                }
 
-                                    xs.sort();
-                                    ys.sort();
+                xs.sort();
+                ys.sort();
 
-                                    expect(xs[0]).toBe("SPARQL");
-                                    expect(xs[1]).toBe("SPARQL Query Language Tutorial");
-                                    expect(ys[0]).toBe("SPARQL (updated)");
-                                    expect(ys[1]).toBe("SPARQL Protocol Tutorial");
-                                    done();
-                                },
-                            );
-                        },
-                    );
-                });
+                expect(xs[0]).toBe("SPARQL");
+                expect(xs[1]).toBe("SPARQL Query Language Tutorial");
+                expect(ys[0]).toBe("SPARQL (updated)");
+                expect(ys[1]).toBe("SPARQL Protocol Tutorial");
             });
 
-            it("should match several triple patterns in each alternative (UnionBasic3)", function (done) {
-                newEngine(function (engine) {
-                    engine.execute(
-                        " PREFIX dc10:  <http://purl.org/dc/elements/1.0/> PREFIX dc11:  <http://purl.org/dc/elements/1.1/> INSERT DATA { \
+            it("should match several triple patterns in each alternative (UnionBasic3)", async function () {
+                var engine = await createEngine();
+
+                await execute(
+                    engine,
+                    " PREFIX dc10:  <http://purl.org/dc/elements/1.0/> PREFIX dc11:  <http://purl.org/dc/elements/1.1/> INSERT DATA { \
                                 _:a  dc10:title     'SPARQL Query Language Tutorial' .\
                                 _:a  dc10:creator   'Alice' .\
                                 _:b  dc11:title     'SPARQL Protocol Tutorial' .\
@@ -439,98 +363,92 @@ describe("QueryEngine", function () {
                                 _:c  dc10:title     'SPARQL' .\
                                 _:c  dc11:title     'SPARQL (updated)' .\
                                 }",
-                        function (err, result) {
-                            engine.execute(
-                                "PREFIX dc10:  <http://purl.org/dc/elements/1.0/>\
+                );
+
+                var results = await execute(
+                    engine,
+                    "PREFIX dc10:  <http://purl.org/dc/elements/1.0/>\
                                                     PREFIX dc11:  <http://purl.org/dc/elements/1.1/>\
                                                     SELECT ?title ?author\
                                                     WHERE  { { ?book dc10:title ?title .  ?book dc10:creator ?author }\
                                                     UNION\
                                                     { ?book dc11:title ?title .  ?book dc11:creator ?author } }",
-                                function (err, results) {
-                                    expect(results.length).toBe(2);
+                );
+                expect(results.length).toBe(2);
 
-                                    if (results[0].author.value == "Alice") {
-                                        expect(results[0].title.value).toBe("SPARQL Query Language Tutorial");
-                                        expect(results[1].author.value).toBe("Bob");
-                                        expect(results[1].title.value).toBe("SPARQL Protocol Tutorial");
-                                    } else {
-                                        expect(results[1].author.value).toBe("Alice");
-                                        expect(results[1].title.value).toBe("SPARQL Query Language Tutorial");
-                                        expect(results[0].author.value).toBe("Bob");
-                                        expect(results[0].title.value).toBe("SPARQL Protocol Tutorial");
-                                    }
-                                    done();
-                                },
-                            );
-                        },
-                    );
-                });
+                if (results[0].author.value == "Alice") {
+                    expect(results[0].title.value).toBe("SPARQL Query Language Tutorial");
+                    expect(results[1].author.value).toBe("Bob");
+                    expect(results[1].title.value).toBe("SPARQL Protocol Tutorial");
+                } else {
+                    expect(results[1].author.value).toBe("Alice");
+                    expect(results[1].title.value).toBe("SPARQL Query Language Tutorial");
+                    expect(results[0].author.value).toBe("Bob");
+                    expect(results[0].title.value).toBe("SPARQL Protocol Tutorial");
+                }
             });
 
-            it("should return blank nodes as blank node terms (UnionBasic4)", function (done) {
-                newEngine(function (engine) {
-                    engine.execute(
-                        " PREFIX dc10:  <http://purl.org/dc/elements/1.0/> PREFIX dc11:  <http://purl.org/dc/elements/1.1/> INSERT DATA { _:a  dc10:title     'SPARQL Query Language Tutorial' .\
+            it("should return blank nodes as blank node terms (UnionBasic4)", async function () {
+                var engine = await createEngine();
+
+                await execute(
+                    engine,
+                    " PREFIX dc10:  <http://purl.org/dc/elements/1.0/> PREFIX dc11:  <http://purl.org/dc/elements/1.1/> INSERT DATA { _:a  dc10:title     'SPARQL Query Language Tutorial' .\
                                 _:a  dc10:creator   'Alice' .\
                                 _:b  dc11:title     'SPARQL Protocol Tutorial' .\
                                 _:b  dc11:creator   'Bob' .\
                                 _:c  dc10:title     'SPARQL' .\
                                 _:c  dc11:title     'SPARQL (updated)' .\
                                 }",
-                        function (err, result) {
-                            engine.execute("SELECT ?book WHERE { ?book ?p ?o }", function (err, results) {
-                                expect(results.length).toBe(6);
-                                for (var i = 0; i < 6; i++) {
-                                    expect(results[i].book.token).toBe("blank");
-                                    expect(results[i].book.value).toEqual(jasmine.any(String));
-                                }
-                                done();
-                            });
-                        },
-                    );
-                });
+                );
+
+                var results = await execute(engine, "SELECT ?book WHERE { ?book ?p ?o }");
+                expect(results.length).toBe(6);
+
+                for (var i = 0; i < 6; i++) {
+                    expect(results[i].book.token).toBe("blank");
+                    expect(results[i].book.value).toEqual(jasmine.any(String));
+                }
             });
 
-            it("should leave the variables of the other alternative unbound (DisjointUnion)", function (done) {
-                newEngine({ treeOrder: 15 }, function (engine) {
-                    var query =
-                        "PREFIX ex:  <http://www.w3.org/2009/sparql/docs/tests/data-sparql11/negation#> \
+            it("should leave the variables of the other alternative unbound (DisjointUnion)", async function () {
+                var engine = await createEngine({ treeOrder: 15 });
+
+                var query =
+                    "PREFIX ex:  <http://www.w3.org/2009/sparql/docs/tests/data-sparql11/negation#> \
                             PREFIX dc:  <http://purl.org/dc/elements/1.1/>\
                             PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> \
                             INSERT DATA { ex:a ex:p ex:o . ex:d ex:q ex:o2 . }";
 
-                    engine.execute(query, function (err, result) {
-                        var query =
-                            "PREFIX ex:  <http://www.w3.org/2009/sparql/docs/tests/data-sparql11/negation#> \
+                await execute(engine, query);
+
+                query =
+                    "PREFIX ex:  <http://www.w3.org/2009/sparql/docs/tests/data-sparql11/negation#> \
                                 PREFIX dc:  <http://purl.org/dc/elements/1.1/>\
                                 SELECT ?a ?b { { ?a ex:p ?o1 } UNION { ?b ex:q ?o2 } }";
 
-                        engine.execute(query, function (err, results) {
-                            expect(results.length).toBe(2);
-                            if (results[0].a == null) {
-                                expect(results[0].b.value).toBe(
-                                    "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/negation#d",
-                                );
-                                expect(results[1].a.value).toBe(
-                                    "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/negation#a",
-                                );
-                                expect(results[1].b).toBeNull();
-                            } else if (results[0].b == null) {
-                                expect(results[0].a.value).toBe(
-                                    "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/negation#a",
-                                );
-                                expect(results[1].b.value).toBe(
-                                    "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/negation#d",
-                                );
-                                expect(results[1].a).toBeNull();
-                            } else {
-                                fail("unexpected solution");
-                            }
-                            done();
-                        });
-                    });
-                });
+                var results = await execute(engine, query);
+                expect(results.length).toBe(2);
+
+                if (results[0].a == null) {
+                    expect(results[0].b.value).toBe(
+                        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/negation#d",
+                    );
+                    expect(results[1].a.value).toBe(
+                        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/negation#a",
+                    );
+                    expect(results[1].b).toBeNull();
+                } else if (results[0].b == null) {
+                    expect(results[0].a.value).toBe(
+                        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/negation#a",
+                    );
+                    expect(results[1].b.value).toBe(
+                        "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/negation#d",
+                    );
+                    expect(results[1].a).toBeNull();
+                } else {
+                    fail("unexpected solution");
+                }
             });
         });
 
@@ -548,10 +466,12 @@ describe("QueryEngine", function () {
                     .sort();
             };
 
-            it("should keep a solution without a match for the optional part (OptionalBasic1)", function (done) {
-                newEngine(function (engine) {
-                    engine.execute(
-                        "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
+            it("should keep a solution without a match for the optional part (OptionalBasic1)", async function () {
+                var engine = await createEngine();
+
+                await execute(
+                    engine,
+                    "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {\
                                  _:a    foaf:name   'Alice' .\
                                  _:a    foaf:knows  _:b .\
@@ -560,42 +480,41 @@ describe("QueryEngine", function () {
                                  _:c    foaf:name   'Clare' .\
                                  _:c    foaf:nick   'CT' .\
                                }",
-                        function (err, result) {
-                            engine.execute(
-                                "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
+                );
+
+                var results = await execute(
+                    engine,
+                    "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
                                                    SELECT ?nameX ?nameY ?nickY\
                                                    WHERE\
                                                    { ?x foaf:knows ?y ;\
                                                      foaf:name ?nameX .\
                                                      ?y foaf:name ?nameY .\
                                                      OPTIONAL { ?y foaf:nick ?nickY }  }",
-                                function (err, results) {
-                                    expect(results.length).toBe(2);
-                                    if (results[0].nickY === null) {
-                                        expect(results[0].nameX.value).toBe("Alice");
-                                        expect(results[0].nameY.value).toBe("Bob");
-                                        expect(results[1].nameX.value).toBe("Alice");
-                                        expect(results[1].nameY.value).toBe("Clare");
-                                        expect(results[1].nickY.value).toBe("CT");
-                                    } else {
-                                        expect(results[1].nameX.value).toBe("Alice");
-                                        expect(results[1].nameY.value).toBe("Bob");
-                                        expect(results[0].nameX.value).toBe("Alice");
-                                        expect(results[0].nameY.value).toBe("Clare");
-                                        expect(results[0].nickY.value).toBe("CT");
-                                    }
-                                    done();
-                                },
-                            );
-                        },
-                    );
-                });
+                );
+                expect(results.length).toBe(2);
+
+                if (results[0].nickY === null) {
+                    expect(results[0].nameX.value).toBe("Alice");
+                    expect(results[0].nameY.value).toBe("Bob");
+                    expect(results[1].nameX.value).toBe("Alice");
+                    expect(results[1].nameY.value).toBe("Clare");
+                    expect(results[1].nickY.value).toBe("CT");
+                } else {
+                    expect(results[1].nameX.value).toBe("Alice");
+                    expect(results[1].nameY.value).toBe("Bob");
+                    expect(results[0].nameX.value).toBe("Alice");
+                    expect(results[0].nameY.value).toBe("Clare");
+                    expect(results[0].nickY.value).toBe("CT");
+                }
             });
 
-            it("should evaluate two OPTIONALs without a pattern before them (OptionalBasic2)", function (done) {
-                newEngine(function (engine) {
-                    engine.execute(
-                        "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
+            it("should evaluate two OPTIONALs without a pattern before them (OptionalBasic2)", async function () {
+                var engine = await createEngine();
+
+                await execute(
+                    engine,
+                    "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {\
                                  _:a    foaf:name   'Alice' .\
                                  _:a    foaf:knows  _:b .\
@@ -604,30 +523,27 @@ describe("QueryEngine", function () {
                                  _:c    foaf:name   'Clare' .\
                                  _:c    foaf:nick   'CT' .\
                                }",
-                        function (err, result) {
-                            engine.execute(
-                                "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
+                );
+
+                var results = await execute(
+                    engine,
+                    "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
                                                    SELECT *\
                                                    { OPTIONAL { ?x foaf:knows ?y }\
                                                      OPTIONAL { ?y foaf:nick ?nickY }\
                                                    }",
-                                function (err, results) {
-                                    expect(results.length === 2).toBe(true);
-                                    done();
-                                },
-                            );
-                        },
-                    );
-                });
+                );
+                expect(results.length === 2).toBe(true);
             });
 
-            it("should unbind the optional variables of a solution that fails the filter (OptionalFilterUnmatchedSolution)", function (done) {
+            it("should unbind the optional variables of a solution that fails the filter (OptionalFilterUnmatchedSolution)", async function () {
                 // the store's default tree order, which yields :a's solution first
-                newEngine({ treeOrder: 15 }, function (engine) {
-                    // :a has no :q, so the left join adds ?x to its solution; ?x must still be
-                    // unbound again for :b, whose only ?x fails the OPTIONAL's filter
-                    var query =
-                        "PREFIX : <http://example/>\
+                var engine = await createEngine({ treeOrder: 15 });
+
+                // :a has no :q, so the left join adds ?x to its solution; ?x must still be
+                // unbound again for :b, whose only ?x fails the OPTIONAL's filter
+                var query =
+                    "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :a :p 1 .\
                             :b :p 2 .\
@@ -635,57 +551,50 @@ describe("QueryEngine", function () {
                             :c :p 3 .\
                             :c :q 20 }";
 
-                    engine.execute(query, function (err, result) {
-                        engine.execute(
-                            "PREFIX : <http://example/> SELECT ?s ?x { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 10) } }",
-                            function (err, results) {
-                                expect(err).toBeNull();
-                                expect(optionalRows(results, ["s", "x"])).toEqual(["a|", "b|", "c|20"]);
-                                done();
-                            },
-                        );
-                    });
-                });
+                await execute(engine, query);
+
+                var results = await execute(
+                    engine,
+                    "PREFIX : <http://example/> SELECT ?s ?x { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 10) } }",
+                );
+                expect(optionalRows(results, ["s", "x"])).toEqual(["a|", "b|", "c|20"]);
             });
 
-            it("should unbind every variable of a UNION that fails the filter (OptionalFilterUnionVariables)", function (done) {
-                newEngine(function (engine) {
-                    // the UNION's solutions bind different variables: all of them must be unbound
-                    // again when a solution fails the OPTIONAL's filter, not only the first one's
-                    var query =
-                        "PREFIX : <http://example/>\
+            it("should unbind every variable of a UNION that fails the filter (OptionalFilterUnionVariables)", async function () {
+                var engine = await createEngine();
+
+                // the UNION's solutions bind different variables: all of them must be unbound
+                // again when a solution fails the OPTIONAL's filter, not only the first one's
+                var query =
+                    "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :a :p 1 .\
                             :b :p 2 .\
                             :b :q :x1 .\
                             :b :r :y1 }";
 
-                    engine.execute(query, function (err, result) {
-                        engine.execute(
-                            "PREFIX : <http://example/> SELECT ?s ?x ?y { ?s :p ?o OPTIONAL { { ?s :q ?x } UNION { ?s :r ?y } FILTER(!BOUND(?y)) } }",
-                            function (err, results) {
-                                expect(err).toBeNull();
-                                expect(optionalRows(results, ["s", "x", "y"])).toEqual(["a||", "b|x1|"]);
-                                engine.execute(
-                                    "PREFIX : <http://example/> SELECT ?s ?x ?y { ?s :p ?o OPTIONAL { { ?s :r ?y } UNION { ?s :q ?x } FILTER(!BOUND(?x)) } }",
-                                    function (err, results) {
-                                        expect(err).toBeNull();
-                                        expect(optionalRows(results, ["s", "x", "y"])).toEqual(["a||", "b||y1"]);
-                                        done();
-                                    },
-                                );
-                            },
-                        );
-                    });
-                });
+                await execute(engine, query);
+
+                var results = await execute(
+                    engine,
+                    "PREFIX : <http://example/> SELECT ?s ?x ?y { ?s :p ?o OPTIONAL { { ?s :q ?x } UNION { ?s :r ?y } FILTER(!BOUND(?y)) } }",
+                );
+                expect(optionalRows(results, ["s", "x", "y"])).toEqual(["a||", "b|x1|"]);
+
+                results = await execute(
+                    engine,
+                    "PREFIX : <http://example/> SELECT ?s ?x ?y { ?s :p ?o OPTIONAL { { ?s :r ?y } UNION { ?s :q ?x } FILTER(!BOUND(?x)) } }",
+                );
+                expect(optionalRows(results, ["s", "x", "y"])).toEqual(["a||", "b||y1"]);
             });
 
-            it("should unbind a variable bound only by the optional part when it fails the filter (OptionalFilterVariableBoundOnlyInSomeLeftSolutions)", function (done) {
-                newEngine(function (engine) {
-                    // the left UNION binds ?x for :a only: :b's ?x comes from the OPTIONAL alone
-                    // and must be unbound again when it fails the OPTIONAL's filter
-                    var query =
-                        "PREFIX : <http://example/>\
+            it("should unbind a variable bound only by the optional part when it fails the filter (OptionalFilterVariableBoundOnlyInSomeLeftSolutions)", async function () {
+                var engine = await createEngine();
+
+                // the left UNION binds ?x for :a only: :b's ?x comes from the OPTIONAL alone
+                // and must be unbound again when it fails the OPTIONAL's filter
+                var query =
+                    "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :a :q 1 .\
                             :b :p 2 .\
@@ -693,25 +602,22 @@ describe("QueryEngine", function () {
                             :c :p 3 .\
                             :c :r 20 }";
 
-                    engine.execute(query, function (err, result) {
-                        engine.execute(
-                            "PREFIX : <http://example/> SELECT ?s ?x { { { ?s :q ?x } UNION { ?s :p ?o } } OPTIONAL { ?s :r ?x FILTER(?x > 10) } }",
-                            function (err, results) {
-                                expect(err).toBeNull();
-                                expect(optionalRows(results, ["s", "x"])).toEqual(["a|1", "b|", "c|20"]);
-                                done();
-                            },
-                        );
-                    });
-                });
+                await execute(engine, query);
+
+                var results = await execute(
+                    engine,
+                    "PREFIX : <http://example/> SELECT ?s ?x { { { ?s :q ?x } UNION { ?s :p ?o } } OPTIONAL { ?s :r ?x FILTER(?x > 10) } }",
+                );
+                expect(optionalRows(results, ["s", "x"])).toEqual(["a|1", "b|", "c|20"]);
             });
 
-            it("should keep the value of a BIND after an OPTIONAL whose filter fails (OptionalFilterKeepsOuterBind)", function (done) {
-                newEngine(function (engine) {
-                    // the BIND after the OPTIONAL is evaluated on the joined solutions: a solution
-                    // whose OPTIONAL part fails the filter keeps the BIND's value
-                    var query =
-                        "PREFIX : <http://example/>\
+            it("should keep the value of a BIND after an OPTIONAL whose filter fails (OptionalFilterKeepsOuterBind)", async function () {
+                var engine = await createEngine();
+
+                // the BIND after the OPTIONAL is evaluated on the joined solutions: a solution
+                // whose OPTIONAL part fails the filter keeps the BIND's value
+                var query =
+                    "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :a :p 1 .\
                             :b :p 2 .\
@@ -719,119 +625,96 @@ describe("QueryEngine", function () {
                             :c :p 3 .\
                             :c :q 20 }";
 
-                    engine.execute(query, function (err, result) {
-                        engine.execute(
-                            "PREFIX : <http://example/> SELECT ?s ?x ?z { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 10) } BIND(STR(?o) AS ?z) }",
-                            function (err, results) {
-                                expect(err).toBeNull();
-                                expect(optionalRows(results, ["s", "x", "z"])).toEqual(["a||1", "b||2", "c|20|3"]);
-                                done();
-                            },
-                        );
-                    });
-                });
+                await execute(engine, query);
+
+                var results = await execute(
+                    engine,
+                    "PREFIX : <http://example/> SELECT ?s ?x ?z { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 10) } BIND(STR(?o) AS ?z) }",
+                );
+                expect(optionalRows(results, ["s", "x", "z"])).toEqual(["a||1", "b||2", "c|20|3"]);
             });
 
-            it("should keep a left solution once if no optional match passes the filter (OptionalFilterKeepsLeftSolutionOnceIfNoneMatches)", function (done) {
-                newEngine(function (engine) {
-                    // :b has a passing and a failing ?x: only the passing one is kept, also with a BIND after the OPTIONAL
-                    var query =
-                        "PREFIX : <http://example/>\
+            it("should keep a left solution once if no optional match passes the filter (OptionalFilterKeepsLeftSolutionOnceIfNoneMatches)", async function () {
+                var engine = await createEngine();
+
+                // :b has a passing and a failing ?x: only the passing one is kept, also with a BIND after the OPTIONAL
+                var query =
+                    "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :b :p 2 .\
                             :b :q 5 .\
                             :b :q 30 .\
                             :b :t :u }";
 
-                    engine.execute(query, function (err, result) {
-                        engine.execute(
-                            "PREFIX : <http://example/> SELECT ?s ?x ?z { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 10) } BIND(1 AS ?z) }",
-                            function (err, results) {
-                                expect(err).toBeNull();
-                                expect(optionalRows(results, ["s", "x", "z"])).toEqual(["b|30|1"]);
-                                // {?s=:b} from the second branch fails the filter (?o unbound): it is kept,
-                                // although its bindings are a subset of the passing solution's
-                                engine.execute(
-                                    "PREFIX : <http://example/> SELECT ?s ?o ?x { { { ?s :p ?o } UNION { ?s :t :u } } OPTIONAL { ?s :q ?x FILTER(?x > ?o) } }",
-                                    function (err, results) {
-                                        expect(err).toBeNull();
-                                        expect(optionalRows(results, ["s", "o", "x"])).toEqual([
-                                            "b|2|30",
-                                            "b|2|5",
-                                            "b||",
-                                        ]);
-                                        done();
-                                    },
-                                );
-                            },
-                        );
-                    });
-                });
+                await execute(engine, query);
+
+                var results = await execute(
+                    engine,
+                    "PREFIX : <http://example/> SELECT ?s ?x ?z { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 10) } BIND(1 AS ?z) }",
+                );
+                expect(optionalRows(results, ["s", "x", "z"])).toEqual(["b|30|1"]);
+
+                // {?s=:b} from the second branch fails the filter (?o unbound): it is kept,
+                // although its bindings are a subset of the passing solution's
+                results = await execute(
+                    engine,
+                    "PREFIX : <http://example/> SELECT ?s ?o ?x { { { ?s :p ?o } UNION { ?s :t :u } } OPTIONAL { ?s :q ?x FILTER(?x > ?o) } }",
+                );
+                expect(optionalRows(results, ["s", "o", "x"])).toEqual(["b|2|30", "b|2|5", "b||"]);
             });
 
-            it("should keep duplicate left solutions (OptionalFilterKeepsDuplicateLeftSolutions)", function (done) {
-                newEngine(function (engine) {
-                    // the UNION yields every left solution twice (a bag): the OPTIONAL keeps both copies
-                    var query =
-                        "PREFIX : <http://example/>\
+            it("should keep duplicate left solutions (OptionalFilterKeepsDuplicateLeftSolutions)", async function () {
+                var engine = await createEngine();
+
+                // the UNION yields every left solution twice (a bag): the OPTIONAL keeps both copies
+                var query =
+                    "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :a :p 1 .\
                             :b :p 2 .\
                             :b :q 5 }";
 
-                    engine.execute(query, function (err, result) {
-                        engine.execute(
-                            "PREFIX : <http://example/> SELECT ?s ?x { { { ?s :p ?o } UNION { ?s :p ?o } } OPTIONAL { ?s :q ?x FILTER(?x > 100) } }",
-                            function (err, results) {
-                                expect(err).toBeNull();
-                                expect(optionalRows(results, ["s", "x"])).toEqual(["a|", "a|", "b|", "b|"]);
-                                done();
-                            },
-                        );
-                    });
-                });
+                await execute(engine, query);
+
+                var results = await execute(
+                    engine,
+                    "PREFIX : <http://example/> SELECT ?s ?x { { { ?s :p ?o } UNION { ?s :p ?o } } OPTIONAL { ?s :q ?x FILTER(?x > 100) } }",
+                );
+                expect(optionalRows(results, ["s", "x"])).toEqual(["a|", "a|", "b|", "b|"]);
             });
         });
 
         describe("GRAPH and datasets", function () {
-            it("should evaluate BIND inside GRAPH (BindInGraph)", function (done) {
-                checkQueries(
-                    "GRAPH :g1 { :a :p 1 }",
+            it("should evaluate BIND inside GRAPH (BindInGraph)", async function () {
+                await checkQueries("GRAPH :g1 { :a :p 1 }", [
                     [
-                        [
-                            "SELECT ?g ?x FROM NAMED <http://example/g1> { GRAPH ?g { BIND(1 AS ?x) } }",
-                            ["g", "x"],
-                            ["g=g1 x=1^^integer"],
-                        ],
-                        [
-                            "SELECT ?g ?k FROM NAMED <http://example/g1> { GRAPH ?g { ?s :p ?o BIND(STR(?o) AS ?k) } }",
-                            ["g", "k"],
-                            ["g=g1 k=1"],
-                        ],
+                        "SELECT ?g ?x FROM NAMED <http://example/g1> { GRAPH ?g { BIND(1 AS ?x) } }",
+                        ["g", "x"],
+                        ["g=g1 x=1^^integer"],
                     ],
-                    done,
-                );
+                    [
+                        "SELECT ?g ?k FROM NAMED <http://example/g1> { GRAPH ?g { ?s :p ?o BIND(STR(?o) AS ?k) } }",
+                        ["g", "k"],
+                        ["g=g1 k=1"],
+                    ],
+                ]);
             });
 
-            it("should match an empty group in GRAPH like a triple pattern (GraphEmptyGroup)", function (done) {
+            it("should match an empty group in GRAPH like a triple pattern (GraphEmptyGroup)", async function () {
                 // like GRAPH over triple patterns: a variable takes each named graph of the dataset, an IRI must be a graph of the store
-                checkQueries(
-                    "GRAPH :g1 { :x :y :z }",
-                    [
-                        ["ASK { GRAPH :g1 {} }", null, true],
-                        ["ASK { GRAPH :nothing {} }", null, false],
-                        ["SELECT ?g FROM NAMED <http://example/g1> { GRAPH ?g {} }", ["g"], ["g=g1"]],
-                        ["SELECT ?g { GRAPH ?g {} }", ["g"], []],
-                    ],
-                    done,
-                );
+                await checkQueries("GRAPH :g1 { :x :y :z }", [
+                    ["ASK { GRAPH :g1 {} }", null, true],
+                    ["ASK { GRAPH :nothing {} }", null, false],
+                    ["SELECT ?g FROM NAMED <http://example/g1> { GRAPH ?g {} }", ["g"], ["g=g1"]],
+                    ["SELECT ?g { GRAPH ?g {} }", ["g"], []],
+                ]);
             });
 
-            it("should match every nested pattern against the active graph (GraphNestedPatterns)", function (done) {
+            it("should match every nested pattern against the active graph (GraphNestedPatterns)", async function () {
                 // every pattern inside GRAPH matches the active graph, and EXISTS inside GRAPH does too
                 var named =
                     "FROM NAMED <http://example/g1> FROM NAMED <http://example/g2> FROM NAMED <http://example/g3> ";
-                checkQueries(
+                await checkQueries(
                     'GRAPH :g1 { :a :p "a1" . :a :q "q1" . :x :p "x1" } GRAPH :g2 { :a :p "a2" . :b :p "b2" . :a :q "q2" } ' +
                         'GRAPH :g3 { :b :q "q3" } :d :p "d" . :d :q "dq"',
                     [
@@ -901,15 +784,14 @@ describe("QueryEngine", function () {
                         ],
                         ["SELECT ?g ?s " + named + "{ GRAPH ?g { ?s :p ?o BIND(1 AS ?g) } }", ["g", "s"], []],
                     ],
-                    done,
                 );
             });
 
-            it("should pass the W3C GRAPH and EXISTS cases (GraphW3C)", function (done) {
+            it("should pass the W3C GRAPH and EXISTS cases (GraphW3C)", async function () {
                 // W3C rdf-tests sparql10/graph (graph-nested-1…4, graph-variable-scope, graph-variable-join, graph-optional)
                 // and sparql11/exists (exists03, exists-graph-variable), with graph names in http://example/
                 var nested = "FROM NAMED <http://example/n1> FROM NAMED <http://example/n2> ";
-                checkQueries(
+                await checkQueries(
                     "GRAPH :n1 { :s :p :o . :s1 :p :o1 } GRAPH :n2 { :s :p :o . :s2 :p :o2 } GRAPH :opt { :s :p :o . :s2 :p :opt } " +
                         "GRAPH :vj { :vj :p :o } GRAPH :w1 { :x :p 1 . :a :p 9 } GRAPH :e2 { :a :p :o1 . :b :p :o1, :o2 } " +
                         ":a :p :o2 . :s1 :p :eg . :s2 :p :o2 . GRAPH :eg { :s1 :p :eg . :s2 :p :o2 }",
@@ -964,150 +846,122 @@ describe("QueryEngine", function () {
                         ["SELECT ?s { GRAPH :e2 { ?s ?p :o1 FILTER EXISTS { ?s ?p :o2 } } }", ["s"], ["s=b"]],
                         ["SELECT ?s { ?s :p ?g FILTER EXISTS { GRAPH ?g { ?s2 :p ?o2 } } }", ["s"], ["s=s1"]],
                     ],
-                    done,
                 );
             });
 
-            it("should restrict GRAPH <iri> to the named graphs of FROM NAMED (GraphIriInDataset)", function (done) {
+            it("should restrict GRAPH <iri> to the named graphs of FROM NAMED (GraphIriInDataset)", async function () {
                 // if the query names named graphs, GRAPH <iri> matches only one of them; without, any graph of the store
                 var g1 = "FROM NAMED <http://example/g1> ",
                     g2 = "FROM NAMED <http://example/g2> ";
-                checkQueries(
-                    "GRAPH :g1 { :a :p 1 } GRAPH :g2 { :a :p 2 }",
+                await checkQueries("GRAPH :g1 { :a :p 1 } GRAPH :g2 { :a :p 2 }", [
+                    ["SELECT ?o " + g2 + "{ GRAPH :g1 { :a :p ?o } }", ["o"], []],
+                    ["SELECT ?o " + g1 + "{ GRAPH :g1 { :a :p ?o } }", ["o"], ["o=1^^integer"]],
+                    ["SELECT ?o { GRAPH :g1 { :a :p ?o } }", ["o"], ["o=1^^integer"]],
+                    ["SELECT ?o " + g2 + "{ GRAPH :g1 { OPTIONAL { :a :p ?o } } }", ["o"], []],
+                    ["ASK " + g2 + "{ GRAPH :g1 {} }", null, false],
+                    ["ASK " + g1 + "{ GRAPH :g1 {} }", null, true],
                     [
-                        ["SELECT ?o " + g2 + "{ GRAPH :g1 { :a :p ?o } }", ["o"], []],
-                        ["SELECT ?o " + g1 + "{ GRAPH :g1 { :a :p ?o } }", ["o"], ["o=1^^integer"]],
-                        ["SELECT ?o { GRAPH :g1 { :a :p ?o } }", ["o"], ["o=1^^integer"]],
-                        ["SELECT ?o " + g2 + "{ GRAPH :g1 { OPTIONAL { :a :p ?o } } }", ["o"], []],
-                        ["ASK " + g2 + "{ GRAPH :g1 {} }", null, false],
-                        ["ASK " + g1 + "{ GRAPH :g1 {} }", null, true],
-                        [
-                            "SELECT ?o " + g2 + "{ GRAPH :g2 { :a :p ?o FILTER EXISTS { GRAPH :g1 { :a :p 1 } } } }",
-                            ["o"],
-                            [],
-                        ],
-                        [
-                            "DELETE { GRAPH :g1 { :a :p ?o } } USING NAMED <http://example/g2> WHERE { GRAPH :g1 { :a :p ?o } }",
-                        ],
-                        ["SELECT ?o { GRAPH :g1 { :a :p ?o } }", ["o"], ["o=1^^integer"]],
-                        ["DELETE WHERE { GRAPH :g1 { :a :p ?o } }"],
-                        ["SELECT ?o { GRAPH :g1 { :a :p ?o } }", ["o"], []],
+                        "SELECT ?o " + g2 + "{ GRAPH :g2 { :a :p ?o FILTER EXISTS { GRAPH :g1 { :a :p 1 } } } }",
+                        ["o"],
+                        [],
                     ],
-                    done,
-                );
+                    [
+                        "DELETE { GRAPH :g1 { :a :p ?o } } USING NAMED <http://example/g2> WHERE { GRAPH :g1 { :a :p ?o } }",
+                    ],
+                    ["SELECT ?o { GRAPH :g1 { :a :p ?o } }", ["o"], ["o=1^^integer"]],
+                    ["DELETE WHERE { GRAPH :g1 { :a :p ?o } }"],
+                    ["SELECT ?o { GRAPH :g1 { :a :p ?o } }", ["o"], []],
+                ]);
             });
 
-            it("should restrict GRAPH <iri> to the named graphs passed to execute (GraphIriInDatasetArguments)", function (done) {
+            it("should restrict GRAPH <iri> to the named graphs passed to execute (GraphIriInDatasetArguments)", async function () {
                 // the named graphs passed to execute restrict GRAPH <iri> like FROM NAMED
-                newEngine(function (engine) {
-                    engine.execute(
-                        "INSERT DATA { GRAPH <http://example/g1> { <http://example/a> <http://example/p> 1 } }",
-                        function (err) {
-                            expect(err).toBeNull();
-                            var query = "SELECT ?o { GRAPH <http://example/g1> { ?s ?p ?o } }";
-                            engine.execute(
-                                query,
-                                function (err, results) {
-                                    expect(err).toBeNull();
-                                    expect(results.length).toBe(0);
-                                    engine.execute(
-                                        query,
-                                        function (err, results) {
-                                            expect(err).toBeNull();
-                                            expect(results.length).toBe(1);
-                                            done();
-                                        },
-                                        [],
-                                        [{ token: "uri", value: "http://example/g1" }],
-                                    );
-                                },
-                                [],
-                                [{ token: "uri", value: "http://example/g2" }],
-                            );
-                        },
-                    );
-                });
+                var engine = await createEngine();
+
+                await execute(
+                    engine,
+                    "INSERT DATA { GRAPH <http://example/g1> { <http://example/a> <http://example/p> 1 } }",
+                );
+
+                var query = "SELECT ?o { GRAPH <http://example/g1> { ?s ?p ?o } }";
+                var results = await execute(engine, query, [], [{ token: "uri", value: "http://example/g2" }]);
+                expect(results.length).toBe(0);
+
+                results = await execute(engine, query, [], [{ token: "uri", value: "http://example/g1" }]);
+                expect(results.length).toBe(1);
             });
         });
 
         describe("BIND", function () {
-            it("should bind a term of the store as that term (BindStoredTerms)", function (done) {
+            it("should bind a term of the store as that term (BindStoredTerms)", async function () {
                 // a BIND result that is a term of the store is the same term as one matched by a triple pattern
-                checkQueries(
-                    ':a :p :b . :a :p :c . :b :p "x" . :c :p "x"@en . :d :p 1',
+                await checkQueries(':a :p :b . :a :p :c . :b :p "x" . :c :p "x"@en . :d :p 1', [
+                    ["SELECT ?o { ?s :p ?o . { BIND(:a AS ?s) } } ORDER BY ?o", ["o"], ["o=b", "o=c"]],
+                    ['SELECT ?s { ?s :p ?o . { BIND("x" AS ?o) } }', ["s"], ["s=b"]],
+                    ['SELECT ?s { ?s :p ?o . { BIND("x"@en AS ?o) } }', ["s"], ["s=c"]],
+                    ["SELECT ?s { ?s :p ?o . { BIND(1 AS ?o) } }", ["s"], ["s=d"]],
                     [
-                        ["SELECT ?o { ?s :p ?o . { BIND(:a AS ?s) } } ORDER BY ?o", ["o"], ["o=b", "o=c"]],
-                        ['SELECT ?s { ?s :p ?o . { BIND("x" AS ?o) } }', ["s"], ["s=b"]],
-                        ['SELECT ?s { ?s :p ?o . { BIND("x"@en AS ?o) } }', ["s"], ["s=c"]],
-                        ["SELECT ?s { ?s :p ?o . { BIND(1 AS ?o) } }", ["s"], ["s=d"]],
-                        [
-                            "SELECT ?s (COUNT(*) AS ?n) { { ?s :p ?o } UNION { BIND(:a AS ?s) } } GROUP BY ?s ORDER BY ?s",
-                            ["s", "n"],
-                            ["s=a n=3^^integer", "s=b n=1^^integer", "s=c n=1^^integer", "s=d n=1^^integer"],
-                        ],
-                        [
-                            "SELECT DISTINCT ?s { { ?s :p ?o } UNION { BIND(:a AS ?s) } } ORDER BY ?s",
-                            ["s"],
-                            ["s=a", "s=b", "s=c", "s=d"],
-                        ],
-                        // a term that is not in the store stays a term
-                        ["SELECT ?s { BIND(:new AS ?s) }", ["s"], ["s=new"]],
-                        ["SELECT ?o { ?s :p ?o . { BIND(:new AS ?s) } }", ["o"], []],
+                        "SELECT ?s (COUNT(*) AS ?n) { { ?s :p ?o } UNION { BIND(:a AS ?s) } } GROUP BY ?s ORDER BY ?s",
+                        ["s", "n"],
+                        ["s=a n=3^^integer", "s=b n=1^^integer", "s=c n=1^^integer", "s=d n=1^^integer"],
                     ],
-                    done,
-                );
+                    [
+                        "SELECT DISTINCT ?s { { ?s :p ?o } UNION { BIND(:a AS ?s) } } ORDER BY ?s",
+                        ["s"],
+                        ["s=a", "s=b", "s=c", "s=d"],
+                    ],
+                    // a term that is not in the store stays a term
+                    ["SELECT ?s { BIND(:new AS ?s) }", ["s"], ["s=new"]],
+                    ["SELECT ?o { ?s :p ?o . { BIND(:new AS ?s) } }", ["o"], []],
+                ]);
             });
 
-            it("should extend only the patterns before the BIND (BindPosition)", function (done) {
+            it("should extend only the patterns before the BIND (BindPosition)", async function () {
                 // BIND extends the patterns before it in its group; FILTERs apply to the whole group
-                checkQueries(
-                    ":a :p 1 . :a :q 3 . :b :p 2 . :b :q 7 . :c :p 4",
+                await checkQueries(":a :p 1 . :a :q 3 . :b :p 2 . :b :q 7 . :c :p 4", [
+                    // after an OPTIONAL, BIND sees the solutions its filter left
                     [
-                        // after an OPTIONAL, BIND sees the solutions its filter left
-                        [
-                            "SELECT ?s ?b { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 5) } BIND(BOUND(?x) AS ?b) } ORDER BY ?s",
-                            ["s", "b"],
-                            ["s=a b=false^^boolean", "s=b b=true^^boolean", "s=c b=false^^boolean"],
-                        ],
-                        [
-                            "SELECT ?s ?z { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 5) } BIND(STR(?x) AS ?z) } ORDER BY ?s",
-                            ["s", "z"],
-                            ["s=a z=-", "s=b z=7", "s=c z=-"],
-                        ],
-                        // the OPTIONAL's filter does not see a later BIND
-                        [
-                            "SELECT ?s ?x { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > ?m) } BIND(5 AS ?m) } ORDER BY ?s",
-                            ["s", "x"],
-                            ["s=a x=-", "s=b x=-", "s=c x=-"],
-                        ],
-                        // the patterns after a BIND join with its value
-                        ["SELECT ?o { BIND(:a AS ?s) ?s :p ?o }", ["o"], ["o=1^^integer"]],
-                        ["SELECT ?s { ?s :p ?o BIND(?o + 2 AS ?y) ?s :q ?y }", ["s"], ["s=a"]],
-                        ["SELECT ?s { ?s :p ?o BIND(?o * 2 AS ?d) FILTER(?d > 4) }", ["s"], ["s=c"]],
-                        ["SELECT ?z { :a :p ?o BIND(?o + 1 AS ?y) BIND(?y * 10 AS ?z) }", ["z"], ["z=20^^integer"]],
-                        [
-                            "SELECT ?s ?y { ?s :p ?o BIND(?x AS ?y) } ORDER BY ?s",
-                            ["s", "y"],
-                            ["s=a y=-", "s=b y=-", "s=c y=-"],
-                        ],
-                        // inside EXISTS, a BIND sees the outer solution
-                        [
-                            "SELECT ?s { ?s :p ?o FILTER EXISTS { ?s :q ?z BIND(?o + 2 AS ?w) FILTER(?w = ?z) } }",
-                            ["s"],
-                            ["s=a"],
-                        ],
-                        ["SELECT ?x { :nothing :p ?o BIND(1 AS ?x) }", ["x"], []],
-                        ["SELECT ?x { ?s :nothing ?o BIND(1 AS ?x) }", ["x"], []],
-                        // nested groups keep their BINDs
-                        ["SELECT ?k { { :a :p ?o BIND(STR(?o) AS ?k) } }", ["k"], ["k=1"]],
-                        ["SELECT ?x { { :a :p ?o FILTER(true) } BIND(1 AS ?x) }", ["x"], ["x=1^^integer"]],
-                        ["SELECT ?x ?y { { BIND(1 AS ?x) } BIND(2 AS ?y) }", ["x", "y"], ["x=1^^integer y=2^^integer"]],
+                        "SELECT ?s ?b { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 5) } BIND(BOUND(?x) AS ?b) } ORDER BY ?s",
+                        ["s", "b"],
+                        ["s=a b=false^^boolean", "s=b b=true^^boolean", "s=c b=false^^boolean"],
                     ],
-                    done,
-                );
+                    [
+                        "SELECT ?s ?z { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 5) } BIND(STR(?x) AS ?z) } ORDER BY ?s",
+                        ["s", "z"],
+                        ["s=a z=-", "s=b z=7", "s=c z=-"],
+                    ],
+                    // the OPTIONAL's filter does not see a later BIND
+                    [
+                        "SELECT ?s ?x { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > ?m) } BIND(5 AS ?m) } ORDER BY ?s",
+                        ["s", "x"],
+                        ["s=a x=-", "s=b x=-", "s=c x=-"],
+                    ],
+                    // the patterns after a BIND join with its value
+                    ["SELECT ?o { BIND(:a AS ?s) ?s :p ?o }", ["o"], ["o=1^^integer"]],
+                    ["SELECT ?s { ?s :p ?o BIND(?o + 2 AS ?y) ?s :q ?y }", ["s"], ["s=a"]],
+                    ["SELECT ?s { ?s :p ?o BIND(?o * 2 AS ?d) FILTER(?d > 4) }", ["s"], ["s=c"]],
+                    ["SELECT ?z { :a :p ?o BIND(?o + 1 AS ?y) BIND(?y * 10 AS ?z) }", ["z"], ["z=20^^integer"]],
+                    [
+                        "SELECT ?s ?y { ?s :p ?o BIND(?x AS ?y) } ORDER BY ?s",
+                        ["s", "y"],
+                        ["s=a y=-", "s=b y=-", "s=c y=-"],
+                    ],
+                    // inside EXISTS, a BIND sees the outer solution
+                    [
+                        "SELECT ?s { ?s :p ?o FILTER EXISTS { ?s :q ?z BIND(?o + 2 AS ?w) FILTER(?w = ?z) } }",
+                        ["s"],
+                        ["s=a"],
+                    ],
+                    ["SELECT ?x { :nothing :p ?o BIND(1 AS ?x) }", ["x"], []],
+                    ["SELECT ?x { ?s :nothing ?o BIND(1 AS ?x) }", ["x"], []],
+                    // nested groups keep their BINDs
+                    ["SELECT ?k { { :a :p ?o BIND(STR(?o) AS ?k) } }", ["k"], ["k=1"]],
+                    ["SELECT ?x { { :a :p ?o FILTER(true) } BIND(1 AS ?x) }", ["x"], ["x=1^^integer"]],
+                    ["SELECT ?x ?y { { BIND(1 AS ?x) } BIND(2 AS ?y) }", ["x", "y"], ["x=1^^integer y=2^^integer"]],
+                ]);
             });
 
-            it("should reject a BIND variable that is already in scope (BindScope)", function (done) {
+            it("should reject a BIND variable that is already in scope (BindScope)", async function () {
                 // the variable of a BIND must not be in scope of the patterns before it (W3C syntax-BINDscope1-8)
                 var w3c = function (n) {
                     return fs.readFileSync(__dirname + "/w3c/syntax-query/syntax-BINDscope" + n + ".rq").toString();
@@ -1151,75 +1005,63 @@ describe("QueryEngine", function () {
                     [prefixes + "ASK { :n :p ?o }", null, false],
                     [prefixes + "SELECT * { ?s :p{2} ?o FILTER(true) }", "NonSupportedSparqlFeatureError"],
                 ];
-                newEngine(function (engine) {
-                    engine.execute(prefixes + "INSERT DATA { " + data.join(" . ") + " }", function (err) {
-                        expect(err).toBeNull();
-                        async.eachSeries(
-                            cases,
-                            function (testCase, k) {
-                                engine.execute(testCase[0], function (err, result) {
-                                    if (testCase[1] == null) {
-                                        expect(err).withContext(testCase[0]).toBeNull();
-                                    } else {
-                                        expect(err != null && err.name)
-                                            .withContext(testCase[0])
-                                            .toBe(testCase[1]);
-                                    }
-                                    if (testCase.length > 2) {
-                                        expect(result).withContext(testCase[0]).toBe(testCase[2]);
-                                    }
-                                    k();
-                                });
-                            },
-                            function () {
-                                done();
-                            },
-                        );
+                var engine = await createEngine();
+
+                await execute(engine, prefixes + "INSERT DATA { " + data.join(" . ") + " }");
+
+                for (var testCase of cases) {
+                    var err = null;
+                    var result = await execute(engine, testCase[0]).catch(function (e) {
+                        err = e;
                     });
-                });
+                    if (testCase[1] == null) {
+                        expect(err).withContext(testCase[0]).toBeNull();
+                    } else {
+                        expect(err != null && err.name)
+                            .withContext(testCase[0])
+                            .toBe(testCase[1]);
+                    }
+                    if (testCase.length > 2) {
+                        expect(result).withContext(testCase[0]).toBe(testCase[2]);
+                    }
+                }
             });
 
-            it("should join a blank node from a BIND with the same blank node from a pattern (BoundBlankNodes)", function (done) {
+            it("should join a blank node from a BIND with the same blank node from a pattern (BoundBlankNodes)", async function () {
                 // a blank node of the store from a BIND joins with the same blank node from a triple pattern, and
                 // one bound into an EXISTS pattern matches only itself
-                checkQueries(
-                    ':a :p _:x . _:x :q "v" . :b :p _:y',
-                    [
-                        ["SELECT ?v { :a :p ?o BIND(?o AS ?x) ?x :q ?v }", ["v"], ["v=v"]],
-                        ["SELECT ?v { { :a :p ?o BIND(?o AS ?x) } { ?x :q ?v } }", ["v"], ["v=v"]],
-                        ["SELECT ?s { ?s :p ?o FILTER EXISTS { ?o :q ?v } }", ["s"], ["s=a"]],
-                        ["SELECT ?s { ?s :p ?o FILTER NOT EXISTS { ?o :q ?v } }", ["s"], ["s=b"]],
-                        ["SELECT ?s { ?s :p ?o BIND(?o AS ?x) FILTER NOT EXISTS { ?x :q ?v } }", ["s"], ["s=b"]],
-                        ["SELECT ?s { ?s :p ?o FILTER EXISTS { ?o :q ?v FILTER(isBlank(?o)) } }", ["s"], ["s=a"]],
-                        // a new blank node from BNODE() matches no quad inside EXISTS either
-                        ["SELECT ?s { ?s :p ?o BIND(BNODE() AS ?x) FILTER EXISTS { ?x ?q ?v } }", ["s"], []],
-                    ],
-                    done,
+                await checkQueries(':a :p _:x . _:x :q "v" . :b :p _:y', [
+                    ["SELECT ?v { :a :p ?o BIND(?o AS ?x) ?x :q ?v }", ["v"], ["v=v"]],
+                    ["SELECT ?v { { :a :p ?o BIND(?o AS ?x) } { ?x :q ?v } }", ["v"], ["v=v"]],
+                    ["SELECT ?s { ?s :p ?o FILTER EXISTS { ?o :q ?v } }", ["s"], ["s=a"]],
+                    ["SELECT ?s { ?s :p ?o FILTER NOT EXISTS { ?o :q ?v } }", ["s"], ["s=b"]],
+                    ["SELECT ?s { ?s :p ?o BIND(?o AS ?x) FILTER NOT EXISTS { ?x :q ?v } }", ["s"], ["s=b"]],
+                    ["SELECT ?s { ?s :p ?o FILTER EXISTS { ?o :q ?v FILTER(isBlank(?o)) } }", ["s"], ["s=a"]],
+                    // a new blank node from BNODE() matches no quad inside EXISTS either
+                    ["SELECT ?s { ?s :p ?o BIND(BNODE() AS ?x) FILTER EXISTS { ?x ?q ?v } }", ["s"], []],
+                ]);
+            });
+
+            it("should let a BIND use the variables of the BINDs before it (ChainedBinds)", async function () {
+                var engine = await createEngine();
+
+                var query = "PREFIX : <http://example/> INSERT DATA { :b :p 2 }";
+
+                await execute(engine, query);
+
+                // a BIND sees the variables of the BINDs before it
+                var results = await execute(
+                    engine,
+                    "PREFIX : <http://example/> SELECT ?x ?y ?z { ?s :p ?v BIND(?v + 1 AS ?x) BIND(?x * 10 AS ?y) BIND(STR(?y) AS ?z) }",
                 );
+                expect(termRows(results, ["x", "y", "z"])).toEqual(["x=3^^integer y=30^^integer z=30"]);
             });
 
-            it("should let a BIND use the variables of the BINDs before it (ChainedBinds)", function (done) {
-                newEngine(function (engine) {
-                    var query = "PREFIX : <http://example/> INSERT DATA { :b :p 2 }";
+            it("should filter on a value computed by BIND (BIND)", async function () {
+                var engine = await createEngine({ treeOrder: 15 });
 
-                    engine.execute(query, function (err, result) {
-                        // a BIND sees the variables of the BINDs before it
-                        engine.execute(
-                            "PREFIX : <http://example/> SELECT ?x ?y ?z { ?s :p ?v BIND(?v + 1 AS ?x) BIND(?x * 10 AS ?y) BIND(STR(?y) AS ?z) }",
-                            function (err, results) {
-                                expect(err).toBeNull();
-                                expect(termRows(results, ["x", "y", "z"])).toEqual(["x=3^^integer y=30^^integer z=30"]);
-                                done();
-                            },
-                        );
-                    });
-                });
-            });
-
-            it("should filter on a value computed by BIND (BIND)", function (done) {
-                newEngine({ treeOrder: 15 }, function (engine) {
-                    var query =
-                        'BASE <http://example.org/book/>\
+                var query =
+                    'BASE <http://example.org/book/>\
                                PREFIX dc:  <http://purl.org/dc/elements/1.1/> \
                                PREFIX ns:  <http://example.org/ns#>\
                                INSERT DATA {\
@@ -1231,9 +1073,10 @@ describe("QueryEngine", function () {
                                  <book2>  ns:discount  0.25 .\
                                }';
 
-                    engine.execute(query, function (err, result) {
-                        var query =
-                            "PREFIX  dc:  <http://purl.org/dc/elements/1.1/>\
+                await execute(engine, query);
+
+                query =
+                    "PREFIX  dc:  <http://purl.org/dc/elements/1.1/>\
                                  PREFIX  ns:  <http://example.org/ns#>\
                                  SELECT  ?title ?price\
                                  {  ?x ns:price ?p .\
@@ -1243,330 +1086,252 @@ describe("QueryEngine", function () {
                                     ?x dc:title ?title .\
                                  }";
 
-                        engine.execute(query, function (err, results) {
-                            expect(results.length).toBe(1);
-                            expect(results[0].price.value).toBe("17.25");
-                            expect(results[0].title.value).toBe("The Semantic Web");
-                            done();
-                        });
-                    });
-                });
+                var results = await execute(engine, query);
+                expect(results.length).toBe(1);
+                expect(results[0].price.value).toBe("17.25");
+                expect(results[0].title.value).toBe("The Semantic Web");
             });
         });
     });
 
     describe("expressions and filters", function () {
-        it("should leave a projected expression with an error unbound and keep the solution (ProjectedExpressions)", function (done) {
-            newEngine(function (engine) {
-                var query = 'PREFIX : <http://example/> INSERT DATA { :a :p "x"@en . :b :p 2 . :c :p :u }';
+        it("should leave a projected expression with an error unbound and keep the solution (ProjectedExpressions)", async function () {
+            var engine = await createEngine();
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT ?s (STR(?v) AS ?x) (?v AS ?y) { ?s :p ?v } ORDER BY ?s",
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(termRows(results, ["s", "x", "y"])).toEqual([
-                                "s=a x=x y=x",
-                                "s=b x=2 y=2^^integer",
-                                "s=c x=u y=u",
-                            ]);
-                            // an error leaves the variable unbound and keeps the solution
-                            engine.execute(
-                                "PREFIX : <http://example/> SELECT ?s (LANG(?v) AS ?x) (-?v AS ?z) { ?s :p ?v } ORDER BY ?s",
-                                function (err, results) {
-                                    expect(err).toBeNull();
-                                    expect(termRows(results, ["s", "x", "z"])).toEqual([
-                                        "s=a x=en z=-",
-                                        "s=b x= z=-2^^integer",
-                                        "s=c x=- z=-",
-                                    ]);
-                                    done();
-                                },
-                            );
-                        },
-                    );
-                });
-            });
+            var query = 'PREFIX : <http://example/> INSERT DATA { :a :p "x"@en . :b :p 2 . :c :p :u }';
+
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT ?s (STR(?v) AS ?x) (?v AS ?y) { ?s :p ?v } ORDER BY ?s",
+            );
+            expect(termRows(results, ["s", "x", "y"])).toEqual(["s=a x=x y=x", "s=b x=2 y=2^^integer", "s=c x=u y=u"]);
+
+            // an error leaves the variable unbound and keeps the solution
+            results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT ?s (LANG(?v) AS ?x) (-?v AS ?z) { ?s :p ?v } ORDER BY ?s",
+            );
+            expect(termRows(results, ["s", "x", "z"])).toEqual(["s=a x=en z=-", "s=b x= z=-2^^integer", "s=c x=- z=-"]);
         });
 
-        it("should compute arithmetic results and errors (ArithmeticResults)", function (done) {
-            newEngine(function (engine) {
-                var query = "PREFIX : <http://example/> INSERT DATA { :b :p 2 . :c :p :u }";
+        it("should compute arithmetic results and errors (ArithmeticResults)", async function () {
+            var engine = await createEngine();
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        'PREFIX : <http://example/> SELECT ?s ?x ?y ?z { ?s :p ?v BIND(?v + 1 AS ?x) BIND(1/"a" AS ?y) BIND(!(1/"a") AS ?z) } ORDER BY ?s',
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(termRows(results, ["s", "x", "y", "z"])).toEqual([
-                                "s=b x=3^^integer y=- z=-",
-                                "s=c x=- y=- z=-",
-                            ]);
-                            expect(typeof results[0].x.value).toBe("string");
-                            engine.execute(
-                                "PREFIX : <http://example/> SELECT ?s (?v / 4 AS ?x) (?v / 0 AS ?y) { ?s :p ?v } ORDER BY ?s",
-                                function (err, results) {
-                                    expect(err).toBeNull();
-                                    expect(termRows(results, ["s", "x", "y"])).toEqual([
-                                        "s=b x=0.5^^decimal y=-",
-                                        "s=c x=- y=-",
-                                    ]);
-                                    // error || true is true
-                                    engine.execute(
-                                        "PREFIX : <http://example/> SELECT ?s { ?s :p ?v FILTER(?v + 1 > 2 || true) } ORDER BY ?s",
-                                        function (err, results) {
-                                            expect(err).toBeNull();
-                                            expect(termRows(results, ["s"])).toEqual(["s=b", "s=c"]);
-                                            done();
-                                        },
-                                    );
-                                },
-                            );
-                        },
-                    );
-                });
-            });
+            var query = "PREFIX : <http://example/> INSERT DATA { :b :p 2 . :c :p :u }";
+
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                'PREFIX : <http://example/> SELECT ?s ?x ?y ?z { ?s :p ?v BIND(?v + 1 AS ?x) BIND(1/"a" AS ?y) BIND(!(1/"a") AS ?z) } ORDER BY ?s',
+            );
+            expect(termRows(results, ["s", "x", "y", "z"])).toEqual(["s=b x=3^^integer y=- z=-", "s=c x=- y=- z=-"]);
+            expect(typeof results[0].x.value).toBe("string");
+
+            results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT ?s (?v / 4 AS ?x) (?v / 0 AS ?y) { ?s :p ?v } ORDER BY ?s",
+            );
+            expect(termRows(results, ["s", "x", "y"])).toEqual(["s=b x=0.5^^decimal y=-", "s=c x=- y=-"]);
+
+            // error || true is true
+            results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT ?s { ?s :p ?v FILTER(?v + 1 > 2 || true) } ORDER BY ?s",
+            );
+            expect(termRows(results, ["s"])).toEqual(["s=b", "s=c"]);
         });
 
-        it("should read computed infinities and large integers back (ComputedLiteralForms)", function (done) {
-            newEngine(function (engine) {
-                var query = "PREFIX : <http://example/> INSERT DATA { :b :p 2 . :c :p 3 }";
-                var xsd = "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> ";
+        it("should read computed infinities and large integers back (ComputedLiteralForms)", async function () {
+            var engine = await createEngine();
 
-                engine.execute(query, function (err, result) {
-                    // a computed INF is read back as infinity
-                    engine.execute(
-                        xsd +
-                            'PREFIX : <http://example/> SELECT ?s ?x ?y { ?s :p ?v BIND(?v / "0"^^xsd:double AS ?x) BIND(?x + 1 AS ?y) FILTER(?x > 1) } ORDER BY ?s',
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(termRows(results, ["s", "x", "y"])).toEqual([
-                                "s=b x=INF^^double y=INF^^double",
-                                "s=c x=INF^^double y=INF^^double",
-                            ]);
-                            // a large integer keeps its digits
-                            engine.execute(
-                                "PREFIX : <http://example/> SELECT ?x ?y { :b :p ?v BIND(10000000000 * 10000000000 * 10 AS ?x) BIND(?x + ?v AS ?y) }",
-                                function (err, results) {
-                                    expect(err).toBeNull();
-                                    expect(termRows(results, ["x", "y"])).toEqual([
-                                        "x=1000000000000000000000^^integer y=1000000000000000000000^^integer",
-                                    ]);
-                                    // the same form from an aggregate
-                                    engine.execute(
-                                        xsd +
-                                            'PREFIX : <http://example/> SELECT (SUM(?v) / "0"^^xsd:double AS ?a) { ?s :p ?v } HAVING (?a > 1)',
-                                        function (err, results) {
-                                            expect(err).toBeNull();
-                                            expect(termRows(results, ["a"])).toEqual(["a=INF^^double"]);
-                                            done();
-                                        },
-                                    );
-                                },
-                            );
-                        },
-                    );
-                });
-            });
+            var query = "PREFIX : <http://example/> INSERT DATA { :b :p 2 . :c :p 3 }";
+            var xsd = "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> ";
+
+            await execute(engine, query);
+
+            // a computed INF is read back as infinity
+            var results = await execute(
+                engine,
+                xsd +
+                    'PREFIX : <http://example/> SELECT ?s ?x ?y { ?s :p ?v BIND(?v / "0"^^xsd:double AS ?x) BIND(?x + 1 AS ?y) FILTER(?x > 1) } ORDER BY ?s',
+            );
+            expect(termRows(results, ["s", "x", "y"])).toEqual([
+                "s=b x=INF^^double y=INF^^double",
+                "s=c x=INF^^double y=INF^^double",
+            ]);
+
+            // a large integer keeps its digits
+            results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT ?x ?y { :b :p ?v BIND(10000000000 * 10000000000 * 10 AS ?x) BIND(?x + ?v AS ?y) }",
+            );
+            expect(termRows(results, ["x", "y"])).toEqual([
+                "x=1000000000000000000000^^integer y=1000000000000000000000^^integer",
+            ]);
+
+            // the same form from an aggregate
+            results = await execute(
+                engine,
+                xsd +
+                    'PREFIX : <http://example/> SELECT (SUM(?v) / "0"^^xsd:double AS ?a) { ?s :p ?v } HAVING (?a > 1)',
+            );
+            expect(termRows(results, ["a"])).toEqual(["a=INF^^double"]);
         });
 
-        it("should evaluate IN and NOT IN with IRIs (InWithIris)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    "PREFIX : <http://example/> INSERT DATA { :a :p :b . :a :p :c . :a :p :d . :a :p 2 }",
-                    function (err, result) {
-                        expect(err).toBeNull();
-                        engine.execute(
-                            "PREFIX : <http://example/> SELECT ?o { ?s :p ?o FILTER(?o IN (:b, :c, 2)) } ORDER BY ?o",
-                            function (err, results) {
-                                expect(err).toBeNull();
-                                expect(termRows(results, ["o"])).toEqual(["o=b", "o=c", "o=2^^integer"]);
-                                engine.execute(
-                                    "PREFIX : <http://example/> SELECT ?o { ?s :p ?o FILTER(?o not in (:b, :c)) } ORDER BY ?o",
-                                    function (err, results) {
-                                        expect(err).toBeNull();
-                                        expect(termRows(results, ["o"])).toEqual(["o=d", "o=2^^integer"]);
-                                        done();
-                                    },
-                                );
-                            },
-                        );
-                    },
-                );
-            });
+        it("should evaluate IN and NOT IN with IRIs (InWithIris)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                "PREFIX : <http://example/> INSERT DATA { :a :p :b . :a :p :c . :a :p :d . :a :p 2 }",
+            );
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT ?o { ?s :p ?o FILTER(?o IN (:b, :c, 2)) } ORDER BY ?o",
+            );
+            expect(termRows(results, ["o"])).toEqual(["o=b", "o=c", "o=2^^integer"]);
+
+            results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT ?o { ?s :p ?o FILTER(?o not in (:b, :c)) } ORDER BY ?o",
+            );
+            expect(termRows(results, ["o"])).toEqual(["o=d", "o=2^^integer"]);
         });
 
         var mixedTypes =
             ':a :v 1 . :b :v 2 . :c :v "x"@en . :e :v "y" . :f :v :iri . :g :v "z"^^:custom . ' +
             ':a :d "2020-01-01"^^xsd:date ; :t "2020-01-01T00:00:00Z"^^xsd:dateTime';
 
-        it("should give an error for values that can't be compared (RelationalTypeErrors)", function (done) {
-            checkQueries(
-                mixedTypes,
+        it("should give an error for values that can't be compared (RelationalTypeErrors)", async function () {
+            await checkQueries(mixedTypes, [
+                // values that can't be compared with a number give an error, and so does its negation
+                ["SELECT ?s { ?s :v ?o FILTER(!(?o > 1)) } ORDER BY ?s", ["s"], ["s=a"]],
                 [
-                    // values that can't be compared with a number give an error, and so does its negation
-                    ["SELECT ?s { ?s :v ?o FILTER(!(?o > 1)) } ORDER BY ?s", ["s"], ["s=a"]],
-                    [
-                        "SELECT ?s (?o > 1 AS ?gt) { ?s :v ?o } ORDER BY ?s",
-                        ["s", "gt"],
-                        [
-                            "s=a gt=false^^boolean",
-                            "s=b gt=true^^boolean",
-                            "s=c gt=-",
-                            "s=e gt=-",
-                            "s=f gt=-",
-                            "s=g gt=-",
-                        ],
-                    ],
-                    [
-                        "SELECT (?d < ?t AS ?lt) (?d = ?t AS ?eq) { :a :d ?d ; :t ?t }",
-                        ["lt", "eq"],
-                        ["lt=- eq=false^^boolean"],
-                    ],
-                    ['SELECT ("a" < "b"^^xsd:string AS ?lt) { :a :v 1 }', ["lt"], ["lt=true^^boolean"]],
+                    "SELECT ?s (?o > 1 AS ?gt) { ?s :v ?o } ORDER BY ?s",
+                    ["s", "gt"],
+                    ["s=a gt=false^^boolean", "s=b gt=true^^boolean", "s=c gt=-", "s=e gt=-", "s=f gt=-", "s=g gt=-"],
                 ],
-                done,
-            );
+                [
+                    "SELECT (?d < ?t AS ?lt) (?d = ?t AS ?eq) { :a :d ?d ; :t ?t }",
+                    ["lt", "eq"],
+                    ["lt=- eq=false^^boolean"],
+                ],
+                ['SELECT ("a" < "b"^^xsd:string AS ?lt) { :a :v 1 }', ["lt"], ["lt=true^^boolean"]],
+            ]);
         });
 
-        it("should compare literals of different types as unequal or as an error (MixedTypeEquality)", function (done) {
-            checkQueries(
-                mixedTypes,
+        it("should compare literals of different types as unequal or as an error (MixedTypeEquality)", async function () {
+            await checkQueries(mixedTypes, [
+                // literals of different known types are unequal; a literal of an unknown type can't be compared
+                ['SELECT ?s { ?s :v ?o FILTER(?o != "y") } ORDER BY ?s', ["s"], ["s=a", "s=b", "s=c", "s=f"]],
+                ['SELECT ?s { ?s :v ?o FILTER(?o NOT IN ("y", 2)) } ORDER BY ?s', ["s"], ["s=a", "s=c", "s=f"]],
+                // an unbound value can't be compared either
+                ['SELECT ?s { ?s :v ?o OPTIONAL { ?s :d ?d } FILTER(?d != "x") }', ["s"], ["s=a"]],
                 [
-                    // literals of different known types are unequal; a literal of an unknown type can't be compared
-                    ['SELECT ?s { ?s :v ?o FILTER(?o != "y") } ORDER BY ?s', ["s"], ["s=a", "s=b", "s=c", "s=f"]],
-                    ['SELECT ?s { ?s :v ?o FILTER(?o NOT IN ("y", 2)) } ORDER BY ?s', ["s"], ["s=a", "s=c", "s=f"]],
-                    // an unbound value can't be compared either
-                    ['SELECT ?s { ?s :v ?o OPTIONAL { ?s :d ?d } FILTER(?d != "x") }', ["s"], ["s=a"]],
-                    [
-                        'SELECT (1 = "1" AS ?x) (true = 1 AS ?y) ("z"^^:c = 1 AS ?z) ("z"^^:c = "z"^^:d AS ?w) (1 = 1.0 AS ?n) { :a :v 1 }',
-                        ["x", "y", "z", "w", "n"],
-                        ["x=false^^boolean y=false^^boolean z=- w=- n=true^^boolean"],
-                    ],
+                    'SELECT (1 = "1" AS ?x) (true = 1 AS ?y) ("z"^^:c = 1 AS ?z) ("z"^^:c = "z"^^:d AS ?w) (1 = 1.0 AS ?n) { :a :v 1 }',
+                    ["x", "y", "z", "w", "n"],
+                    ["x=false^^boolean y=false^^boolean z=- w=- n=true^^boolean"],
                 ],
-                done,
-            );
+            ]);
         });
 
-        it("should resolve prefixed IRIs in expressions, also when grouped (IriConstantsAndGroupedExpressions)", function (done) {
-            checkQueries(
-                ":a :p 1 , 2 . :b :p 3",
+        it("should resolve prefixed IRIs in expressions, also when grouped (IriConstantsAndGroupedExpressions)", async function () {
+            await checkQueries(":a :p 1 , 2 . :b :p 3", [
+                // prefixed IRIs in expressions are resolved, also when grouped, aggregated or sorted
+                ["SELECT (:c AS ?x) (STR(:c) AS ?y) {}", ["x", "y"], ["x=c y=c"]],
+                ["SELECT ?s (:c AS ?x) { ?s :p ?o } GROUP BY ?s ORDER BY ?s", ["s", "x"], ["s=a x=c", "s=b x=c"]],
+                ["SELECT ?k (COUNT(*) AS ?n) { ?s :p ?o } GROUP BY (:c AS ?k)", ["k", "n"], ["k=c n=3^^integer"]],
+                ["SELECT (MAX(:c) AS ?x) { ?s :p ?o }", ["x"], ["x=c"]],
+                ["SELECT ?o { ?s :p ?o } ORDER BY (:c) ?o", ["o"], ["o=1^^integer", "o=2^^integer", "o=3^^integer"]],
+                ["SELECT DISTINCT ?s { ?s :p ?o FILTER(STR(?s) = STR(:b)) }", ["s"], ["s=b"]],
+                ["SELECT DISTINCT ?s { ?s :p ?o FILTER EXISTS { ?s :p ?x FILTER(?s = :b) } }", ["s"], ["s=b"]],
+                // a grouped expression without an aggregate is evaluated (it was missing from the result)
                 [
-                    // prefixed IRIs in expressions are resolved, also when grouped, aggregated or sorted
-                    ["SELECT (:c AS ?x) (STR(:c) AS ?y) {}", ["x", "y"], ["x=c y=c"]],
-                    ["SELECT ?s (:c AS ?x) { ?s :p ?o } GROUP BY ?s ORDER BY ?s", ["s", "x"], ["s=a x=c", "s=b x=c"]],
-                    ["SELECT ?k (COUNT(*) AS ?n) { ?s :p ?o } GROUP BY (:c AS ?k)", ["k", "n"], ["k=c n=3^^integer"]],
-                    ["SELECT (MAX(:c) AS ?x) { ?s :p ?o }", ["x"], ["x=c"]],
-                    [
-                        "SELECT ?o { ?s :p ?o } ORDER BY (:c) ?o",
-                        ["o"],
-                        ["o=1^^integer", "o=2^^integer", "o=3^^integer"],
-                    ],
-                    ["SELECT DISTINCT ?s { ?s :p ?o FILTER(STR(?s) = STR(:b)) }", ["s"], ["s=b"]],
-                    ["SELECT DISTINCT ?s { ?s :p ?o FILTER EXISTS { ?s :p ?x FILTER(?s = :b) } }", ["s"], ["s=b"]],
-                    // a grouped expression without an aggregate is evaluated (it was missing from the result)
-                    [
-                        'SELECT (STR(?s) AS ?x) ("k" AS ?y) { ?s :p ?o } GROUP BY ?s ORDER BY ?x',
-                        ["x", "y"],
-                        ["x=a y=k", "x=b y=k"],
-                    ],
+                    'SELECT (STR(?s) AS ?x) ("k" AS ?y) { ?s :p ?o } GROUP BY ?s ORDER BY ?x',
+                    ["x", "y"],
+                    ["x=a y=k", "x=b y=k"],
                 ],
-                function () {
-                    newEngine(function (engine) {
-                        engine.execute("INSERT DATA { <r> <http://example/p> 1 }", function (err) {
-                            expect(err).toBeNull();
-                            // BASE resolves relative IRIs of the query, not the stored IRI <r>
-                            engine.execute(
-                                "BASE <http://example/> SELECT (<d> AS ?x) (?s AS ?y) ?z { ?s <p> ?o BIND(?s AS ?z) }",
-                                function (err, results) {
-                                    expect(err).toBeNull();
-                                    expect([results[0].x.value, results[0].y.value, results[0].z.value]).toEqual([
-                                        "http://example/d",
-                                        "r",
-                                        "r",
-                                    ]);
-                                    done();
-                                },
-                            );
+            ]);
+            var engine = await createEngine();
+            await execute(engine, "INSERT DATA { <r> <http://example/p> 1 }");
+            // BASE resolves relative IRIs of the query, not the stored IRI <r>
+            var results = await execute(
+                engine,
+                "BASE <http://example/> SELECT (<d> AS ?x) (?s AS ?y) ?z { ?s <p> ?o BIND(?s AS ?z) }",
+            );
+            expect([results[0].x.value, results[0].y.value, results[0].z.value]).toEqual([
+                "http://example/d",
+                "r",
+                "r",
+            ]);
+        });
+
+        it("should create blank nodes with BNODE() (BNodeFunction)", async function () {
+            await checkQueries(":a :p 1 . :b :p 2", [
+                ["SELECT ?x ?y { ?s :p ?o BIND(BNODE() AS ?x) BIND(BNODE() AS ?y) }", expectNewBlanks(["x", "y"])],
+                ["SELECT (BNODE() AS ?x) { ?s :p ?o }", expectNewBlanks(["x"])],
+                // BNODE(str): the same blank node for the same string within a solution
+                [
+                    'SELECT ?x ?y { ?s :p ?o BIND(BNODE("k") AS ?x) BIND(BNODE("k") AS ?y) }',
+                    function (results, query) {
+                        expect(results.length).withContext(query).toBe(2);
+                        results.forEach(function (result) {
+                            expect(result.x.token).withContext(query).toBe("blank");
+                            expect(result.y.value).withContext(query).toBe(result.x.value);
                         });
-                    });
-                },
-            );
-        });
-
-        it("should create blank nodes with BNODE() (BNodeFunction)", function (done) {
-            checkQueries(
-                ":a :p 1 . :b :p 2",
-                [
-                    ["SELECT ?x ?y { ?s :p ?o BIND(BNODE() AS ?x) BIND(BNODE() AS ?y) }", expectNewBlanks(["x", "y"])],
-                    ["SELECT (BNODE() AS ?x) { ?s :p ?o }", expectNewBlanks(["x"])],
-                    // BNODE(str): the same blank node for the same string within a solution
-                    [
-                        'SELECT ?x ?y { ?s :p ?o BIND(BNODE("k") AS ?x) BIND(BNODE("k") AS ?y) }',
-                        function (results, query) {
-                            expect(results.length).withContext(query).toBe(2);
-                            results.forEach(function (result) {
-                                expect(result.x.token).withContext(query).toBe("blank");
-                                expect(result.y.value).withContext(query).toBe(result.x.value);
-                            });
-                            expect(results[0].x.value).withContext(query).not.toBe(results[1].x.value);
-                        },
-                    ],
-                    ["SELECT ?x { ?s :p ?o BIND(BNODE(STR(?s)) AS ?x) }", expectNewBlanks(["x"])],
-                    ["SELECT ?x { :a :p ?o BIND(BNODE(1) AS ?x) }", ["x"], ["x=-"]],
-                    ['SELECT ?x { :a :p ?o BIND(BNODE("k"@en) AS ?x) }', ["x"], ["x=-"]],
-                    [
-                        "SELECT ?s { ?s :p ?o FILTER EXISTS { ?s ?q ?v FILTER(isBlank(BNODE())) } } ORDER BY ?s",
-                        ["s"],
-                        ["s=a", "s=b"],
-                    ],
-                    // a new blank node matches no quad of the store
-                    ["SELECT ?s { ?s :p ?o BIND(BNODE() AS ?x) ?x ?q ?v }", ["s"], []],
-                    ["INSERT { ?x :q ?o } WHERE { ?s :p ?o BIND(BNODE() AS ?x) }"],
-                    ["SELECT (COUNT(DISTINCT ?x) AS ?n) { ?x :q ?o FILTER(isBlank(?x)) }", ["n"], ["n=2^^integer"]],
-                    ["INSERT { ?x :u ?o . ?x :w ?s } WHERE { ?s :p ?o BIND(BNODE() AS ?x) }"],
-                    [
-                        "SELECT ?s ?o { ?x :u ?o ; :w ?s } ORDER BY ?s",
-                        ["s", "o"],
-                        ["s=a o=1^^integer", "s=b o=2^^integer"],
-                    ],
-                    // one blank node per solution, used by both template triples
-                    [
-                        "CONSTRUCT { ?x :r ?o . ?x :t ?s } WHERE { ?s :p ?o BIND(BNODE() AS ?x) }",
-                        function (graph, query) {
-                            var subjects = graph.toArray().map(function (triple) {
-                                return triple.subject;
-                            });
-                            expect(subjects.length).withContext(query).toBe(4);
-                            subjects.forEach(function (subject) {
-                                expect(subject.interfaceName).withContext(query).toBe("BlankNode");
-                            });
-                            expect(_.uniq(subjects.map(String)).length)
-                                .withContext(query)
-                                .toBe(2);
-                        },
-                    ],
+                        expect(results[0].x.value).withContext(query).not.toBe(results[1].x.value);
+                    },
                 ],
-                done,
-            );
+                ["SELECT ?x { ?s :p ?o BIND(BNODE(STR(?s)) AS ?x) }", expectNewBlanks(["x"])],
+                ["SELECT ?x { :a :p ?o BIND(BNODE(1) AS ?x) }", ["x"], ["x=-"]],
+                ['SELECT ?x { :a :p ?o BIND(BNODE("k"@en) AS ?x) }', ["x"], ["x=-"]],
+                [
+                    "SELECT ?s { ?s :p ?o FILTER EXISTS { ?s ?q ?v FILTER(isBlank(BNODE())) } } ORDER BY ?s",
+                    ["s"],
+                    ["s=a", "s=b"],
+                ],
+                // a new blank node matches no quad of the store
+                ["SELECT ?s { ?s :p ?o BIND(BNODE() AS ?x) ?x ?q ?v }", ["s"], []],
+                ["INSERT { ?x :q ?o } WHERE { ?s :p ?o BIND(BNODE() AS ?x) }"],
+                ["SELECT (COUNT(DISTINCT ?x) AS ?n) { ?x :q ?o FILTER(isBlank(?x)) }", ["n"], ["n=2^^integer"]],
+                ["INSERT { ?x :u ?o . ?x :w ?s } WHERE { ?s :p ?o BIND(BNODE() AS ?x) }"],
+                ["SELECT ?s ?o { ?x :u ?o ; :w ?s } ORDER BY ?s", ["s", "o"], ["s=a o=1^^integer", "s=b o=2^^integer"]],
+                // one blank node per solution, used by both template triples
+                [
+                    "CONSTRUCT { ?x :r ?o . ?x :t ?s } WHERE { ?s :p ?o BIND(BNODE() AS ?x) }",
+                    function (graph, query) {
+                        var subjects = graph.toArray().map(function (triple) {
+                            return triple.subject;
+                        });
+                        expect(subjects.length).withContext(query).toBe(4);
+                        subjects.forEach(function (subject) {
+                            expect(subject.interfaceName).withContext(query).toBe("BlankNode");
+                        });
+                        expect(new Set(subjects.map(String)).size)
+                            .withContext(query)
+                            .toBe(2);
+                    },
+                ],
+            ]);
         });
 
-        it("should keep the internal path variables inside EXISTS apart from the outer ones (PathsInExists)", function (done) {
+        it("should keep the internal path variables inside EXISTS apart from the outer ones (PathsInExists)", async function () {
             // the internal variables of a path sequence inside EXISTS don't take the values of the outer ones
-            checkQueries(
-                ":a :p :m . :m :q :b . :c :r :n . :n :s :d",
-                [
-                    ["SELECT ?a { ?a :p/:q ?b FILTER EXISTS { :c :r/:s :d } }", ["a"], ["a=a"]],
-                    ["SELECT ?a ?c { ?a :p/:q ?b FILTER EXISTS { ?c :r/:s ?d } }", ["a", "c"], ["a=a c=-"]],
-                ],
-                done,
-            );
+            await checkQueries(":a :p :m . :m :q :b . :c :r :n . :n :s :d", [
+                ["SELECT ?a { ?a :p/:q ?b FILTER EXISTS { :c :r/:s :d } }", ["a"], ["a=a"]],
+                ["SELECT ?a ?c { ?a :p/:q ?b FILTER EXISTS { ?c :r/:s ?d } }", ["a", "c"], ["a=a c=-"]],
+            ]);
         });
 
-        it("should filter with EXISTS (FILTER EXISTS)", function (done) {
-            newEngine({ treeOrder: 15 }, function (engine) {
-                var query =
-                    'BASE <http://example.org/book/>\
+        it("should filter with EXISTS (FILTER EXISTS)", async function () {
+            var engine = await createEngine({ treeOrder: 15 });
+
+            var query =
+                'BASE <http://example.org/book/>\
                              PREFIX dc:  <http://purl.org/dc/elements/1.1/> \
                              PREFIX ns:  <http://example.org/ns#>\
                              INSERT DATA {\
@@ -1578,30 +1343,26 @@ describe("QueryEngine", function () {
                                <book2>  ns:price     23 .\
                                <book2>  ns:discount  0.25 .\
                              }';
-                engine.execute(query, function (err, result) {
-                    expect(err).toBeNull();
-                    var query =
-                        "PREFIX  dc:  <http://purl.org/dc/elements/1.1/>\
+            await execute(engine, query);
+
+            query =
+                "PREFIX  dc:  <http://purl.org/dc/elements/1.1/>\
                                  PREFIX  ns:  <http://example.org/ns#>\
                                  SELECT  * \
                                  { ?x ns:discount ?discount .\
                                    ?x dc:title ?title .\
                                     FILTER EXISTS { ?x ns:price ?p FILTER (?p = 23) } .\
                                  }";
-                    engine.execute(query, function (err, result) {
-                        expect(err).toBeNull();
-                        expect(result.length).toEqual(1);
-                        expect(result[0].title.value).toEqual("The Semantic Web");
-                        done();
-                    });
-                });
-            });
+            var result = await execute(engine, query);
+            expect(result.length).toEqual(1);
+            expect(result[0].title.value).toEqual("The Semantic Web");
         });
 
-        it("should combine EXISTS with other conditions (FILTER EXISTS composition)", function (done) {
-            newEngine({ treeOrder: 15 }, function (engine) {
-                var query =
-                    'BASE <http://example.org/book/>\
+        it("should combine EXISTS with other conditions (FILTER EXISTS composition)", async function () {
+            var engine = await createEngine({ treeOrder: 15 });
+
+            var query =
+                'BASE <http://example.org/book/>\
                           PREFIX dc:  <http://purl.org/dc/elements/1.1/> \
                           PREFIX ns:  <http://example.org/ns#>\
                           INSERT DATA {\
@@ -1613,30 +1374,27 @@ describe("QueryEngine", function () {
                             <book2>  ns:price     23 .\
                             <book2>  ns:discount  0.25 .\
                           }';
-                engine.execute(query, function (err, result) {
-                    expect(err).toBeNull();
-                    var query =
-                        "PREFIX  dc:  <http://purl.org/dc/elements/1.1/>\
+            await execute(engine, query);
+
+            query =
+                "PREFIX  dc:  <http://purl.org/dc/elements/1.1/>\
                               PREFIX  ns:  <http://example.org/ns#>\
                               SELECT  * \
                               {  ?x ns:price ?p .\
                                  FILTER (?p = 23 || EXISTS { ?x ns:price 42 })  .\
                               }";
-                    engine.execute(query, function (err, result) {
-                        expect(err).toBeNull();
-                        expect(result.length).toEqual(2);
-                        done();
-                    });
-                });
-            });
+            var result = await execute(engine, query);
+            expect(result.length).toEqual(2);
         });
     });
 
     describe("solution modifiers", function () {
-        it("should remove duplicate solutions with DISTINCT (OptionalDistinct1)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should remove duplicate solutions with DISTINCT (OptionalDistinct1)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {\
                                  _:x    foaf:name   'Alice' .\
                                  _:x    foaf:mbox   <mailto:alice@example.com> .\
@@ -1645,25 +1403,23 @@ describe("QueryEngine", function () {
                                  _:z    foaf:name   'Alice' .\
                                  _:z    foaf:mbox   <mailto:alice.smith@example.com> .\
                                }",
-                    function (err, result) {
-                        engine.execute(
-                            "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
+            );
+
+            var results = await execute(
+                engine,
+                "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
                                                    SELECT DISTINCT ?name WHERE { ?x foaf:name ?name }",
-                            function (err, results) {
-                                expect(results.length).toBe(1);
-                                expect(results[0].name.value).toBe("Alice");
-                                done();
-                            },
-                        );
-                    },
-                );
-            });
+            );
+            expect(results.length).toBe(1);
+            expect(results[0].name.value).toBe("Alice");
         });
 
-        it("should return at most LIMIT solutions (Limit1)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should return at most LIMIT solutions (Limit1)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {\
                                  _:x    foaf:name   'Alice' .\
                                  _:x    foaf:mbox   <mailto:alice@example.com> .\
@@ -1672,26 +1428,24 @@ describe("QueryEngine", function () {
                                  _:z    foaf:name   'Alice' .\
                                  _:z    foaf:mbox   <mailto:alice.smith@example.com> .\
                                }",
-                    function (err, result) {
-                        engine.execute(
-                            "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
+            );
+
+            var results = await execute(
+                engine,
+                "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
                                     SELECT ?name WHERE { ?x foaf:name ?name } LIMIT 2",
-                            function (err, results) {
-                                expect(results.length).toBe(2);
-                                expect(results[0].name.value).toBe("Alice");
-                                expect(results[1].name.value).toBe("Alice");
-                                done();
-                            },
-                        );
-                    },
-                );
-            });
+            );
+            expect(results.length).toBe(2);
+            expect(results[0].name.value).toBe("Alice");
+            expect(results[1].name.value).toBe("Alice");
         });
 
-        it("should order solutions ascending (OrderBy1)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should order solutions ascending (OrderBy1)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {\
                                  _:x    foaf:name   'Bob' .\
                                  _:x    foaf:mbox   <mailto:alice@example.com> .\
@@ -1700,27 +1454,25 @@ describe("QueryEngine", function () {
                                  _:z    foaf:name   'Marie' .\
                                  _:z    foaf:mbox   <mailto:alice.smith@example.com> .\
                                }",
-                    function (err, result) {
-                        engine.execute(
-                            "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
+            );
+
+            var results = await execute(
+                engine,
+                "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
                                                    SELECT ?name WHERE { ?x foaf:name ?name } ORDER BY ?name",
-                            function (err, results) {
-                                expect(results.length).toBe(3);
-                                expect(results[0].name.value).toBe("Alice");
-                                expect(results[1].name.value).toBe("Bob");
-                                expect(results[2].name.value).toBe("Marie");
-                                done();
-                            },
-                        );
-                    },
-                );
-            });
+            );
+            expect(results.length).toBe(3);
+            expect(results[0].name.value).toBe("Alice");
+            expect(results[1].name.value).toBe("Bob");
+            expect(results[2].name.value).toBe("Marie");
         });
 
-        it("should order solutions descending (OrderBy2)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should order solutions descending (OrderBy2)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {\
                                  _:x    foaf:name   'Bob' .\
                                  _:x    foaf:mbox   <mailto:alice@example.com> .\
@@ -1729,27 +1481,25 @@ describe("QueryEngine", function () {
                                  _:z    foaf:name   'Marie' .\
                                  _:z    foaf:mbox   <mailto:alice.smith@example.com> .\
                                }",
-                    function (err, result) {
-                        engine.execute(
-                            "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
+            );
+
+            var results = await execute(
+                engine,
+                "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
                                                    SELECT ?name WHERE { ?x foaf:name ?name } ORDER BY DESC(?name)",
-                            function (err, results) {
-                                expect(results.length).toBe(3);
-                                expect(results[0].name.value).toBe("Marie");
-                                expect(results[1].name.value).toBe("Bob");
-                                expect(results[2].name.value).toBe("Alice");
-                                done();
-                            },
-                        );
-                    },
-                );
-            });
+            );
+            expect(results.length).toBe(3);
+            expect(results[0].name.value).toBe("Marie");
+            expect(results[1].name.value).toBe("Bob");
+            expect(results[2].name.value).toBe("Alice");
         });
 
-        it("should order IRIs with ASC (OrderBy3)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should order IRIs with ASC (OrderBy3)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {\
                                  _:x    foaf:name   'Bob' .\
                                  _:x    foaf:mbox   <mailto:bob@example.com> .\
@@ -1758,27 +1508,25 @@ describe("QueryEngine", function () {
                                  _:z    foaf:name   'Marie' .\
                                  _:z    foaf:mbox   <mailto:marie@example.com> .\
                                }",
-                    function (err, result) {
-                        engine.execute(
-                            "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
+            );
+
+            var results = await execute(
+                engine,
+                "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
                                                    SELECT ?mbox WHERE { ?x foaf:mbox ?mbox } ORDER BY ASC(?mbox)",
-                            function (err, results) {
-                                expect(results.length).toBe(3);
-                                expect(results[0].mbox.value).toBe("mailto:alice@example.com");
-                                expect(results[1].mbox.value).toBe("mailto:bob@example.com");
-                                expect(results[2].mbox.value).toBe("mailto:marie@example.com");
-                                done();
-                            },
-                        );
-                    },
-                );
-            });
+            );
+            expect(results.length).toBe(3);
+            expect(results[0].mbox.value).toBe("mailto:alice@example.com");
+            expect(results[1].mbox.value).toBe("mailto:bob@example.com");
+            expect(results[2].mbox.value).toBe("mailto:marie@example.com");
         });
 
-        it("should order by several keys (OrderBy4)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should order by several keys (OrderBy4)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                "PREFIX  foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {\
                                  _:x    foaf:name   'Bob' .\
                                  _:x    foaf:test1   'b' .\
@@ -1787,69 +1535,49 @@ describe("QueryEngine", function () {
                                  _:z    foaf:name   'Marie' .\
                                  _:z    foaf:test1   'a' .\
                                }",
-                    function (err, result) {
-                        engine.execute(
-                            "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
+            );
+
+            var results = await execute(
+                engine,
+                "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
                                                    SELECT ?name WHERE { ?x foaf:test1 ?test . ?x foaf:name ?name } ORDER BY ASC(?test) ASC(?name)",
-                            function (err, results) {
-                                expect(results.length).toBe(3);
-                                expect(results[0].name.value).toBe("Alice");
-                                expect(results[1].name.value).toBe("Marie");
-                                expect(results[2].name.value).toBe("Bob");
-                                done();
-                            },
-                        );
-                    },
-                );
-            });
+            );
+            expect(results.length).toBe(3);
+            expect(results[0].name.value).toBe("Alice");
+            expect(results[1].name.value).toBe("Marie");
+            expect(results[2].name.value).toBe("Bob");
         });
 
-        it("should order by a projected expression (OrderByProjectedExpression)", function (done) {
-            newEngine(function (engine) {
-                var query = "PREFIX : <http://example/> INSERT DATA { :b :p 2 . :c :p 3 . :d :p :u }";
+        it("should order by a projected expression (OrderByProjectedExpression)", async function () {
+            var engine = await createEngine();
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT ?s (?v * 2 AS ?d) { ?s :p ?v } ORDER BY DESC(?d) LIMIT 2",
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(termRows(results, ["s", "d"])).toEqual(["s=c d=6^^integer", "s=b d=4^^integer"]);
-                            // the effective boolean value of an IRI is an error, and so is its negation
-                            engine.execute(
-                                "PREFIX : <http://example/> SELECT ?s { ?s :p ?v FILTER(!?v) }",
-                                function (err, results) {
-                                    expect(err).toBeNull();
-                                    expect(termRows(results, ["s"])).toEqual([]);
-                                    // AVG of values that are no numbers is unbound, AVG of no values is 0
-                                    engine.execute(
-                                        "PREFIX : <http://example/> SELECT ?s (AVG(?v) AS ?a) { ?s :p ?v } GROUP BY ?s ORDER BY ?s",
-                                        function (err, results) {
-                                            expect(err).toBeNull();
-                                            expect(termRows(results, ["s", "a"])).toEqual([
-                                                "s=b a=2^^decimal",
-                                                "s=c a=3^^decimal",
-                                                "s=d a=-",
-                                            ]);
-                                            engine.execute(
-                                                "PREFIX : <http://example/> SELECT (AVG(?v) AS ?a) { ?s :nothing ?v }",
-                                                function (err, results) {
-                                                    expect(err).toBeNull();
-                                                    expect(termRows(results, ["a"])).toEqual(["a=0^^integer"]);
-                                                    done();
-                                                },
-                                            );
-                                        },
-                                    );
-                                },
-                            );
-                        },
-                    );
-                });
-            });
+            var query = "PREFIX : <http://example/> INSERT DATA { :b :p 2 . :c :p 3 . :d :p :u }";
+
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT ?s (?v * 2 AS ?d) { ?s :p ?v } ORDER BY DESC(?d) LIMIT 2",
+            );
+            expect(termRows(results, ["s", "d"])).toEqual(["s=c d=6^^integer", "s=b d=4^^integer"]);
+
+            // the effective boolean value of an IRI is an error, and so is its negation
+            results = await execute(engine, "PREFIX : <http://example/> SELECT ?s { ?s :p ?v FILTER(!?v) }");
+            expect(termRows(results, ["s"])).toEqual([]);
+
+            // AVG of values that are no numbers is unbound, AVG of no values is 0
+            results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT ?s (AVG(?v) AS ?a) { ?s :p ?v } GROUP BY ?s ORDER BY ?s",
+            );
+            expect(termRows(results, ["s", "a"])).toEqual(["s=b a=2^^decimal", "s=c a=3^^decimal", "s=d a=-"]);
+
+            results = await execute(engine, "PREFIX : <http://example/> SELECT (AVG(?v) AS ?a) { ?s :nothing ?v }");
+            expect(termRows(results, ["a"])).toEqual(["a=0^^integer"]);
         });
 
-        it("should order typed literals by value (OrderByTypedValues)", function (done) {
-            checkQueries(
+        it("should order typed literals by value (OrderByTypedValues)", async function () {
+            await checkQueries(
                 ':a :s "ab"^^xsd:string , "b" , "a"^^xsd:string . :a :x "foo"^^xsd:date , "2020-01-01"^^xsd:date , "bar"^^xsd:date . :a :b "1"^^xsd:boolean , "false"^^xsd:boolean . ' +
                     ':a :t "2020-01-01T10:00:00+05:00"^^xsd:dateTime , "2020-01-01T06:00:00Z"^^xsd:dateTime',
                 [
@@ -1864,87 +1592,81 @@ describe("QueryEngine", function () {
                         ["v=2020-01-01T10:00:00+05:00^^dateTime", "v=2020-01-01T06:00:00Z^^dateTime"],
                     ],
                 ],
-                done,
             );
         });
     });
 
     describe("aggregates and grouping", function () {
-        it("should project a grouped variable under an alias (AliasedVar)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    "PREFIX : <http://example/>\
+        it("should project a grouped variable under an alias (AliasedVar)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p 1 .\
                             :s1 :q 9 .\
                             :s2 :p 2 . }";
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT (?s AS ?t) {  ?s :p ?v . } GROUP BY ?s",
-                        function (err, results) {
-                            expect(results.length).toBe(2);
-                            expect(results[0].t.value).toBe("http://example/s1");
-                            expect(results[1].t.value).toBe("http://example/s2");
-                            done();
-                        },
-                    );
-                });
-            });
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (?s AS ?t) {  ?s :p ?v . } GROUP BY ?s",
+            );
+            expect(results.length).toBe(2);
+            expect(results[0].t.value).toBe("http://example/s1");
+            expect(results[1].t.value).toBe("http://example/s2");
         });
 
-        it("should compute MAX per group (GroupMax1)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    "PREFIX : <http://example/>\
+        it("should compute MAX per group (GroupMax1)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p 1 .\
                             :s1 :q 9 .\
                             :s2 :p 2 .\
                             :s2 :p 0 }";
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT (MAX(?v) AS ?maxv) {  ?s ?p ?v . } GROUP BY ?s",
-                        function (err, results) {
-                            expect(results.length).toBe(2);
-                            expect(results[0].maxv.value).toBe("9");
-                            expect(results[1].maxv.value).toBe("2");
-                            done();
-                        },
-                    );
-                });
-            });
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (MAX(?v) AS ?maxv) {  ?s ?p ?v . } GROUP BY ?s",
+            );
+            expect(results.length).toBe(2);
+            expect(results[0].maxv.value).toBe("9");
+            expect(results[1].maxv.value).toBe("2");
         });
 
-        it("should compute MIN per group (GroupMin1)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    "PREFIX : <http://example/>\
+        it("should compute MIN per group (GroupMin1)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p 1 .\
                             :s1 :q 9 .\
                             :s2 :p 2 .\
                             :s2 :p 0 }";
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT (MIN(?v) AS ?maxv) {  ?s ?p ?v . } GROUP BY ?s",
-                        function (err, results) {
-                            expect(results.length).toBe(2);
-                            expect(results[0].maxv.value).toBe("1");
-                            expect(results[1].maxv.value).toBe("0");
-                            done();
-                        },
-                    );
-                });
-            });
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (MIN(?v) AS ?maxv) {  ?s ?p ?v . } GROUP BY ?s",
+            );
+            expect(results.length).toBe(2);
+            expect(results[0].maxv.value).toBe("1");
+            expect(results[1].maxv.value).toBe("0");
         });
 
-        it("should compute COUNT per group (GroupCount1)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    "PREFIX : <http://example/>\
+        it("should compute COUNT per group (GroupCount1)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p 1 .\
                             :s1 :q 9 .\
@@ -1952,25 +1674,22 @@ describe("QueryEngine", function () {
                             :s2 :p 2 .\
                             :s2 :p 0 }";
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT (COUNT(?v) AS ?count) {  ?s ?p ?v . } GROUP BY ?s",
-                        function (err, results) {
-                            expect(results.length).toBe(2);
-                            expect(results[0].count.value).toBe("3");
-                            expect(results[1].count.value).toBe("2");
+            await execute(engine, query);
 
-                            done();
-                        },
-                    );
-                });
-            });
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (COUNT(?v) AS ?count) {  ?s ?p ?v . } GROUP BY ?s",
+            );
+            expect(results.length).toBe(2);
+            expect(results[0].count.value).toBe("3");
+            expect(results[1].count.value).toBe("2");
         });
 
-        it("should compute COUNT(DISTINCT) per group (GroupCountDistinct1)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    "PREFIX : <http://example/>\
+        it("should compute COUNT(DISTINCT) per group (GroupCountDistinct1)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p 1 .\
                             :s1 :q 9 .\
@@ -1978,25 +1697,22 @@ describe("QueryEngine", function () {
                             :s2 :p 2 .\
                             :s2 :p 0 }";
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT (COUNT( distinct ?v) AS ?count) {  ?s ?p ?v . } GROUP BY ?s",
-                        function (err, results) {
-                            expect(results.length).toBe(2);
-                            expect(results[0].count.value).toBe("2");
-                            expect(results[1].count.value).toBe("2");
+            await execute(engine, query);
 
-                            done();
-                        },
-                    );
-                });
-            });
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (COUNT( distinct ?v) AS ?count) {  ?s ?p ?v . } GROUP BY ?s",
+            );
+            expect(results.length).toBe(2);
+            expect(results[0].count.value).toBe("2");
+            expect(results[1].count.value).toBe("2");
         });
 
-        it("should compute AVG(DISTINCT) per group (GroupAvg1)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    "PREFIX : <http://example/>\
+        it("should compute AVG(DISTINCT) per group (GroupAvg1)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p 1 .\
                             :s1 :q 3 .\
@@ -2004,49 +1720,44 @@ describe("QueryEngine", function () {
                             :s2 :p 1 .\
                             :s2 :p 11 }";
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT (AVG( distinct ?v) AS ?avg) {  ?s ?p ?v . } GROUP BY ?s",
-                        function (err, results) {
-                            expect(results.length).toBe(2);
-                            expect(results[0].avg.value).toBe("2");
-                            expect(results[1].avg.value).toBe("6");
+            await execute(engine, query);
 
-                            done();
-                        },
-                    );
-                });
-            });
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (AVG( distinct ?v) AS ?avg) {  ?s ?p ?v . } GROUP BY ?s",
+            );
+            expect(results.length).toBe(2);
+            expect(results[0].avg.value).toBe("2");
+            expect(results[1].avg.value).toBe("6");
         });
 
-        it("should compute AVG per group (GroupAvg2)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    "PREFIX : <http://example/>\
+        it("should compute AVG per group (GroupAvg2)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p 2 .\
                             :s1 :q 3 .\
                             :s2 :p 1 .\
                             :s2 :p 11 }";
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT (AVG(?v) AS ?avg) {  ?s ?p ?v . } GROUP BY ?s",
-                        function (err, results) {
-                            expect(results.length).toBe(2);
-                            expect(results[0].avg.value).toBe("2.5");
-                            expect(results[1].avg.value).toBe("6");
-                            done();
-                        },
-                    );
-                });
-            });
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (AVG(?v) AS ?avg) {  ?s ?p ?v . } GROUP BY ?s",
+            );
+            expect(results.length).toBe(2);
+            expect(results[0].avg.value).toBe("2.5");
+            expect(results[1].avg.value).toBe("6");
         });
 
-        it("should compute SUM(DISTINCT) per group (GroupSum1)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    "PREFIX : <http://example/>\
+        it("should compute SUM(DISTINCT) per group (GroupSum1)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p 1 .\
                             :s1 :q 3 .\
@@ -2054,75 +1765,68 @@ describe("QueryEngine", function () {
                             :s2 :p 1 .\
                             :s2 :p 11 }";
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT (SUM( distinct ?v) AS ?avg) {  ?s ?p ?v . } GROUP BY ?s",
-                        function (err, results) {
-                            expect(results.length).toBe(2);
-                            expect(results[0].avg.value).toBe("4");
-                            expect(results[1].avg.value).toBe("12");
+            await execute(engine, query);
 
-                            done();
-                        },
-                    );
-                });
-            });
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (SUM( distinct ?v) AS ?avg) {  ?s ?p ?v . } GROUP BY ?s",
+            );
+            expect(results.length).toBe(2);
+            expect(results[0].avg.value).toBe("4");
+            expect(results[1].avg.value).toBe("12");
         });
 
-        it("should compute SUM per group (GroupSum2)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    "PREFIX : <http://example/>\
+        it("should compute SUM per group (GroupSum2)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p 2 .\
                             :s1 :q 3.5 .\
                             :s2 :p 1 .\
                             :s2 :p 11 }";
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT (SUM(?v) AS ?avg) {  ?s ?p ?v . } GROUP BY ?s",
-                        function (err, results) {
-                            expect(results.length).toBe(2);
-                            expect(results[0].avg.value).toBe("5.5");
-                            expect(results[1].avg.value).toBe("12");
-                            done();
-                        },
-                    );
-                });
-            });
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (SUM(?v) AS ?avg) {  ?s ?p ?v . } GROUP BY ?s",
+            );
+            expect(results.length).toBe(2);
+            expect(results[0].avg.value).toBe("5.5");
+            expect(results[1].avg.value).toBe("12");
         });
 
-        it("should group by a function call (GroupByFunctionCall)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    "PREFIX : <http://example/>\
+        it("should group by a function call (GroupByFunctionCall)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p 1 .\
                             :s2 :p 2 .\
                             :s3 :p 2 }";
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) {  ?s :p ?v . } GROUP BY STR(?v)",
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(results.length).toBe(2);
-                            var counts = [results[0].count.value, results[1].count.value].sort();
-                            expect(counts).toEqual(["1", "2"]);
-                            done();
-                        },
-                    );
-                });
-            });
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) {  ?s :p ?v . } GROUP BY STR(?v)",
+            );
+            expect(results.length).toBe(2);
+
+            var counts = [results[0].count.value, results[1].count.value].sort();
+            expect(counts).toEqual(["1", "2"]);
         });
 
-        it("should keep a group key whose first value is an error (GroupByFunctionCallFirstSolutionError)", function (done) {
-            newEngine(function (engine) {
-                // LANG() of an IRI is an error. With this data an IRI solution comes first,
-                // and it must not drop the clause from the group key
-                var query =
-                    'PREFIX : <http://example/>\
+        it("should keep a group key whose first value is an error (GroupByFunctionCallFirstSolutionError)", async function () {
+            var engine = await createEngine();
+
+            // LANG() of an IRI is an error. With this data an IRI solution comes first,
+            // and it must not drop the clause from the group key
+            var query =
+                'PREFIX : <http://example/>\
                             INSERT DATA {\
                             :a :p <http://example/iri1> .\
                             :e :p <http://example/iri2> .\
@@ -2130,156 +1834,138 @@ describe("QueryEngine", function () {
                             :c :p "y"@fr .\
                             :d :p "z"@fr }';
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) {  ?s :p ?v . } GROUP BY LANG(?v)",
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(results.length).toBe(2);
-                            var counts = [results[0].count.value, results[1].count.value].sort();
-                            expect(counts).toEqual(["1", "2"]);
-                            done();
-                        },
-                    );
-                });
-            });
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) {  ?s :p ?v . } GROUP BY LANG(?v)",
+            );
+            expect(results.length).toBe(2);
+
+            var counts = [results[0].count.value, results[1].count.value].sort();
+            expect(counts).toEqual(["1", "2"]);
         });
 
-        it("should keep the group keys of several expressions apart (GroupByKeysDoNotCollide)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    'PREFIX : <http://example/>\
+        it("should keep the group keys of several expressions apart (GroupByKeysDoNotCollide)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                'PREFIX : <http://example/>\
                             INSERT DATA {\
                             :e :q "a" .\
                             :e :r "bc" .\
                             :f :q "ab" .\
                             :f :r "c" }';
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) {  ?s :q ?a . ?s :r ?b . } GROUP BY STR(?a) STR(?b)",
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(results.length).toBe(2);
-                            expect(results[0].count.value).toBe("1");
-                            expect(results[1].count.value).toBe("1");
-                            done();
-                        },
-                    );
-                });
-            });
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) {  ?s :q ?a . ?s :r ?b . } GROUP BY STR(?a) STR(?b)",
+            );
+            expect(results.length).toBe(2);
+            expect(results[0].count.value).toBe("1");
+            expect(results[1].count.value).toBe("1");
         });
 
-        it("should group by an aliased expression (GroupByAliasedExpression)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    "PREFIX : <http://example/>\
+        it("should group by an aliased expression (GroupByAliasedExpression)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p 1 .\
                             :s2 :p 2 .\
                             :s3 :p 2 }";
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT ?key (COUNT(?s) AS ?count) {  ?s :p ?v . } GROUP BY (STR(?v) AS ?key)",
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(results.length).toBe(2);
-                            var counts = {};
-                            for (var i = 0; i < results.length; i++) {
-                                counts[results[i].key.value] = results[i].count.value;
-                            }
-                            expect(counts).toEqual({ 1: "1", 2: "2" });
-                            done();
-                        },
-                    );
-                });
-            });
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT ?key (COUNT(?s) AS ?count) {  ?s :p ?v . } GROUP BY (STR(?v) AS ?key)",
+            );
+            expect(results.length).toBe(2);
+
+            var counts = {};
+            for (var i = 0; i < results.length; i++) {
+                counts[results[i].key.value] = results[i].count.value;
+            }
+            expect(counts).toEqual({ 1: "1", 2: "2" });
         });
 
-        it("should aggregate over all solutions without GROUP BY (AggregatesWithoutGroupBy)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    "PREFIX : <http://example/>\
+        it("should aggregate over all solutions without GROUP BY (AggregatesWithoutGroupBy)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p 1 .\
                             :s2 :p 2 .\
                             :s3 :p 3 }";
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) (SUM(?v) AS ?sum) (GROUP_CONCAT(?v) AS ?all) {  ?s :p ?v . }",
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(results.length).toBe(1);
-                            expect(results[0].count.value).toBe("3");
-                            expect(results[0].sum.value).toBe("6");
-                            expect(results[0].all.value.split(" ").sort()).toEqual(["1", "2", "3"]);
+            await execute(engine, query);
 
-                            // over no solutions, as defined by SPARQL 1.1
-                            engine.execute(
-                                "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) (SUM(?v) AS ?sum) (AVG(?v) AS ?avg) (GROUP_CONCAT(?v) AS ?all) (MAX(?v) AS ?max) {  ?s :none ?v . }",
-                                function (err, results) {
-                                    expect(err).toBeNull();
-                                    expect(results.length).toBe(1);
-                                    expect(results[0].count.value).toBe("0");
-                                    expect(results[0].sum.value).toBe("0");
-                                    expect(results[0].avg.value).toBe("0");
-                                    expect(results[0].all.value).toBe("");
-                                    expect(results[0].max).toBeNull();
-                                    done();
-                                },
-                            );
-                        },
-                    );
-                });
-            });
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) (SUM(?v) AS ?sum) (GROUP_CONCAT(?v) AS ?all) {  ?s :p ?v . }",
+            );
+            expect(results.length).toBe(1);
+            expect(results[0].count.value).toBe("3");
+            expect(results[0].sum.value).toBe("6");
+            expect(results[0].all.value.split(" ").sort()).toEqual(["1", "2", "3"]);
+
+            // over no solutions, as defined by SPARQL 1.1
+            results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) (SUM(?v) AS ?sum) (AVG(?v) AS ?avg) (GROUP_CONCAT(?v) AS ?all) (MAX(?v) AS ?max) {  ?s :none ?v . }",
+            );
+            expect(results.length).toBe(1);
+            expect(results[0].count.value).toBe("0");
+            expect(results[0].sum.value).toBe("0");
+            expect(results[0].avg.value).toBe("0");
+            expect(results[0].all.value).toBe("");
+            expect(results[0].max).toBeNull();
         });
 
-        it("should group by a bracketed expression without an alias (GroupByBracketedExpressionWithoutAlias)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    "PREFIX : <http://example/>\
+        it("should group by a bracketed expression without an alias (GroupByBracketedExpressionWithoutAlias)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p 1 .\
                             :s2 :p 2 .\
                             :s3 :p 2 }";
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) {  ?s :p ?v . } GROUP BY (STR(?v))",
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(results.length).toBe(2);
-                            var counts = [results[0].count.value, results[1].count.value].sort();
-                            expect(counts).toEqual(["1", "2"]);
-                            done();
-                        },
-                    );
-                });
-            });
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) {  ?s :p ?v . } GROUP BY (STR(?v))",
+            );
+            expect(results.length).toBe(2);
+
+            var counts = [results[0].count.value, results[1].count.value].sort();
+            expect(counts).toEqual(["1", "2"]);
         });
 
-        it("should reject a projected variable that is neither grouped nor aggregated (AggregateWithUngroupedVariable)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    "PREFIX : <http://example/>\
+        it("should reject a projected variable that is neither grouped nor aggregated (AggregateWithUngroupedVariable)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p 1 .\
                             :s2 :p 2 }";
 
-                engine.execute(query, function (err, result) {
-                    // ?s is neither grouped nor aggregated, so the query is invalid
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT ?s (COUNT(?v) AS ?count) {  ?s :p ?v . }",
-                        function (err, results) {
-                            expect(err).not.toBeNull();
-                            expect(err.message).toBe("Incompatible Group and Projection variables");
-                            done();
-                        },
-                    );
-                });
-            });
+            await execute(engine, query);
+
+            // ?s is neither grouped nor aggregated, so the query is invalid
+            var err = await rejection(
+                execute(engine, "PREFIX : <http://example/> SELECT ?s (COUNT(?v) AS ?count) {  ?s :p ?v . }"),
+            );
+            expect(err).not.toBeNull();
+            expect(err.message).toBe("Incompatible Group and Projection variables");
         });
 
         // Classes with 3, 1, 2, 10 and 9 instances: the groups don't come out in count order, and 10 vs. 9
@@ -2302,629 +1988,498 @@ describe("QueryEngine", function () {
             });
         };
 
-        it("should apply LIMIT and OFFSET to groups (GroupByWithSolutionModifiers)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    "PREFIX : <http://example/>\
+        it("should apply LIMIT and OFFSET to groups (GroupByWithSolutionModifiers)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p 1 .\
                             :s2 :p 2 .\
                             :s3 :p 3 }";
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT ?s (COUNT(?v) AS ?count) {  ?s :p ?v . } GROUP BY ?s LIMIT 1",
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(results.length).toBe(1);
-                            engine.execute(
-                                "PREFIX : <http://example/> SELECT ?s (COUNT(?v) AS ?count) {  ?s :p ?v . } GROUP BY ?s OFFSET 1",
-                                function (err, results) {
-                                    expect(err).toBeNull();
-                                    expect(results.length).toBe(2);
-                                    engine.execute(
-                                        "PREFIX : <http://example/> SELECT DISTINCT (COUNT(?v) AS ?count) {  ?s :p ?v . } GROUP BY ?s",
-                                        function (err, results) {
-                                            expect(err).toBeNull();
-                                            expect(results.length).toBe(1);
-                                            expect(results[0].count.value).toBe("1");
-                                            engine.execute(
-                                                "PREFIX : <http://example/> SELECT (COUNT(?v) AS ?count) {  ?s :p ?v . } LIMIT 0",
-                                                function (err, results) {
-                                                    expect(err).toBeNull();
-                                                    expect(results.length).toBe(0);
-                                                    done();
-                                                },
-                                            );
-                                        },
-                                    );
-                                },
-                            );
-                        },
-                    );
-                });
-            });
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT ?s (COUNT(?v) AS ?count) {  ?s :p ?v . } GROUP BY ?s LIMIT 1",
+            );
+            expect(results.length).toBe(1);
+
+            results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT ?s (COUNT(?v) AS ?count) {  ?s :p ?v . } GROUP BY ?s OFFSET 1",
+            );
+            expect(results.length).toBe(2);
+
+            results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT DISTINCT (COUNT(?v) AS ?count) {  ?s :p ?v . } GROUP BY ?s",
+            );
+            expect(results.length).toBe(1);
+            expect(results[0].count.value).toBe("1");
+
+            results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (COUNT(?v) AS ?count) {  ?s :p ?v . } LIMIT 0",
+            );
+            expect(results.length).toBe(0);
         });
 
-        it("should order groups by an aggregate (GroupByOrderBy)", function (done) {
-            newEngine(function (engine) {
-                var select =
-                    "PREFIX : <http://example/> SELECT ?class (COUNT(?s) AS ?count) { ?s a ?class } GROUP BY ?class ";
+        it("should order groups by an aggregate (GroupByOrderBy)", async function () {
+            var engine = await createEngine();
 
-                engine.execute(groupCountData(), function (err, result) {
-                    engine.execute(select + "ORDER BY ?count", function (err, results) {
-                        expect(err).toBeNull();
-                        expect(classCounts(results)).toEqual(["C1=1", "C3=2", "C2=3", "C5=9", "C4=10"]);
-                        engine.execute(select + "ORDER BY DESC(?count)", function (err, results) {
-                            expect(err).toBeNull();
-                            expect(classCounts(results)).toEqual(["C4=10", "C5=9", "C2=3", "C3=2", "C1=1"]);
-                            engine.execute(select + "ORDER BY DESC(?class)", function (err, results) {
-                                expect(err).toBeNull();
-                                expect(classCounts(results)).toEqual(["C5=9", "C4=10", "C3=2", "C2=3", "C1=1"]);
-                                // an aggregate that is not projected
-                                engine.execute(
-                                    "PREFIX : <http://example/> SELECT ?class { ?s a ?class } GROUP BY ?class ORDER BY DESC(COUNT(?s))",
-                                    function (err, results) {
-                                        expect(err).toBeNull();
-                                        expect(
-                                            results.map(function (r) {
-                                                return r["class"].value.replace("http://example/", "");
-                                            }),
-                                        ).toEqual(["C4", "C5", "C2", "C3", "C1"]);
-                                        engine.execute(select + "ORDER BY ?count LIMIT 2", function (err, results) {
-                                            expect(err).toBeNull();
-                                            expect(classCounts(results)).toEqual(["C1=1", "C3=2"]);
-                                            done();
-                                        });
-                                    },
-                                );
-                            });
-                        });
-                    });
-                });
-            });
+            var select =
+                "PREFIX : <http://example/> SELECT ?class (COUNT(?s) AS ?count) { ?s a ?class } GROUP BY ?class ";
+
+            await execute(engine, groupCountData());
+
+            var results = await execute(engine, select + "ORDER BY ?count");
+            expect(classCounts(results)).toEqual(["C1=1", "C3=2", "C2=3", "C5=9", "C4=10"]);
+
+            results = await execute(engine, select + "ORDER BY DESC(?count)");
+            expect(classCounts(results)).toEqual(["C4=10", "C5=9", "C2=3", "C3=2", "C1=1"]);
+
+            results = await execute(engine, select + "ORDER BY DESC(?class)");
+            expect(classCounts(results)).toEqual(["C5=9", "C4=10", "C3=2", "C2=3", "C1=1"]);
+
+            // an aggregate that is not projected
+            results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT ?class { ?s a ?class } GROUP BY ?class ORDER BY DESC(COUNT(?s))",
+            );
+            expect(
+                results.map(function (r) {
+                    return r["class"].value.replace("http://example/", "");
+                }),
+            ).toEqual(["C4", "C5", "C2", "C3", "C1"]);
+
+            results = await execute(engine, select + "ORDER BY ?count LIMIT 2");
+            expect(classCounts(results)).toEqual(["C1=1", "C3=2"]);
         });
 
-        it("should filter groups with HAVING (GroupByHaving)", function (done) {
-            newEngine(function (engine) {
-                var select =
-                    "PREFIX : <http://example/> SELECT ?class (COUNT(?s) AS ?count) { ?s a ?class } GROUP BY ?class ";
+        it("should filter groups with HAVING (GroupByHaving)", async function () {
+            var engine = await createEngine();
 
-                engine.execute(groupCountData(), function (err, result) {
-                    engine.execute(select + "HAVING (COUNT(?s) > 2) ORDER BY ?count", function (err, results) {
-                        expect(err).toBeNull();
-                        expect(classCounts(results)).toEqual(["C2=3", "C5=9", "C4=10"]);
-                        // the SELECT alias, several conditions, lower case
-                        engine.execute(
-                            select + "having (?count > 1) (?count < 10) ORDER BY DESC(?count)",
-                            function (err, results) {
-                                expect(err).toBeNull();
-                                expect(classCounts(results)).toEqual(["C5=9", "C2=3", "C3=2"]);
-                                // a group variable
-                                engine.execute(
-                                    select + "HAVING (?class = :C3 || ?class = :C1) ORDER BY ?count LIMIT 1",
-                                    function (err, results) {
-                                        expect(err).toBeNull();
-                                        expect(classCounts(results)).toEqual(["C1=1"]);
-                                        // without GROUP BY: one group over all solutions
-                                        engine.execute(
-                                            "PREFIX : <http://example/> SELECT (COUNT(*) AS ?c) { ?s a ?class } HAVING (COUNT(*) > 100)",
-                                            function (err, results) {
-                                                expect(err).toBeNull();
-                                                expect(results.length).toBe(0);
-                                                engine.execute(
-                                                    "PREFIX : <http://example/> SELECT (COUNT(*) AS ?c) { ?s a ?class } HAVING (COUNT(*) > 20)",
-                                                    function (err, results) {
-                                                        expect(err).toBeNull();
-                                                        expect(results.length).toBe(1);
-                                                        expect(results[0].c.value).toBe("25");
-                                                        done();
-                                                    },
-                                                );
-                                            },
-                                        );
-                                    },
-                                );
-                            },
-                        );
-                    });
-                });
-            });
+            var select =
+                "PREFIX : <http://example/> SELECT ?class (COUNT(?s) AS ?count) { ?s a ?class } GROUP BY ?class ";
+
+            await execute(engine, groupCountData());
+
+            var results = await execute(engine, select + "HAVING (COUNT(?s) > 2) ORDER BY ?count");
+            expect(classCounts(results)).toEqual(["C2=3", "C5=9", "C4=10"]);
+
+            // the SELECT alias, several conditions, lower case
+            results = await execute(engine, select + "having (?count > 1) (?count < 10) ORDER BY DESC(?count)");
+            expect(classCounts(results)).toEqual(["C5=9", "C2=3", "C3=2"]);
+
+            // a group variable
+            results = await execute(engine, select + "HAVING (?class = :C3 || ?class = :C1) ORDER BY ?count LIMIT 1");
+            expect(classCounts(results)).toEqual(["C1=1"]);
+
+            // without GROUP BY: one group over all solutions
+            results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (COUNT(*) AS ?c) { ?s a ?class } HAVING (COUNT(*) > 100)",
+            );
+            expect(results.length).toBe(0);
+
+            results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (COUNT(*) AS ?c) { ?s a ?class } HAVING (COUNT(*) > 20)",
+            );
+            expect(results.length).toBe(1);
+            expect(results[0].c.value).toBe("25");
         });
 
-        it("should reject invalid grouped queries (GroupByInvalidQueries)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(groupCountData(), function (err, result) {
-                    // SELECT * can't be grouped
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT * { ?s a ?class } GROUP BY ?class",
-                        function (err, results) {
-                            expect(err.message).toBe("Incompatible Group and Projection variables");
-                            // an aggregate in ORDER BY groups the solutions, so ?class must be grouped
-                            engine.execute(
-                                "PREFIX : <http://example/> SELECT ?class { ?s a ?class } ORDER BY DESC(COUNT(?s))",
-                                function (err, results) {
-                                    expect(err.message).toBe("Incompatible Group and Projection variables");
-                                    // ?s is neither grouped nor aggregated
-                                    engine.execute(
-                                        "PREFIX : <http://example/> SELECT ?class { ?s a ?class } GROUP BY ?class HAVING (BOUND(?s))",
-                                        function (err, results) {
-                                            expect(err.message).toBe("Variable ?s is neither grouped nor aggregated");
-                                            engine.execute(
-                                                "PREFIX : <http://example/> SELECT ?class { ?s a ?class } GROUP BY ?class ORDER BY ?s",
-                                                function (err, results) {
-                                                    expect(err.message).toBe(
-                                                        "Variable ?s is neither grouped nor aggregated",
-                                                    );
-                                                    engine.execute(
-                                                        "PREFIX : <http://example/> SELECT (STR(?s) AS ?x) { ?s a ?class } GROUP BY ?class",
-                                                        function (err, results) {
-                                                            expect(err.message).toBe(
-                                                                "Variable ?s is neither grouped nor aggregated",
-                                                            );
-                                                            engine.execute(
-                                                                "PREFIX : <http://example/> CONSTRUCT { ?class a ?class } WHERE { ?s a ?class } GROUP BY ?class HAVING (COUNT(?s) > 100)",
-                                                                function (err, results) {
-                                                                    expect(err.name).toBe(
-                                                                        "NonSupportedSparqlFeatureError",
-                                                                    );
-                                                                    engine.execute(
-                                                                        "PREFIX : <http://example/> CONSTRUCT { ?class a ?class } WHERE { ?s a ?class } GROUP BY ?class",
-                                                                        function (err, results) {
-                                                                            expect(err.name).toBe(
-                                                                                "NonSupportedSparqlFeatureError",
-                                                                            );
-                                                                            done();
-                                                                        },
-                                                                    );
-                                                                },
-                                                            );
-                                                        },
-                                                    );
-                                                },
-                                            );
-                                        },
-                                    );
-                                },
-                            );
-                        },
-                    );
-                });
-            });
+        it("should reject invalid grouped queries (GroupByInvalidQueries)", async function () {
+            var engine = await createEngine();
+
+            await execute(engine, groupCountData());
+
+            // SELECT * can't be grouped
+            var err = await rejection(
+                execute(engine, "PREFIX : <http://example/> SELECT * { ?s a ?class } GROUP BY ?class"),
+            );
+            expect(err && err.message).toBe("Incompatible Group and Projection variables");
+
+            // an aggregate in ORDER BY groups the solutions, so ?class must be grouped
+            err = await rejection(
+                execute(engine, "PREFIX : <http://example/> SELECT ?class { ?s a ?class } ORDER BY DESC(COUNT(?s))"),
+            );
+            expect(err && err.message).toBe("Incompatible Group and Projection variables");
+
+            // ?s is neither grouped nor aggregated
+            err = await rejection(
+                execute(
+                    engine,
+                    "PREFIX : <http://example/> SELECT ?class { ?s a ?class } GROUP BY ?class HAVING (BOUND(?s))",
+                ),
+            );
+            expect(err && err.message).toBe("Variable ?s is neither grouped nor aggregated");
+
+            err = await rejection(
+                execute(engine, "PREFIX : <http://example/> SELECT ?class { ?s a ?class } GROUP BY ?class ORDER BY ?s"),
+            );
+            expect(err && err.message).toBe("Variable ?s is neither grouped nor aggregated");
+
+            err = await rejection(
+                execute(engine, "PREFIX : <http://example/> SELECT (STR(?s) AS ?x) { ?s a ?class } GROUP BY ?class"),
+            );
+            expect(err && err.message).toBe("Variable ?s is neither grouped nor aggregated");
+
+            err = await rejection(
+                execute(
+                    engine,
+                    "PREFIX : <http://example/> CONSTRUCT { ?class a ?class } WHERE { ?s a ?class } GROUP BY ?class HAVING (COUNT(?s) > 100)",
+                ),
+            );
+            expect(err && err.name).toBe("NonSupportedSparqlFeatureError");
+
+            err = await rejection(
+                execute(
+                    engine,
+                    "PREFIX : <http://example/> CONSTRUCT { ?class a ?class } WHERE { ?s a ?class } GROUP BY ?class",
+                ),
+            );
+            expect(err && err.name).toBe("NonSupportedSparqlFeatureError");
         });
 
-        it("should evaluate aggregates inside the expressions of a grouped query (GroupByAggregatesInsideExpressions)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(groupCountData(), function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT ?class ((COUNT(?s) * 2) AS ?double) { ?s a ?class } GROUP BY ?class HAVING (COUNT(?s) * 2 > 5) ORDER BY ?double",
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(
-                                results.map(function (r) {
-                                    return r["class"].value.replace("http://example/", "") + "=" + r["double"].value;
-                                }),
-                            ).toEqual(["C2=6", "C5=18", "C4=20"]);
-                            done();
-                        },
-                    );
-                });
-            });
+        it("should evaluate aggregates inside the expressions of a grouped query (GroupByAggregatesInsideExpressions)", async function () {
+            var engine = await createEngine();
+
+            await execute(engine, groupCountData());
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT ?class ((COUNT(?s) * 2) AS ?double) { ?s a ?class } GROUP BY ?class HAVING (COUNT(?s) * 2 > 5) ORDER BY ?double",
+            );
+            expect(
+                results.map(function (r) {
+                    return r["class"].value.replace("http://example/", "") + "=" + r["double"].value;
+                }),
+            ).toEqual(["C2=6", "C5=18", "C4=20"]);
         });
 
-        it("should keep a user variable named like an internal aggregate (GroupByAggregateNamesDoNotCollide)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(groupCountData(), function (err, result) {
-                    // a user variable named like an internal one keeps its own value
-                    engine.execute(
-                        'PREFIX : <http://example/> SELECT ?class (COUNT(?s) AS ?__aggregate0) { ?s a ?class } GROUP BY ?class HAVING (MAX(STR(?s)) != "") ORDER BY ?__aggregate0 LIMIT 2',
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(
-                                results.map(function (r) {
-                                    return r.__aggregate0.value;
-                                }),
-                            ).toEqual(["1", "2"]);
-                            done();
-                        },
-                    );
-                });
-            });
+        it("should keep a user variable named like an internal aggregate (GroupByAggregateNamesDoNotCollide)", async function () {
+            var engine = await createEngine();
+
+            await execute(engine, groupCountData());
+
+            // a user variable named like an internal one keeps its own value
+            var results = await execute(
+                engine,
+                'PREFIX : <http://example/> SELECT ?class (COUNT(?s) AS ?__aggregate0) { ?s a ?class } GROUP BY ?class HAVING (MAX(STR(?s)) != "") ORDER BY ?__aggregate0 LIMIT 2',
+            );
+            expect(
+                results.map(function (r) {
+                    return r.__aggregate0.value;
+                }),
+            ).toEqual(["1", "2"]);
         });
 
-        it("should evaluate an aggregate inside an expression (AggregateInsideExpression)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    "PREFIX : <http://example/>\
+        it("should evaluate an aggregate inside an expression (AggregateInsideExpression)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                "PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p 1 .\
                             :s2 :p 2 }";
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT (COUNT(?s)*2 AS ?double) {  ?s :p ?v . }",
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(results.length).toBe(1);
-                            expect(results[0]["double"].value).toBe("4");
-                            done();
-                        },
-                    );
-                });
-            });
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (COUNT(?s)*2 AS ?double) {  ?s :p ?v . }",
+            );
+            expect(results.length).toBe(1);
+            expect(results[0]["double"].value).toBe("4");
         });
 
-        it("should concatenate the values of each group with GROUP_CONCAT (GroupConcat1)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    'PREFIX : <http://example/>\
+        it("should concatenate the values of each group with GROUP_CONCAT (GroupConcat1)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                'PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p "1" .\
                             :s1 :p "22" .\
                             :s2 :p "3" }';
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT ?s (GROUP_CONCAT(?o) AS ?concat) {  ?s :p ?o . } GROUP BY ?s",
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(results.length).toBe(2);
-                            var concats = {};
-                            for (var i = 0; i < results.length; i++) {
-                                concats[results[i].s.value] = results[i].concat;
-                            }
-                            expect(concats["http://example/s1"].value.split(" ").sort()).toEqual(["1", "22"]);
-                            expect(concats["http://example/s1"].type).toBeNull();
-                            expect(concats["http://example/s2"].value).toBe("3");
-                            done();
-                        },
-                    );
-                });
-            });
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT ?s (GROUP_CONCAT(?o) AS ?concat) {  ?s :p ?o . } GROUP BY ?s",
+            );
+            expect(results.length).toBe(2);
+
+            var concats = {};
+            for (var i = 0; i < results.length; i++) {
+                concats[results[i].s.value] = results[i].concat;
+            }
+            expect(concats["http://example/s1"].value.split(" ").sort()).toEqual(["1", "22"]);
+            expect(concats["http://example/s1"].type).toBeNull();
+            expect(concats["http://example/s2"].value).toBe("3");
         });
 
-        it("should use the SEPARATOR of GROUP_CONCAT (GroupConcat2)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    'PREFIX : <http://example/>\
+        it("should use the SEPARATOR of GROUP_CONCAT (GroupConcat2)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                'PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p "1" .\
                             :s1 :p "22" .\
                             :s1 :p "333" }';
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        'PREFIX : <http://example/> SELECT (GROUP_CONCAT(?o ; SEPARATOR="|") AS ?concat) {  ?s :p ?o . } GROUP BY ?s',
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(results.length).toBe(1);
-                            expect(results[0].concat.value.split("|").sort()).toEqual(["1", "22", "333"]);
-                            // keywords are case-insensitive
-                            engine.execute(
-                                'PREFIX : <http://example/> SELECT (group_concat(?o ; Separator=",") AS ?concat) {  ?s :p ?o . } GROUP BY ?s',
-                                function (err, results) {
-                                    expect(err).toBeNull();
-                                    expect(results[0].concat.value.split(",").sort()).toEqual(["1", "22", "333"]);
-                                    done();
-                                },
-                            );
-                        },
-                    );
-                });
-            });
+            await execute(engine, query);
+
+            var results = await execute(
+                engine,
+                'PREFIX : <http://example/> SELECT (GROUP_CONCAT(?o ; SEPARATOR="|") AS ?concat) {  ?s :p ?o . } GROUP BY ?s',
+            );
+            expect(results.length).toBe(1);
+            expect(results[0].concat.value.split("|").sort()).toEqual(["1", "22", "333"]);
+
+            // keywords are case-insensitive
+            results = await execute(
+                engine,
+                'PREFIX : <http://example/> SELECT (group_concat(?o ; Separator=",") AS ?concat) {  ?s :p ?o . } GROUP BY ?s',
+            );
+            expect(results[0].concat.value.split(",").sort()).toEqual(["1", "22", "333"]);
         });
 
-        it("should concatenate distinct values with GROUP_CONCAT(DISTINCT) (GroupConcatDistinct)", function (done) {
-            newEngine(function (engine) {
-                var query =
-                    'PREFIX : <http://example/>\
+        it("should concatenate distinct values with GROUP_CONCAT(DISTINCT) (GroupConcatDistinct)", async function () {
+            var engine = await createEngine();
+
+            var query =
+                'PREFIX : <http://example/>\
                             INSERT DATA {\
                             :s1 :p "a" .\
                             :s1 :q "a" .\
                             :s1 :p "b" }';
 
-                engine.execute(query, function (err, result) {
-                    engine.execute(
-                        "PREFIX : <http://example/> SELECT (GROUP_CONCAT(?o) AS ?all) (GROUP_CONCAT(DISTINCT ?o) AS ?distinct) {  ?s ?p ?o . } GROUP BY ?s",
-                        function (err, results) {
-                            expect(err).toBeNull();
-                            expect(results.length).toBe(1);
-                            expect(results[0].all.value.split(" ").sort()).toEqual(["a", "a", "b"]);
-                            expect(results[0].distinct.value.split(" ").sort()).toEqual(["a", "b"]);
-                            done();
-                        },
-                    );
-                });
-            });
-        });
+            await execute(engine, query);
 
-        it("should count distinct solutions with COUNT(DISTINCT *) (CountDistinctStar)", function (done) {
-            checkQueries(
-                ":a :p 1 . :a :p 2 . :b :p 1",
-                [
-                    [
-                        "SELECT (COUNT(DISTINCT *) AS ?c) (COUNT(*) AS ?n) { { ?s :p ?o } UNION { ?s :p ?o } }",
-                        ["c", "n"],
-                        ["c=3^^integer n=6^^integer"],
-                    ],
-                    [
-                        "SELECT ?s (COUNT(DISTINCT *) AS ?c) { { ?s :p ?o } UNION { ?s :p ?o } } GROUP BY ?s ORDER BY ?s",
-                        ["s", "c"],
-                        ["s=a c=2^^integer", "s=b c=1^^integer"],
-                    ],
-                ],
-                done,
+            var results = await execute(
+                engine,
+                "PREFIX : <http://example/> SELECT (GROUP_CONCAT(?o) AS ?all) (GROUP_CONCAT(DISTINCT ?o) AS ?distinct) {  ?s ?p ?o . } GROUP BY ?s",
             );
+            expect(results.length).toBe(1);
+            expect(results[0].all.value.split(" ").sort()).toEqual(["a", "a", "b"]);
+            expect(results[0].distinct.value.split(" ").sort()).toEqual(["a", "b"]);
         });
 
-        it("should leave SUM and AVG unbound for values that are no numbers (SumAvgTypeErrors)", function (done) {
-            checkQueries(
-                ':a :v 1 , 2 , "a" . :b :v 3 , 4 . :c :k 1 ; :n 3 . :d :k 1 ; :n 5 . :e :k 1',
+        it("should count distinct solutions with COUNT(DISTINCT *) (CountDistinctStar)", async function () {
+            await checkQueries(":a :p 1 . :a :p 2 . :b :p 1", [
                 [
-                    // a value that is no number makes SUM and AVG unbound
-                    [
-                        "SELECT ?s (SUM(?o) AS ?sum) (SUM(DISTINCT ?o) AS ?sd) (AVG(?o) AS ?avg) { ?s :v ?o } GROUP BY ?s ORDER BY ?s",
-                        ["s", "sum", "sd", "avg"],
-                        ["s=a sum=- sd=- avg=-", "s=b sum=7^^integer sd=7^^integer avg=3.5^^decimal"],
-                    ],
-                    // unbound values are skipped, also by COUNT
-                    [
-                        "SELECT (SUM(?o) AS ?sum) (AVG(?o) AS ?avg) (COUNT(?o) AS ?n) { ?s :k ?k OPTIONAL { ?s :n ?o } }",
-                        ["sum", "avg", "n"],
-                        ["sum=8^^integer avg=4^^decimal n=2^^integer"],
-                    ],
-                    // AVG of no values is 0, as for an empty group
-                    ["SELECT (AVG(?o) AS ?avg) { ?s :k ?k OPTIONAL { ?s :zz ?o } }", ["avg"], ["avg=0^^integer"]],
+                    "SELECT (COUNT(DISTINCT *) AS ?c) (COUNT(*) AS ?n) { { ?s :p ?o } UNION { ?s :p ?o } }",
+                    ["c", "n"],
+                    ["c=3^^integer n=6^^integer"],
                 ],
-                done,
-            );
+                [
+                    "SELECT ?s (COUNT(DISTINCT *) AS ?c) { { ?s :p ?o } UNION { ?s :p ?o } } GROUP BY ?s ORDER BY ?s",
+                    ["s", "c"],
+                    ["s=a c=2^^integer", "s=b c=1^^integer"],
+                ],
+            ]);
         });
 
-        it("should skip unbound values in GROUP_CONCAT (GroupConcatUnbound)", function (done) {
+        it("should leave SUM and AVG unbound for values that are no numbers (SumAvgTypeErrors)", async function () {
+            await checkQueries(':a :v 1 , 2 , "a" . :b :v 3 , 4 . :c :k 1 ; :n 3 . :d :k 1 ; :n 5 . :e :k 1', [
+                // a value that is no number makes SUM and AVG unbound
+                [
+                    "SELECT ?s (SUM(?o) AS ?sum) (SUM(DISTINCT ?o) AS ?sd) (AVG(?o) AS ?avg) { ?s :v ?o } GROUP BY ?s ORDER BY ?s",
+                    ["s", "sum", "sd", "avg"],
+                    ["s=a sum=- sd=- avg=-", "s=b sum=7^^integer sd=7^^integer avg=3.5^^decimal"],
+                ],
+                // unbound values are skipped, also by COUNT
+                [
+                    "SELECT (SUM(?o) AS ?sum) (AVG(?o) AS ?avg) (COUNT(?o) AS ?n) { ?s :k ?k OPTIONAL { ?s :n ?o } }",
+                    ["sum", "avg", "n"],
+                    ["sum=8^^integer avg=4^^decimal n=2^^integer"],
+                ],
+                // AVG of no values is 0, as for an empty group
+                ["SELECT (AVG(?o) AS ?avg) { ?s :k ?k OPTIONAL { ?s :zz ?o } }", ["avg"], ["avg=0^^integer"]],
+            ]);
+        });
+
+        it("should skip unbound values in GROUP_CONCAT (GroupConcatUnbound)", async function () {
             // an unbound value is skipped (it crashed the process)
-            checkQueries(
-                ':c :k 1 ; :n "x" . :e :k 1',
-                [["SELECT (GROUP_CONCAT(?o) AS ?g) { ?s :k ?k OPTIONAL { ?s :n ?o } }", ["g"], ["g=x"]]],
-                done,
-            );
+            await checkQueries(':c :k 1 ; :n "x" . :e :k 1', [
+                ["SELECT (GROUP_CONCAT(?o) AS ?g) { ?s :k ?k OPTIONAL { ?s :n ?o } }", ["g"], ["g=x"]],
+            ]);
         });
 
-        it("should order mixed types for MIN and MAX like ORDER BY (MinMaxMixedTypes)", function (done) {
+        it("should order mixed types for MIN and MAX like ORDER BY (MinMaxMixedTypes)", async function () {
             // MIN and MAX follow the ORDER BY order (IRIs before literals without a datatype before typed literals), whatever the insertion order
             var query = "SELECT (MIN(?o) AS ?min) (MAX(?o) AS ?max) { ?s :v ?o }";
-            checkQueries(
-                ':s :v "x"@en , "y" , :iri , 2',
-                [[query, ["min", "max"], ["min=iri max=2^^integer"]]],
-                function () {
-                    checkQueries(
-                        ':s :v 2 , :iri , "y" , "x"@en',
-                        [[query, ["min", "max"], ["min=iri max=2^^integer"]]],
-                        function () {
-                            checkQueries(
-                                ':s :v "b" , "a"^^xsd:string',
-                                [[query, ["min", "max"], ["min=a^^string max=b"]]],
-                                done,
-                            );
-                        },
-                    );
-                },
-            );
+            await checkQueries(':s :v "x"@en , "y" , :iri , 2', [[query, ["min", "max"], ["min=iri max=2^^integer"]]]);
+            await checkQueries(':s :v 2 , :iri , "y" , "x"@en', [[query, ["min", "max"], ["min=iri max=2^^integer"]]]);
+            await checkQueries(':s :v "b" , "a"^^xsd:string', [[query, ["min", "max"], ["min=a^^string max=b"]]]);
         });
     });
 
     describe("update", function () {
-        it("should insert a triple with INSERT DATA (InsertDataTrivialRecovery)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
-                    function (err) {
-                        expect(err).toBeNull();
-                        engine.execute("SELECT * { ?s ?p ?o }", function (err, result) {
-                            expect(err).toBe(null);
-                            expect(result.length).toBe(1);
-                            expect(result[0]["s"].value).toBe("http://example/book3");
-                            expect(result[0]["p"].value).toBe("http://example.com/vocab#title");
-                            expect(result[0]["o"].value).toBe("http://test.com/example");
-                            done();
-                        });
-                    },
-                );
-            });
+        it("should insert a triple with INSERT DATA (InsertDataTrivialRecovery)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
+            );
+
+            var result = await execute(engine, "SELECT * { ?s ?p ?o }");
+            expect(result.length).toBe(1);
+            expect(result[0]["s"].value).toBe("http://example/book3");
+            expect(result[0]["p"].value).toBe("http://example.com/vocab#title");
+            expect(result[0]["o"].value).toBe("http://test.com/example");
         });
 
-        it("should insert triples with a shared subject (InsertDataTrivialRecovery2)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example>; <http://example.com/vocab#pages> 95 }",
-                    function (err, result) {
-                        expect(err).toBe(null);
+        it("should insert triples with a shared subject (InsertDataTrivialRecovery2)", async function () {
+            var engine = await createEngine();
 
-                        engine.execute("SELECT * { ?s ?p ?o }", function (err, result) {
-                            expect(err).toBeNull();
-                            expect(result.length).toBe(2);
-                            expect(result[0]["s"].value).toBe("http://example/book3");
-                            expect(result[1]["s"].value).toBe("http://example/book3");
+            await execute(
+                engine,
+                "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example>; <http://example.com/vocab#pages> 95 }",
+            );
 
-                            if (result[0]["p"].value === "http://example.com/vocab#title") {
-                                expect(result[0]["o"].value).toBe("http://test.com/example");
-                            } else if (result[0]["p"].value === "http://example.com/vocab#pages") {
-                                expect(result[0]["o"].value).toBe("95");
-                                expect(result[0]["o"].type).toBe("http://www.w3.org/2001/XMLSchema#integer");
-                            } else {
-                                fail("unexpected solution");
-                            }
+            var result = await execute(engine, "SELECT * { ?s ?p ?o }");
+            expect(result.length).toBe(2);
+            expect(result[0]["s"].value).toBe("http://example/book3");
+            expect(result[1]["s"].value).toBe("http://example/book3");
 
-                            if (result[1]["p"].value === "http://example.com/vocab#title") {
-                                expect(result[1]["o"].value).toBe("http://test.com/example");
-                            } else if (result[1]["p"].value === "http://example.com/vocab#pages") {
-                                expect(result[1]["o"].value).toBe("95");
-                                expect(result[1]["o"].type).toBe("http://www.w3.org/2001/XMLSchema#integer");
-                            } else {
-                                fail("unexpected solution");
-                            }
+            if (result[0]["p"].value === "http://example.com/vocab#title") {
+                expect(result[0]["o"].value).toBe("http://test.com/example");
+            } else if (result[0]["p"].value === "http://example.com/vocab#pages") {
+                expect(result[0]["o"].value).toBe("95");
+                expect(result[0]["o"].type).toBe("http://www.w3.org/2001/XMLSchema#integer");
+            } else {
+                fail("unexpected solution");
+            }
 
-                            done();
-                        });
-                    },
-                );
-            });
+            if (result[1]["p"].value === "http://example.com/vocab#title") {
+                expect(result[1]["o"].value).toBe("http://test.com/example");
+            } else if (result[1]["p"].value === "http://example.com/vocab#pages") {
+                expect(result[1]["o"].value).toBe("95");
+                expect(result[1]["o"].type).toBe("http://www.w3.org/2001/XMLSchema#integer");
+            } else {
+                fail("unexpected solution");
+            }
         });
 
-        it("should insert data in two requests (InsertDataTrivialRecovery3)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example>; <http://example.com/vocab#pages> 95 }",
-                    function (err, result) {
-                        expect(err).toBeNull();
-                        engine.execute(
-                            "INSERT DATA { <http://example/book4> <http://example.com/vocab#title> <http://test.com/example>; <http://example.com/vocab#pages> 96 }",
-                            function (err, result) {
-                                expect(err).toBe(null);
-                                engine.execute("SELECT * { <http://example/book3> ?p ?o }", function (err, result) {
-                                    expect(err).toBe(null);
-                                    expect(result.length).toBe(2);
+        it("should insert data in two requests (InsertDataTrivialRecovery3)", async function () {
+            var engine = await createEngine();
 
-                                    if (result[0]["p"].value === "http://example.com/vocab#title") {
-                                        expect(result[0]["o"].value).toBe("http://test.com/example");
-                                    } else if (result[0]["p"].value === "http://example.com/vocab#pages") {
-                                        expect(result[0]["o"].value).toBe("95");
-                                        expect(result[0]["o"].type).toBe("http://www.w3.org/2001/XMLSchema#integer");
-                                    } else {
-                                        fail("unexpected solution");
-                                    }
+            await execute(
+                engine,
+                "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example>; <http://example.com/vocab#pages> 95 }",
+            );
 
-                                    if (result[1]["p"].value === "http://example.com/vocab#title") {
-                                        expect(result[1]["o"].value).toBe("http://test.com/example");
-                                    } else if (result[1]["p"].value === "http://example.com/vocab#pages") {
-                                        expect(result[1]["o"].value).toBe("95");
-                                        expect(result[1]["o"].type).toBe("http://www.w3.org/2001/XMLSchema#integer");
-                                    } else {
-                                        fail("unexpected solution");
-                                    }
+            await execute(
+                engine,
+                "INSERT DATA { <http://example/book4> <http://example.com/vocab#title> <http://test.com/example>; <http://example.com/vocab#pages> 96 }",
+            );
 
-                                    done();
-                                });
-                            },
-                        );
-                    },
-                );
-            });
+            var result = await execute(engine, "SELECT * { <http://example/book3> ?p ?o }");
+            expect(result.length).toBe(2);
+
+            if (result[0]["p"].value === "http://example.com/vocab#title") {
+                expect(result[0]["o"].value).toBe("http://test.com/example");
+            } else if (result[0]["p"].value === "http://example.com/vocab#pages") {
+                expect(result[0]["o"].value).toBe("95");
+                expect(result[0]["o"].type).toBe("http://www.w3.org/2001/XMLSchema#integer");
+            } else {
+                fail("unexpected solution");
+            }
+
+            if (result[1]["p"].value === "http://example.com/vocab#title") {
+                expect(result[1]["o"].value).toBe("http://test.com/example");
+            } else if (result[1]["p"].value === "http://example.com/vocab#pages") {
+                expect(result[1]["o"].value).toBe("95");
+                expect(result[1]["o"].type).toBe("http://www.w3.org/2001/XMLSchema#integer");
+            } else {
+                fail("unexpected solution");
+            }
         });
 
-        it("should delete an inserted triple with DELETE DATA (InsertionDeletionTrivial1)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
-                    function (err) {
-                        expect(err).toBeNull();
-                        engine.execute("SELECT * { ?s ?p ?o }", function (err, result) {
-                            expect(result.length).toBe(1);
-                            expect(result[0]["s"].value).toBe("http://example/book3");
-                            expect(result[0]["p"].value).toBe("http://example.com/vocab#title");
-                            expect(result[0]["o"].value).toBe("http://test.com/example");
+        it("should delete an inserted triple with DELETE DATA (InsertionDeletionTrivial1)", async function () {
+            var engine = await createEngine();
 
-                            engine.execute(
-                                "DELETE DATA { <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
-                                function (err) {
-                                    expect(err).toBeNull();
-                                    engine.execute("SELECT * { ?s ?p ?o }", function (err, result) {
-                                        expect(result.length).toBe(0);
-                                        countLexiconTerms(engine.lexicon, function (count) {
-                                            expect(count).toBe(0);
-                                            done();
-                                        });
-                                    });
-                                },
-                            );
-                        });
-                    },
-                );
-            });
+            await execute(
+                engine,
+                "INSERT DATA {  <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
+            );
+
+            var result = await execute(engine, "SELECT * { ?s ?p ?o }");
+            expect(result.length).toBe(1);
+            expect(result[0]["s"].value).toBe("http://example/book3");
+            expect(result[0]["p"].value).toBe("http://example.com/vocab#title");
+            expect(result[0]["o"].value).toBe("http://test.com/example");
+
+            await execute(
+                engine,
+                "DELETE DATA { <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }",
+            );
+
+            result = await execute(engine, "SELECT * { ?s ?p ?o }");
+            expect(result.length).toBe(0);
+
+            var count = await lexiconTermCount(engine.lexicon);
+            expect(count).toBe(0);
         });
 
-        it("should delete a triple from one named graph only (InsertionDeletion2)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    "INSERT DATA {  GRAPH <a> { <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> } }",
-                    function (err) {
-                        expect(err).toBe(null);
+        it("should delete a triple from one named graph only (InsertionDeletion2)", async function () {
+            var engine = await createEngine();
 
-                        engine.execute(
-                            "INSERT DATA {  GRAPH <b> { <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> } }",
-                            function (err) {
-                                expect(err).toBe(null);
-                                engine.execute(
-                                    "SELECT * FROM NAMED <a> { GRAPH <a> { ?s ?p ?o } }",
-                                    function (err, result) {
-                                        expect(err).toBeNull();
-                                        expect(result.length).toBe(1);
-                                        expect(result[0]["s"].value).toBe("http://example/book3");
-                                        expect(result[0]["p"].value).toBe("http://example.com/vocab#title");
-                                        expect(result[0]["o"].value).toBe("http://test.com/example");
+            await execute(
+                engine,
+                "INSERT DATA {  GRAPH <a> { <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> } }",
+            );
 
-                                        engine.execute(
-                                            "SELECT * FROM NAMED <b> { GRAPH <b> { ?s ?p ?o } }",
-                                            function (err, result) {
-                                                expect(err).toBeNull();
-                                                expect(result.length).toBe(1);
-                                                expect(result[0]["s"].value).toBe("http://example/book3");
-                                                expect(result[0]["p"].value).toBe("http://example.com/vocab#title");
-                                                expect(result[0]["o"].value).toBe("http://test.com/example");
+            await execute(
+                engine,
+                "INSERT DATA {  GRAPH <b> { <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> } }",
+            );
 
-                                                engine.execute(
-                                                    "DELETE DATA { GRAPH <a> { <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }  }",
-                                                    function (err) {
-                                                        expect(err).toBeNull();
-                                                        engine.execute(
-                                                            "SELECT * FROM NAMED <a> { GRAPH <a> { ?s ?p ?o } }",
-                                                            function (err, result) {
-                                                                expect(err).toBeNull();
-                                                                expect(result.length).toBe(0);
+            var result = await execute(engine, "SELECT * FROM NAMED <a> { GRAPH <a> { ?s ?p ?o } }");
+            expect(result.length).toBe(1);
+            expect(result[0]["s"].value).toBe("http://example/book3");
+            expect(result[0]["p"].value).toBe("http://example.com/vocab#title");
+            expect(result[0]["o"].value).toBe("http://test.com/example");
 
-                                                                engine.execute(
-                                                                    "SELECT * FROM NAMED <b> { GRAPH <b> { ?s ?p ?o } }",
-                                                                    function (err, result) {
-                                                                        expect(err).toBeNull();
-                                                                        expect(result.length).toBe(1);
-                                                                        expect(result[0]["s"].value).toBe(
-                                                                            "http://example/book3",
-                                                                        );
-                                                                        expect(result[0]["p"].value).toBe(
-                                                                            "http://example.com/vocab#title",
-                                                                        );
-                                                                        expect(result[0]["o"].value).toBe(
-                                                                            "http://test.com/example",
-                                                                        );
+            result = await execute(engine, "SELECT * FROM NAMED <b> { GRAPH <b> { ?s ?p ?o } }");
+            expect(result.length).toBe(1);
+            expect(result[0]["s"].value).toBe("http://example/book3");
+            expect(result[0]["p"].value).toBe("http://example.com/vocab#title");
+            expect(result[0]["o"].value).toBe("http://test.com/example");
 
-                                                                        countLexiconTerms(
-                                                                            engine.lexicon,
-                                                                            function (count) {
-                                                                                expect(count).toBe(8);
+            await execute(
+                engine,
+                "DELETE DATA { GRAPH <a> { <http://example/book3> <http://example.com/vocab#title> <http://test.com/example> }  }",
+            );
 
-                                                                                done();
-                                                                            },
-                                                                        );
-                                                                    },
-                                                                );
-                                                            },
-                                                        );
-                                                    },
-                                                );
-                                            },
-                                        );
-                                    },
-                                );
-                            },
-                        );
-                    },
-                );
-            });
+            result = await execute(engine, "SELECT * FROM NAMED <a> { GRAPH <a> { ?s ?p ?o } }");
+            expect(result.length).toBe(0);
+
+            result = await execute(engine, "SELECT * FROM NAMED <b> { GRAPH <b> { ?s ?p ?o } }");
+            expect(result.length).toBe(1);
+            expect(result[0]["s"].value).toBe("http://example/book3");
+            expect(result[0]["p"].value).toBe("http://example.com/vocab#title");
+            expect(result[0]["o"].value).toBe("http://test.com/example");
+
+            var count = await lexiconTermCount(engine.lexicon);
+            expect(count).toBe(8);
         });
 
-        it("should modify a named graph with WITH, DELETE and INSERT (Modify1)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should modify a named graph with WITH, DELETE and INSERT (Modify1)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/addresses> \
                                    { \
                                         <http://example/president25> foaf:givenName "Bill" .\
@@ -2935,50 +2490,46 @@ describe("QueryEngine", function () {
                                         <http://example/president42> foaf:familyName "Clinton" .\
                                    } \
                                }',
-                    function (err) {
-                        expect(err).toBeNull();
-                        engine.execute(
-                            "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                               WITH <http://example/addresses>\
                               DELETE { ?person foaf:givenName 'Bill' }\
                               INSERT { ?person foaf:givenName 'William' }\
                               WHERE  { ?person foaf:givenName 'Bill' }",
-                            function (err, result) {
-                                engine.execute(
-                                    "PREFIX foaf:<http://xmlns.com/foaf/0.1/>\
+            );
+
+            var results = await execute(
+                engine,
+                "PREFIX foaf:<http://xmlns.com/foaf/0.1/>\
                               SELECT * FROM NAMED <http://example/addresses> { \
                               GRAPH <http://example/addresses> { ?s ?p ?o } }\
                               ORDER BY ?s ?p",
-                                    function (err, results) {
-                                        expect(results[0].s.value).toBe("http://example/president25");
-                                        expect(results[1].s.value).toBe("http://example/president25");
-                                        expect(results[0].o.value).toBe("McKinley");
-                                        expect(results[1].o.value).toBe("William");
+            );
+            expect(results[0].s.value).toBe("http://example/president25");
+            expect(results[1].s.value).toBe("http://example/president25");
+            expect(results[0].o.value).toBe("McKinley");
+            expect(results[1].o.value).toBe("William");
 
-                                        expect(results[2].s.value).toBe("http://example/president27");
-                                        expect(results[3].s.value).toBe("http://example/president27");
-                                        expect(results[2].o.value).toBe("Taft");
-                                        expect(results[3].o.value).toBe("William");
+            expect(results[2].s.value).toBe("http://example/president27");
+            expect(results[3].s.value).toBe("http://example/president27");
+            expect(results[2].o.value).toBe("Taft");
+            expect(results[3].o.value).toBe("William");
 
-                                        expect(results[4].s.value).toBe("http://example/president42");
-                                        expect(results[5].s.value).toBe("http://example/president42");
-                                        expect(results[4].o.value).toBe("Clinton");
-                                        expect(results[5].o.value).toBe("William");
-
-                                        done();
-                                    },
-                                );
-                            },
-                        );
-                    },
-                );
-            });
+            expect(results[4].s.value).toBe("http://example/president42");
+            expect(results[5].s.value).toBe("http://example/president42");
+            expect(results[4].o.value).toBe("Clinton");
+            expect(results[5].o.value).toBe("William");
         });
 
-        it("should modify the default graph with DELETE and INSERT (ModifyDefaultGraph)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should modify the default graph with DELETE and INSERT (ModifyDefaultGraph)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  \
                                         <http://example/president25> foaf:givenName "Bill" .\
                                         <http://example/president25> foaf:familyName "McKinley" .\
@@ -2987,47 +2538,44 @@ describe("QueryEngine", function () {
                                         <http://example/president42> foaf:givenName "Bill" .\
                                         <http://example/president42> foaf:familyName "Clinton" .\
                                }',
-                    function () {
-                        engine.execute(
-                            "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                               DELETE { ?person foaf:givenName 'Bill' }\
                               INSERT { ?person foaf:givenName 'William' }\
                               WHERE  { ?person foaf:givenName 'Bill' }",
-                            function (err) {
-                                engine.execute(
-                                    "PREFIX foaf:<http://xmlns.com/foaf/0.1/>\
+            );
+
+            var results = await execute(
+                engine,
+                "PREFIX foaf:<http://xmlns.com/foaf/0.1/>\
                               SELECT * { ?s ?p ?o }\
                               ORDER BY ?s ?p",
-                                    function (err, results) {
-                                        expect(results[0].s.value).toBe("http://example/president25");
-                                        expect(results[1].s.value).toBe("http://example/president25");
-                                        expect(results[0].o.value).toBe("McKinley");
-                                        expect(results[1].o.value).toBe("William");
+            );
+            expect(results[0].s.value).toBe("http://example/president25");
+            expect(results[1].s.value).toBe("http://example/president25");
+            expect(results[0].o.value).toBe("McKinley");
+            expect(results[1].o.value).toBe("William");
 
-                                        expect(results[2].s.value).toBe("http://example/president27");
-                                        expect(results[3].s.value).toBe("http://example/president27");
-                                        expect(results[2].o.value).toBe("Taft");
-                                        expect(results[3].o.value).toBe("William");
+            expect(results[2].s.value).toBe("http://example/president27");
+            expect(results[3].s.value).toBe("http://example/president27");
+            expect(results[2].o.value).toBe("Taft");
+            expect(results[3].o.value).toBe("William");
 
-                                        expect(results[4].s.value).toBe("http://example/president42");
-                                        expect(results[5].s.value).toBe("http://example/president42");
-                                        expect(results[4].o.value).toBe("Clinton");
-                                        expect(results[5].o.value).toBe("William");
-
-                                        done();
-                                    },
-                                );
-                            },
-                        );
-                    },
-                );
-            });
+            expect(results[4].s.value).toBe("http://example/president42");
+            expect(results[5].s.value).toBe("http://example/president42");
+            expect(results[4].o.value).toBe("Clinton");
+            expect(results[5].o.value).toBe("William");
         });
 
-        it("should insert into another graph with WITH and USING (ModifyOnlyInsert)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should insert into another graph with WITH and USING (ModifyOnlyInsert)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/addresses> \
                                    { \
                                         <http://example/president25> foaf:givenName "Bill" .\
@@ -3038,43 +2586,40 @@ describe("QueryEngine", function () {
                                         <http://example/president42> foaf:familyName "Clinton" .\
                                    } \
                                }',
-                    function () {
-                        engine.execute(
-                            "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                               WITH <http://example/addresses_bis>\
                               INSERT { ?person foaf:givenName 'William' }\
                               USING <http://example/addresses>\
                               WHERE  { ?person foaf:givenName 'Bill' }",
-                            function (err, result) {
-                                engine.execute(
-                                    "PREFIX foaf:<http://xmlns.com/foaf/0.1/>\
+            );
+
+            var results = await execute(
+                engine,
+                "PREFIX foaf:<http://xmlns.com/foaf/0.1/>\
                               SELECT * FROM <http://example/addresses_bis> \
                               { ?s ?p ?o }\
                               ORDER BY ?s ?p",
-                                    function (err, results) {
-                                        expect(results[0].s.value).toBe("http://example/president25");
-                                        expect(results[0].o.value).toBe("William");
+            );
+            expect(results[0].s.value).toBe("http://example/president25");
+            expect(results[0].o.value).toBe("William");
 
-                                        expect(results[1].s.value).toBe("http://example/president27");
-                                        expect(results[1].o.value).toBe("William");
+            expect(results[1].s.value).toBe("http://example/president27");
+            expect(results[1].o.value).toBe("William");
 
-                                        expect(results[2].s.value).toBe("http://example/president42");
-                                        expect(results[2].o.value).toBe("William");
-
-                                        done();
-                                    },
-                                );
-                            },
-                        );
-                    },
-                );
-            });
+            expect(results[2].s.value).toBe("http://example/president42");
+            expect(results[2].o.value).toBe("William");
         });
 
-        it("should delete with WITH and USING (ModifyOnlyDelete)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should delete with WITH and USING (ModifyOnlyDelete)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/addresses> \
                                    { \
                                         <http://example/president25> foaf:givenName "Bill" .\
@@ -3085,501 +2630,390 @@ describe("QueryEngine", function () {
                                         <http://example/president42> foaf:familyName "Clinton" .\
                                    } \
                                }',
-                    function (err) {
-                        expect(err).toBeNull();
-                        engine.execute(
-                            "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                               WITH <http://example/addresses>\
                               DELETE { ?person foaf:givenName 'Bill' }\
                               USING <http://example/addresses>\
                               WHERE  { ?person foaf:givenName 'Bill' }",
-                            function (err, result) {
-                                engine.execute(
-                                    "PREFIX foaf:<http://xmlns.com/foaf/0.1/>\
+            );
+
+            var results = await execute(
+                engine,
+                "PREFIX foaf:<http://xmlns.com/foaf/0.1/>\
                               SELECT * FROM <http://example/addresses> \
                               { ?s ?p ?o }\
                               ORDER BY ?s ?p",
-                                    function (err, results) {
-                                        expect(results.length).toBe(3);
-                                        done();
-                                    },
-                                );
-                            },
-                        );
-                    },
-                );
-            });
+            );
+            expect(results.length).toBe(3);
         });
 
-        it("should clear one named graph with CLEAR GRAPH (ClearGraph1)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should clear one named graph with CLEAR GRAPH (ClearGraph1)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president25> \
                                    { \
                                         <http://example/president25> foaf:givenName "Bill" .\
                                         <http://example/president25> foaf:familyName "McKinley" .\
                                    } \
                                }',
-                    function (err) {
-                        expect(err).toBeNull();
-                        engine.execute(
-                            'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president27> \
                                    { \
                                         <http://example/president27> foaf:givenName "Bill" .\
                                         <http://example/president27> foaf:familyName "Taft" .\
                                    } \
                                }',
-                            function (err) {
-                                expect(err).toBeNull();
-                                engine.execute("CLEAR GRAPH <http://example/president27>", function (err, results) {
-                                    engine.execute(
-                                        "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }",
-                                        function (err, results) {
-                                            expect(results.length).toBe(0);
+            );
 
-                                            engine.execute(
-                                                "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }",
-                                                function (err, results) {
-                                                    expect(results.length).toBe(2);
-                                                    done();
-                                                },
-                                            );
-                                        },
-                                    );
-                                });
-                            },
-                        );
-                    },
-                );
-            });
+            await execute(engine, "CLEAR GRAPH <http://example/president27>");
+
+            var results = await execute(engine, "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }");
+            expect(results.length).toBe(0);
+
+            results = await execute(engine, "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }");
+            expect(results.length).toBe(2);
         });
 
-        it("should clear the default graph with CLEAR DEFAULT (ClearGraph2)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should clear the default graph with CLEAR DEFAULT (ClearGraph2)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                  INSERT DATA { \
                                       <http://example/president22> foaf:givenName "Grover" .\
                                       <http://example/president22> foaf:familyName "Cleveland" .\
                                  }',
-                    function (err, result) {
-                        engine.execute(
-                            'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president25> \
                                    { \
                                         <http://example/president25> foaf:givenName "Bill" .\
                                         <http://example/president25> foaf:familyName "McKinley" .\
                                    } \
                                }',
-                            function (err) {
-                                expect(err).toBeNull();
-                                engine.execute(
-                                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president27> \
                                    { \
                                         <http://example/president27> foaf:givenName "Bill" .\
                                         <http://example/president27> foaf:familyName "Taft" .\
                                    } \
                                }',
-                                    function (err) {
-                                        expect(err).toBeNull();
-                                        engine.execute("CLEAR DEFAULT", function (err, results) {
-                                            engine.execute("SELECT *  { ?s ?p ?o } ", function (err, results) {
-                                                expect(results.length).toBe(0);
+            );
 
-                                                engine.execute(
-                                                    "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }",
-                                                    function (err, results) {
-                                                        expect(results.length).toBe(2);
+            await execute(engine, "CLEAR DEFAULT");
 
-                                                        engine.execute(
-                                                            "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }",
-                                                            function (err, results) {
-                                                                expect(results.length).toBe(2);
-                                                                done();
-                                                            },
-                                                        );
-                                                    },
-                                                );
-                                            });
-                                        });
-                                    },
-                                );
-                            },
-                        );
-                    },
-                );
-            });
+            var results = await execute(engine, "SELECT *  { ?s ?p ?o } ");
+            expect(results.length).toBe(0);
+
+            results = await execute(engine, "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }");
+            expect(results.length).toBe(2);
+
+            results = await execute(engine, "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }");
+            expect(results.length).toBe(2);
         });
 
-        it("should clear all named graphs with CLEAR NAMED (ClearGraph3)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should clear all named graphs with CLEAR NAMED (ClearGraph3)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                  INSERT DATA { \
                                       <http://example/president22> foaf:givenName "Grover" .\
                                       <http://example/president22> foaf:familyName "Cleveland" .\
                                  }',
-                    function (err, result) {
-                        engine.execute(
-                            'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president25> \
                                    { \
                                         <http://example/president25> foaf:givenName "Bill" .\
                                         <http://example/president25> foaf:familyName "McKinley" .\
                                    } \
                                }',
-                            function (err) {
-                                expect(err).toBeNull();
-                                engine.execute(
-                                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president27> \
                                    { \
                                         <http://example/president27> foaf:givenName "Bill" .\
                                         <http://example/president27> foaf:familyName "Taft" .\
                                    } \
                                }',
-                                    function (err) {
-                                        expect(err).toBeNull();
-                                        engine.execute("CLEAR NAMED", function (err, results) {
-                                            engine.execute("SELECT *  { ?s ?p ?o } ", function (err, results) {
-                                                expect(err).toBeNull();
-                                                expect(results.length).toBe(2);
+            );
 
-                                                engine.execute(
-                                                    "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }",
-                                                    function (err, results) {
-                                                        expect(results.length).toBe(0);
+            await execute(engine, "CLEAR NAMED");
 
-                                                        engine.execute(
-                                                            "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }",
-                                                            function (err, results) {
-                                                                expect(results.length).toBe(0);
-                                                                done();
-                                                            },
-                                                        );
-                                                    },
-                                                );
-                                            });
-                                        });
-                                    },
-                                );
-                            },
-                        );
-                    },
-                );
-            });
+            var results = await execute(engine, "SELECT *  { ?s ?p ?o } ");
+            expect(results.length).toBe(2);
+
+            results = await execute(engine, "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }");
+            expect(results.length).toBe(0);
+
+            results = await execute(engine, "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }");
+            expect(results.length).toBe(0);
         });
 
-        it("should clear all graphs with CLEAR ALL (ClearGraph4)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should clear all graphs with CLEAR ALL (ClearGraph4)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                  INSERT DATA { \
                                       <http://example/president22> foaf:givenName "Grover" .\
                                       <http://example/president22> foaf:familyName "Cleveland" .\
                                  }',
-                    function (err, result) {
-                        engine.execute(
-                            'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president25> \
                                    { \
                                         <http://example/president25> foaf:givenName "Bill" .\
                                         <http://example/president25> foaf:familyName "McKinley" .\
                                    } \
                                }',
-                            function (err) {
-                                expect(err).toBeNull();
-                                engine.execute(
-                                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president27> \
                                    { \
                                         <http://example/president27> foaf:givenName "Bill" .\
                                         <http://example/president27> foaf:familyName "Taft" .\
                                    } \
                                }',
-                                    function (err) {
-                                        expect(err).toBeNull();
-                                        engine.execute("CLEAR ALL", function (err, results) {
-                                            engine.execute("SELECT *  { ?s ?p ?o } ", function (err, results) {
-                                                expect(err).toBeNull();
-                                                expect(results.length).toBe(0);
+            );
 
-                                                engine.execute(
-                                                    "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }",
-                                                    function (err, results) {
-                                                        expect(results.length).toBe(0);
+            await execute(engine, "CLEAR ALL");
 
-                                                        engine.execute(
-                                                            "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }",
-                                                            function (err, results) {
-                                                                expect(results.length).toBe(0);
-                                                                engine.lexicon.registeredGraphs(
-                                                                    true,
-                                                                    function (graphs) {
-                                                                        expect(graphs.length).toBe(0);
-                                                                        done();
-                                                                    },
-                                                                );
-                                                            },
-                                                        );
-                                                    },
-                                                );
-                                            });
-                                        });
-                                    },
-                                );
-                            },
-                        );
-                    },
-                );
-            });
+            var results = await execute(engine, "SELECT *  { ?s ?p ?o } ");
+            expect(results.length).toBe(0);
+
+            results = await execute(engine, "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }");
+            expect(results.length).toBe(0);
+
+            results = await execute(engine, "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }");
+            expect(results.length).toBe(0);
+
+            var graphs = await registeredGraphs(engine.lexicon);
+            expect(graphs.length).toBe(0);
         });
 
-        it("should accept CREATE GRAPH (Create)", function (done) {
-            newEngine(function (engine) {
-                engine.execute("CREATE GRAPH <a>", function (err, result) {
-                    expect(err).toBe(null);
-                    expect(result).toBe(true);
+        it("should accept CREATE GRAPH (Create)", async function () {
+            var engine = await createEngine();
 
-                    done();
-                });
-            });
+            var result = await execute(engine, "CREATE GRAPH <a>");
+            expect(result).toBe(true);
         });
 
-        it("should drop one named graph with DROP GRAPH (Drop1)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should drop one named graph with DROP GRAPH (Drop1)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president25> \
                                    { \
                                         <http://example/president25> foaf:givenName "Bill" .\
                                         <http://example/president25> foaf:familyName "McKinley" .\
                                    } \
                                }',
-                    function (err) {
-                        expect(err).toBeNull();
-                        engine.execute(
-                            'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president27> \
                                    { \
                                         <http://example/president27> foaf:givenName "Bill" .\
                                         <http://example/president27> foaf:familyName "Taft" .\
                                    } \
                                }',
-                            function (err) {
-                                expect(err).toBeNull();
-                                engine.execute("DROP GRAPH <http://example/president27>", function (err, results) {
-                                    engine.execute(
-                                        "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }",
-                                        function (err, results) {
-                                            expect(results.length).toBe(0);
+            );
 
-                                            engine.execute(
-                                                "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }",
-                                                function (err, results) {
-                                                    expect(results.length).toBe(2);
-                                                    done();
-                                                },
-                                            );
-                                        },
-                                    );
-                                });
-                            },
-                        );
-                    },
-                );
-            });
+            await execute(engine, "DROP GRAPH <http://example/president27>");
+
+            var results = await execute(engine, "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }");
+            expect(results.length).toBe(0);
+
+            results = await execute(engine, "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }");
+            expect(results.length).toBe(2);
         });
 
-        it("should drop the default graph with DROP DEFAULT (Drop2)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should drop the default graph with DROP DEFAULT (Drop2)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                  INSERT DATA { \
                                       <http://example/president22> foaf:givenName "Grover" .\
                                       <http://example/president22> foaf:familyName "Cleveland" .\
                                  }',
-                    function (err, result) {
-                        engine.execute(
-                            'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president25> \
                                    { \
                                         <http://example/president25> foaf:givenName "Bill" .\
                                         <http://example/president25> foaf:familyName "McKinley" .\
                                    } \
                                }',
-                            function (err) {
-                                expect(err).toBeNull();
-                                engine.execute(
-                                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president27> \
                                    { \
                                         <http://example/president27> foaf:givenName "Bill" .\
                                         <http://example/president27> foaf:familyName "Taft" .\
                                    } \
                                }',
-                                    function (err) {
-                                        expect(err).toBeNull();
-                                        engine.execute("DROP DEFAULT", function (err, results) {
-                                            engine.execute("SELECT *  { ?s ?p ?o } ", function (err, results) {
-                                                expect(results.length).toBe(0);
+            );
 
-                                                engine.execute(
-                                                    "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }",
-                                                    function (err, results) {
-                                                        expect(results.length).toBe(2);
+            await execute(engine, "DROP DEFAULT");
 
-                                                        engine.execute(
-                                                            "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }",
-                                                            function (err, results) {
-                                                                expect(results.length).toBe(2);
-                                                                done();
-                                                            },
-                                                        );
-                                                    },
-                                                );
-                                            });
-                                        });
-                                    },
-                                );
-                            },
-                        );
-                    },
-                );
-            });
+            var results = await execute(engine, "SELECT *  { ?s ?p ?o } ");
+            expect(results.length).toBe(0);
+
+            results = await execute(engine, "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }");
+            expect(results.length).toBe(2);
+
+            results = await execute(engine, "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }");
+            expect(results.length).toBe(2);
         });
 
-        it("should drop all named graphs with DROP NAMED (Drop3)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should drop all named graphs with DROP NAMED (Drop3)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                  INSERT DATA { \
                                       <http://example/president22> foaf:givenName "Grover" .\
                                       <http://example/president22> foaf:familyName "Cleveland" .\
                                  }',
-                    function (err, result) {
-                        engine.execute(
-                            'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president25> \
                                    { \
                                         <http://example/president25> foaf:givenName "Bill" .\
                                         <http://example/president25> foaf:familyName "McKinley" .\
                                    } \
                                }',
-                            function (err) {
-                                expect(err).toBeNull();
-                                engine.execute(
-                                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president27> \
                                    { \
                                         <http://example/president27> foaf:givenName "Bill" .\
                                         <http://example/president27> foaf:familyName "Taft" .\
                                    } \
                                }',
-                                    function (err) {
-                                        expect(err).toBeNull();
-                                        engine.execute("DROP NAMED", function (err, results) {
-                                            engine.execute("SELECT *  { ?s ?p ?o } ", function (err, results) {
-                                                expect(err).toBeNull();
-                                                expect(results.length).toBe(2);
+            );
 
-                                                engine.execute(
-                                                    "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }",
-                                                    function (err, results) {
-                                                        expect(results.length).toBe(0);
+            await execute(engine, "DROP NAMED");
 
-                                                        engine.execute(
-                                                            "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }",
-                                                            function (err, results) {
-                                                                expect(results.length).toBe(0);
-                                                                done();
-                                                            },
-                                                        );
-                                                    },
-                                                );
-                                            });
-                                        });
-                                    },
-                                );
-                            },
-                        );
-                    },
-                );
-            });
+            var results = await execute(engine, "SELECT *  { ?s ?p ?o } ");
+            expect(results.length).toBe(2);
+
+            results = await execute(engine, "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }");
+            expect(results.length).toBe(0);
+
+            results = await execute(engine, "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }");
+            expect(results.length).toBe(0);
         });
 
-        it("should drop all graphs with DROP ALL (Drop4)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should drop all graphs with DROP ALL (Drop4)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                  INSERT DATA { \
                                       <http://example/president22> foaf:givenName "Grover" .\
                                       <http://example/president22> foaf:familyName "Cleveland" .\
                                  }',
-                    function (err, result) {
-                        engine.execute(
-                            'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president25> \
                                    { \
                                         <http://example/president25> foaf:givenName "Bill" .\
                                         <http://example/president25> foaf:familyName "McKinley" .\
                                    } \
                                }',
-                            function (err) {
-                                expect(err).toBeNull();
-                                engine.execute(
-                                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA {  GRAPH <http://example/president27> \
                                    { \
                                         <http://example/president27> foaf:givenName "Bill" .\
                                         <http://example/president27> foaf:familyName "Taft" .\
                                    } \
                                }',
-                                    function (err) {
-                                        expect(err).toBeNull();
-                                        engine.execute("DROP ALL", function (err, results) {
-                                            engine.execute("SELECT *  { ?s ?p ?o } ", function (err, results) {
-                                                expect(err).toBeNull();
-                                                expect(results.length).toBe(0);
+            );
 
-                                                engine.execute(
-                                                    "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }",
-                                                    function (err, results) {
-                                                        expect(results.length).toBe(0);
+            await execute(engine, "DROP ALL");
 
-                                                        engine.execute(
-                                                            "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }",
-                                                            function (err, results) {
-                                                                expect(results.length).toBe(0);
-                                                                engine.lexicon.registeredGraphs(
-                                                                    true,
-                                                                    function (graphs) {
-                                                                        expect(graphs.length).toBe(0);
-                                                                        done();
-                                                                    },
-                                                                );
-                                                            },
-                                                        );
-                                                    },
-                                                );
-                                            });
-                                        });
-                                    },
-                                );
-                            },
-                        );
-                    },
-                );
-            });
+            var results = await execute(engine, "SELECT *  { ?s ?p ?o } ");
+            expect(results.length).toBe(0);
+
+            results = await execute(engine, "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }");
+            expect(results.length).toBe(0);
+
+            results = await execute(engine, "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }");
+            expect(results.length).toBe(0);
+
+            var graphs = await registeredGraphs(engine.lexicon);
+            expect(graphs.length).toBe(0);
         });
 
-        it("should delete the matching triples with DELETE WHERE (DeleteWhere1)", function (done) {
-            newEngine(function (engine) {
-                engine.execute(
-                    'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+        it("should delete the matching triples with DELETE WHERE (DeleteWhere1)", async function () {
+            var engine = await createEngine();
+
+            await execute(
+                engine,
+                'PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                                INSERT DATA \
                                    { \
                                         <http://example/president25> foaf:givenName "Bill" .\
@@ -3589,153 +3023,119 @@ describe("QueryEngine", function () {
                                         <http://example/president42> foaf:givenName "Bill" .\
                                         <http://example/president42> foaf:familyName "Clinton" .\
                                    }',
-                    function (err) {
-                        expect(err).toBeNull();
-                        engine.execute(
-                            "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
+            );
+
+            await execute(
+                engine,
+                "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\
                               DELETE WHERE  { ?person foaf:givenName 'Bill'}",
-                            function (err, result) {
-                                engine.execute(
-                                    "PREFIX foaf:<http://xmlns.com/foaf/0.1/>\
+            );
+
+            var results = await execute(
+                engine,
+                "PREFIX foaf:<http://xmlns.com/foaf/0.1/>\
                               SELECT *  \
                               { ?s ?p ?o }\
                               ORDER BY ?s ?p",
-                                    function (err, results) {
-                                        expect(results.length).toBe(3);
-                                        done();
-                                    },
-                                );
-                            },
-                        );
-                    },
-                );
-            });
-        });
-
-        it("should create new blank nodes per solution from an INSERT template (InsertTemplateBlankNodes)", function (done) {
-            // a blank node of an INSERT template is a new blank node per solution, shared by the quads of one solution
-            checkQueries(
-                ":a :p 1 . :b :p 2 . :c :p 3",
-                [
-                    ["INSERT { [] :q ?o } WHERE { ?s :p ?o }"],
-                    ["SELECT (COUNT(DISTINCT ?b) AS ?n) { ?b :q ?o FILTER(isBlank(?b)) }", ["n"], ["n=3^^integer"]],
-                    ["INSERT { _:x :r ?o . _:x :t ?s } WHERE { ?s :p ?o }"],
-                    [
-                        "SELECT ?s ?o { ?b :r ?o ; :t ?s } ORDER BY ?o",
-                        ["s", "o"],
-                        ["s=a o=1^^integer", "s=b o=2^^integer", "s=c o=3^^integer"],
-                    ],
-                    ["SELECT (COUNT(DISTINCT ?b) AS ?n) { ?b :r ?o }", ["n"], ["n=3^^integer"]],
-                    // the same label in a second operation of the request is another blank node
-                    ["INSERT { _:y :u ?o } WHERE { :a :p ?o } ; INSERT { _:y :u ?o } WHERE { :b :p ?o }"],
-                    ["SELECT (COUNT(DISTINCT ?b) AS ?n) { ?b :u ?o }", ["n"], ["n=2^^integer"]],
-                    // a quad with an unbound variable is skipped, the other quads of the solution are inserted
-                    ["INSERT { :n :w ?x . :n :v ?o } WHERE { ?s :p ?o OPTIONAL { ?s :none ?x } }"],
-                    ["SELECT ?o { :n :v ?o } ORDER BY ?o", ["o"], ["o=1^^integer", "o=2^^integer", "o=3^^integer"]],
-                    ["ASK { :n :w ?x }", null, false],
-                ],
-                done,
             );
+            expect(results.length).toBe(3);
         });
 
-        it("should create a new blank node for a template label that the store already has (InsertTemplateBlankLabels)", function (done) {
+        it("should create new blank nodes per solution from an INSERT template (InsertTemplateBlankNodes)", async function () {
+            // a blank node of an INSERT template is a new blank node per solution, shared by the quads of one solution
+            await checkQueries(":a :p 1 . :b :p 2 . :c :p 3", [
+                ["INSERT { [] :q ?o } WHERE { ?s :p ?o }"],
+                ["SELECT (COUNT(DISTINCT ?b) AS ?n) { ?b :q ?o FILTER(isBlank(?b)) }", ["n"], ["n=3^^integer"]],
+                ["INSERT { _:x :r ?o . _:x :t ?s } WHERE { ?s :p ?o }"],
+                [
+                    "SELECT ?s ?o { ?b :r ?o ; :t ?s } ORDER BY ?o",
+                    ["s", "o"],
+                    ["s=a o=1^^integer", "s=b o=2^^integer", "s=c o=3^^integer"],
+                ],
+                ["SELECT (COUNT(DISTINCT ?b) AS ?n) { ?b :r ?o }", ["n"], ["n=3^^integer"]],
+                // the same label in a second operation of the request is another blank node
+                ["INSERT { _:y :u ?o } WHERE { :a :p ?o } ; INSERT { _:y :u ?o } WHERE { :b :p ?o }"],
+                ["SELECT (COUNT(DISTINCT ?b) AS ?n) { ?b :u ?o }", ["n"], ["n=2^^integer"]],
+                // a quad with an unbound variable is skipped, the other quads of the solution are inserted
+                ["INSERT { :n :w ?x . :n :v ?o } WHERE { ?s :p ?o OPTIONAL { ?s :none ?x } }"],
+                ["SELECT ?o { :n :v ?o } ORDER BY ?o", ["o"], ["o=1^^integer", "o=2^^integer", "o=3^^integer"]],
+                ["ASK { :n :w ?x }", null, false],
+            ]);
+        });
+
+        it("should create a new blank node for a template label that the store already has (InsertTemplateBlankLabels)", async function () {
             // a template label equal to the label of a blank node of the store is still a new blank node
-            newEngine(function (engine) {
-                var prefix = "PREFIX : <http://example/> ";
-                engine.execute(prefix + "INSERT DATA { _:d :p 1 }", function (err) {
-                    expect(err).toBeNull();
-                    engine.execute(prefix + "SELECT ?b { ?b :p 1 }", function (err, results) {
-                        expect(err).toBeNull();
-                        var label = results[0].b.value;
-                        engine.execute(prefix + "INSERT { " + label + " :q ?o } WHERE { ?b :p ?o }", function (err) {
-                            expect(err).toBeNull();
-                            engine.execute(prefix + "ASK { ?b :p 1 ; :q 1 }", function (err, result) {
-                                expect(err).toBeNull();
-                                expect(result).toBe(false);
-                                engine.execute(
-                                    prefix + "SELECT ?b { ?b :q 1 FILTER(isBlank(?b)) }",
-                                    function (err, results) {
-                                        expect(err).toBeNull();
-                                        expect(results.length).toBe(1);
-                                        expect(results[0].b.value).not.toBe(label);
-                                        done();
-                                    },
-                                );
-                            });
-                        });
-                    });
-                });
-            });
+            var engine = await createEngine();
+
+            var prefix = "PREFIX : <http://example/> ";
+            await execute(engine, prefix + "INSERT DATA { _:d :p 1 }");
+
+            var results = await execute(engine, prefix + "SELECT ?b { ?b :p 1 }");
+
+            var label = results[0].b.value;
+            await execute(engine, prefix + "INSERT { " + label + " :q ?o } WHERE { ?b :p ?o }");
+
+            var result = await execute(engine, prefix + "ASK { ?b :p 1 ; :q 1 }");
+            expect(result).toBe(false);
+
+            results = await execute(engine, prefix + "SELECT ?b { ?b :q 1 FILTER(isBlank(?b)) }");
+            expect(results.length).toBe(1);
+            expect(results[0].b.value).not.toBe(label);
         });
 
-        it("should use a blank node bound by WHERE as that blank node in the templates (ModifyBoundBlankNodes)", function (done) {
+        it("should use a blank node bound by WHERE as that blank node in the templates (ModifyBoundBlankNodes)", async function () {
             // a blank node of the store bound by WHERE is that blank node in the templates, also after a BIND, and
             // deleting one of its quads keeps it for the others
-            checkQueries(
-                '_:x :p 1 . _:x :k "keep" . :a :p 2',
-                [
-                    ["INSERT { ?b :r ?z } WHERE { ?b :p 1 BIND(5 AS ?z) }"],
-                    ["SELECT ?k { ?b :r 5 ; :k ?k }", ["k"], ["k=keep"]],
-                    ["DELETE { ?b :r ?z } WHERE { ?b :p 1 BIND(5 AS ?z) }"],
-                    ["ASK { ?b :r 5 }", null, false],
-                    ["DELETE { ?b :p 1 } WHERE { ?b :p 1 }"],
-                    ["SELECT ?k { ?b :k ?k }", ["k"], ["k=keep"]],
-                    // deleting a quad the store does not have changes nothing
-                    ["DELETE { ?b :none 1 } WHERE { ?b :k ?k }"],
-                    ["SELECT ?k { ?b :k ?k }", ["k"], ["k=keep"]],
-                    // the insert still finds a blank node whose last quad the delete removed
-                    ["DELETE { ?b :k ?k } INSERT { ?b :k2 ?k } WHERE { ?b :k ?k }"],
-                    ["SELECT ?k { ?b :k2 ?k FILTER(isBlank(?b)) }", ["k"], ["k=keep"]],
-                    ["DELETE { _:t :p ?o } WHERE { ?s :p ?o }"],
-                    ["SELECT ?s ?o { ?s :p ?o }", ["s", "o"], ["s=a o=2^^integer"]],
-                ],
-                done,
-            );
+            await checkQueries('_:x :p 1 . _:x :k "keep" . :a :p 2', [
+                ["INSERT { ?b :r ?z } WHERE { ?b :p 1 BIND(5 AS ?z) }"],
+                ["SELECT ?k { ?b :r 5 ; :k ?k }", ["k"], ["k=keep"]],
+                ["DELETE { ?b :r ?z } WHERE { ?b :p 1 BIND(5 AS ?z) }"],
+                ["ASK { ?b :r 5 }", null, false],
+                ["DELETE { ?b :p 1 } WHERE { ?b :p 1 }"],
+                ["SELECT ?k { ?b :k ?k }", ["k"], ["k=keep"]],
+                // deleting a quad the store does not have changes nothing
+                ["DELETE { ?b :none 1 } WHERE { ?b :k ?k }"],
+                ["SELECT ?k { ?b :k ?k }", ["k"], ["k=keep"]],
+                // the insert still finds a blank node whose last quad the delete removed
+                ["DELETE { ?b :k ?k } INSERT { ?b :k2 ?k } WHERE { ?b :k ?k }"],
+                ["SELECT ?k { ?b :k2 ?k FILTER(isBlank(?b)) }", ["k"], ["k=keep"]],
+                ["DELETE { _:t :p ?o } WHERE { ?s :p ?o }"],
+                ["SELECT ?s ?o { ?s :p ?o }", ["s", "o"], ["s=a o=2^^integer"]],
+            ]);
         });
 
-        it("should leave no terms behind after deleting quads the store does not have (DeleteMissingQuadsLeaveNoTerms)", function (done) {
+        it("should leave no terms behind after deleting quads the store does not have (DeleteMissingQuadsLeaveNoTerms)", async function () {
             // deleting quads the store does not have leaves no graph and no blank node in the lexicon
-            newEngine(function (engine) {
-                var lexicon = engine.lexicon;
-                var registered = 0,
-                    released = 0;
-                var registerBlank = lexicon.registerBlank.bind(lexicon);
-                var unregisterTerm = lexicon._unregisterTerm.bind(lexicon);
-                lexicon.registerBlank = function (cb) {
-                    registered++;
-                    registerBlank(cb);
-                };
-                lexicon._unregisterTerm = function (kind, oid, cb) {
-                    if (kind === "blank") released++;
-                    unregisterTerm(kind, oid, cb);
-                };
-                var prefix = "PREFIX : <http://example/> ";
-                engine.execute(prefix + "DELETE DATA { GRAPH :g { :a :b :c } }", function (err) {
-                    expect(err).toBeNull();
-                    lexicon.registeredGraphs(true, function (graphs) {
-                        expect(graphs).toEqual([]);
-                        engine.execute(prefix + "INSERT DATA { :a :p 1 . :b :p 2 }", function (err) {
-                            expect(err).toBeNull();
-                            engine.execute(
-                                prefix + "DELETE { ?x :p 1 } WHERE { ?s :p ?o BIND(BNODE() AS ?x) }",
-                                function (err) {
-                                    expect(err).toBeNull();
-                                    // a new blank node from BNODE() is in no quad, so there is nothing to delete
-                                    expect(registered).toBe(0);
-                                    expect(released).toBe(0);
-                                    done();
-                                },
-                            );
-                        });
-                    });
-                });
-            });
+            var engine = await createEngine();
+
+            var lexicon = engine.lexicon;
+            var registered = 0,
+                released = 0;
+            var registerBlank = lexicon.registerBlank.bind(lexicon);
+            var unregisterTerm = lexicon._unregisterTerm.bind(lexicon);
+            lexicon.registerBlank = function (cb) {
+                registered++;
+                registerBlank(cb);
+            };
+            lexicon._unregisterTerm = function (kind, oid, cb) {
+                if (kind === "blank") released++;
+                unregisterTerm(kind, oid, cb);
+            };
+            var prefix = "PREFIX : <http://example/> ";
+            await execute(engine, prefix + "DELETE DATA { GRAPH :g { :a :b :c } }");
+            expect(await registeredGraphs(lexicon)).toEqual([]);
+
+            await execute(engine, prefix + "INSERT DATA { :a :p 1 . :b :p 2 }");
+            await execute(engine, prefix + "DELETE { ?x :p 1 } WHERE { ?s :p ?o BIND(BNODE() AS ?x) }");
+            // a new blank node from BNODE() is in no quad, so there is nothing to delete
+            expect(registered).toBe(0);
+            expect(released).toBe(0);
         });
 
-        it("should handle several GRAPH blocks in one update (QuadsWithSeveralGraphs)", function (done) {
+        it("should handle several GRAPH blocks in one update (QuadsWithSeveralGraphs)", async function () {
             // every GRAPH block of INSERT DATA, DELETE DATA and update templates counts, and so do the triples between them
             var named = "FROM NAMED <http://example/g1> FROM NAMED <http://example/g2> FROM NAMED <http://example/g3> ";
-            checkQueries(
+            await checkQueries(
                 ":a :p 1 . GRAPH :g1 { :a :p 2 } :a :p 3 . GRAPH :g2 { :a :p 4 } GRAPH :g3 { :a :p 5 } :a :p 6",
                 [
                     ["SELECT ?o { :a :p ?o } ORDER BY ?o", ["o"], ["o=1^^integer", "o=3^^integer", "o=6^^integer"]],
@@ -3765,7 +3165,6 @@ describe("QueryEngine", function () {
                         ["g=h2 o=1^^integer"],
                     ],
                 ],
-                done,
             );
         });
     });
