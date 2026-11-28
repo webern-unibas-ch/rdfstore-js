@@ -70,4 +70,18 @@ function lexiconTermCount(lexicon) {
     });
 }
 
-module.exports = { newEngine, countLexiconTerms, createEngine, execute, lexiconTermCount };
+/**
+ * Resolves with the error the promise rejects with, or with null if it resolves.
+ */
+function rejection(promise) {
+    return promise.then(
+        function () {
+            return null;
+        },
+        function (err) {
+            return err;
+        },
+    );
+}
+
+module.exports = { newEngine, countLexiconTerms, createEngine, execute, lexiconTermCount, rejection };
