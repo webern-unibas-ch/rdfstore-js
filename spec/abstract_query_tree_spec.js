@@ -1,7 +1,7 @@
 var AbstractQueryTree = require("../src/abstract_query_tree").AbstractQueryTree;
 var aqt = new AbstractQueryTree();
 
-describe("Parser", function () {
+describe("AbstractQueryTree", function () {
     it("should parse 'SELECT * { ?s ?p ?o }'", function () {
         var query = "SELECT * { ?s ?p ?o }";
 
