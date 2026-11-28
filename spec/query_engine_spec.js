@@ -82,7 +82,6 @@ describe("QueryEngine", function () {
             );
 
             var results = await execute(engine, "BASE <http://example.org/x/> PREFIX : <> SELECT * WHERE { :x ?p ?v }");
-
             expect(results.length).toBe(2);
 
             for (var i = 0; i < results.length; i++) {
@@ -106,7 +105,6 @@ describe("QueryEngine", function () {
             );
 
             var results = await execute(engine, "SELECT * { ?s ?p ?o }");
-
             expect(results.length).toBe(3);
 
             for (var i = 0; i < results.length; i++) {
@@ -148,7 +146,6 @@ describe("QueryEngine", function () {
                 engine,
                 "Prefix : <http://example/> Select Distinct ?s (Count(?v) As ?n) Where { ?s :p ?v Optional { ?s :q ?w } Filter(?v > 1) } Group By ?s Having (Count(?v) > 0) Order By Desc(?s) Limit 5",
             );
-
             expect(termRows(results, ["s", "n"])).toEqual(["s=c n=1^^integer", "s=b n=1^^integer"]);
         });
 
@@ -161,13 +158,12 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT ?s ?v (?v + 1e0 AS ?x) { ?s :p ?v } ORDER BY ?s",
             );
-
             expect(termRows(results, ["s", "v", "x"])).toEqual([
                 "s=a v=2e1^^double x=21^^double",
                 "s=b v=1.0e0^^double x=2^^double",
             ]);
-            results = await execute(engine, "PREFIX : <http://example/> SELECT ?s { ?s :p 1.0e0 }");
 
+            results = await execute(engine, "PREFIX : <http://example/> SELECT ?s { ?s :p 1.0e0 }");
             expect(termRows(results, ["s"])).toEqual(["s=b"]);
         });
     });
@@ -186,7 +182,6 @@ describe("QueryEngine", function () {
                     engine,
                     "SELECT * { ?s <http://example.com/vocab#title> ?o . ?s <http://example.com/vocab#pages> 95 }",
                 );
-
                 expect(result.length).toBe(1);
 
                 expect(result[0]["s"].value).toBe("http://example/book3");
@@ -302,7 +297,6 @@ describe("QueryEngine", function () {
                                     PREFIX dc11:  <http://purl.org/dc/elements/1.1/>\
                                     SELECT ?title WHERE  { { ?book dc10:title  ?title } UNION { ?book dc11:title  ?title } }",
                 );
-
                 expect(results.length).toBe(4);
 
                 var titles = [];
@@ -338,7 +332,6 @@ describe("QueryEngine", function () {
                                                     SELECT ?x ?y\
                                                     WHERE  { { ?book dc10:title ?x } UNION { ?book dc11:title  ?y } }",
                 );
-
                 expect(results.length).toBe(4);
 
                 var xs = [];
@@ -384,7 +377,6 @@ describe("QueryEngine", function () {
                                                     UNION\
                                                     { ?book dc11:title ?title .  ?book dc11:creator ?author } }",
                 );
-
                 expect(results.length).toBe(2);
 
                 if (results[0].author.value == "Alice") {
@@ -414,8 +406,8 @@ describe("QueryEngine", function () {
                 );
 
                 var results = await execute(engine, "SELECT ?book WHERE { ?book ?p ?o }");
-
                 expect(results.length).toBe(6);
+
                 for (var i = 0; i < 6; i++) {
                     expect(results[i].book.token).toBe("blank");
                     expect(results[i].book.value).toEqual(jasmine.any(String));
@@ -439,8 +431,8 @@ describe("QueryEngine", function () {
                                 SELECT ?a ?b { { ?a ex:p ?o1 } UNION { ?b ex:q ?o2 } }";
 
                 var results = await execute(engine, query);
-
                 expect(results.length).toBe(2);
+
                 if (results[0].a == null) {
                     expect(results[0].b.value).toBe(
                         "http://www.w3.org/2009/sparql/docs/tests/data-sparql11/negation#d",
@@ -503,8 +495,8 @@ describe("QueryEngine", function () {
                                                      ?y foaf:name ?nameY .\
                                                      OPTIONAL { ?y foaf:nick ?nickY }  }",
                 );
-
                 expect(results.length).toBe(2);
+
                 if (results[0].nickY === null) {
                     expect(results[0].nameX.value).toBe("Alice");
                     expect(results[0].nameY.value).toBe("Bob");
@@ -544,7 +536,6 @@ describe("QueryEngine", function () {
                                                      OPTIONAL { ?y foaf:nick ?nickY }\
                                                    }",
                 );
-
                 expect(results.length === 2).toBe(true);
             });
 
@@ -569,7 +560,6 @@ describe("QueryEngine", function () {
                     engine,
                     "PREFIX : <http://example/> SELECT ?s ?x { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 10) } }",
                 );
-
                 expect(optionalRows(results, ["s", "x"])).toEqual(["a|", "b|", "c|20"]);
             });
 
@@ -592,13 +582,12 @@ describe("QueryEngine", function () {
                     engine,
                     "PREFIX : <http://example/> SELECT ?s ?x ?y { ?s :p ?o OPTIONAL { { ?s :q ?x } UNION { ?s :r ?y } FILTER(!BOUND(?y)) } }",
                 );
-
                 expect(optionalRows(results, ["s", "x", "y"])).toEqual(["a||", "b|x1|"]);
+
                 results = await execute(
                     engine,
                     "PREFIX : <http://example/> SELECT ?s ?x ?y { ?s :p ?o OPTIONAL { { ?s :r ?y } UNION { ?s :q ?x } FILTER(!BOUND(?x)) } }",
                 );
-
                 expect(optionalRows(results, ["s", "x", "y"])).toEqual(["a||", "b||y1"]);
             });
 
@@ -622,7 +611,6 @@ describe("QueryEngine", function () {
                     engine,
                     "PREFIX : <http://example/> SELECT ?s ?x { { { ?s :q ?x } UNION { ?s :p ?o } } OPTIONAL { ?s :r ?x FILTER(?x > 10) } }",
                 );
-
                 expect(optionalRows(results, ["s", "x"])).toEqual(["a|1", "b|", "c|20"]);
             });
 
@@ -646,7 +634,6 @@ describe("QueryEngine", function () {
                     engine,
                     "PREFIX : <http://example/> SELECT ?s ?x ?z { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 10) } BIND(STR(?o) AS ?z) }",
                 );
-
                 expect(optionalRows(results, ["s", "x", "z"])).toEqual(["a||1", "b||2", "c|20|3"]);
             });
 
@@ -668,15 +655,14 @@ describe("QueryEngine", function () {
                     engine,
                     "PREFIX : <http://example/> SELECT ?s ?x ?z { ?s :p ?o OPTIONAL { ?s :q ?x FILTER(?x > 10) } BIND(1 AS ?z) }",
                 );
-
                 expect(optionalRows(results, ["s", "x", "z"])).toEqual(["b|30|1"]);
+
                 // {?s=:b} from the second branch fails the filter (?o unbound): it is kept,
                 // although its bindings are a subset of the passing solution's
                 results = await execute(
                     engine,
                     "PREFIX : <http://example/> SELECT ?s ?o ?x { { { ?s :p ?o } UNION { ?s :t :u } } OPTIONAL { ?s :q ?x FILTER(?x > ?o) } }",
                 );
-
                 expect(optionalRows(results, ["s", "o", "x"])).toEqual(["b|2|30", "b|2|5", "b||"]);
             });
 
@@ -697,7 +683,6 @@ describe("QueryEngine", function () {
                     engine,
                     "PREFIX : <http://example/> SELECT ?s ?x { { { ?s :p ?o } UNION { ?s :p ?o } } OPTIONAL { ?s :q ?x FILTER(?x > 100) } }",
                 );
-
                 expect(optionalRows(results, ["s", "x"])).toEqual(["a|", "a|", "b|", "b|"]);
             });
         });
@@ -903,10 +888,9 @@ describe("QueryEngine", function () {
 
                 var query = "SELECT ?o { GRAPH <http://example/g1> { ?s ?p ?o } }";
                 var results = await execute(engine, query, [], [{ token: "uri", value: "http://example/g2" }]);
-
                 expect(results.length).toBe(0);
-                results = await execute(engine, query, [], [{ token: "uri", value: "http://example/g1" }]);
 
+                results = await execute(engine, query, [], [{ token: "uri", value: "http://example/g1" }]);
                 expect(results.length).toBe(1);
             });
         });
@@ -1073,7 +1057,6 @@ describe("QueryEngine", function () {
                     engine,
                     "PREFIX : <http://example/> SELECT ?x ?y ?z { ?s :p ?v BIND(?v + 1 AS ?x) BIND(?x * 10 AS ?y) BIND(STR(?y) AS ?z) }",
                 );
-
                 expect(termRows(results, ["x", "y", "z"])).toEqual(["x=3^^integer y=30^^integer z=30"]);
             });
 
@@ -1107,7 +1090,6 @@ describe("QueryEngine", function () {
                                  }";
 
                 var results = await execute(engine, query);
-
                 expect(results.length).toBe(1);
                 expect(results[0].price.value).toBe("17.25");
                 expect(results[0].title.value).toBe("The Semantic Web");
@@ -1127,14 +1109,13 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT ?s (STR(?v) AS ?x) (?v AS ?y) { ?s :p ?v } ORDER BY ?s",
             );
-
             expect(termRows(results, ["s", "x", "y"])).toEqual(["s=a x=x y=x", "s=b x=2 y=2^^integer", "s=c x=u y=u"]);
+
             // an error leaves the variable unbound and keeps the solution
             results = await execute(
                 engine,
                 "PREFIX : <http://example/> SELECT ?s (LANG(?v) AS ?x) (-?v AS ?z) { ?s :p ?v } ORDER BY ?s",
             );
-
             expect(termRows(results, ["s", "x", "z"])).toEqual(["s=a x=en z=-", "s=b x= z=-2^^integer", "s=c x=- z=-"]);
         });
 
@@ -1149,21 +1130,20 @@ describe("QueryEngine", function () {
                 engine,
                 'PREFIX : <http://example/> SELECT ?s ?x ?y ?z { ?s :p ?v BIND(?v + 1 AS ?x) BIND(1/"a" AS ?y) BIND(!(1/"a") AS ?z) } ORDER BY ?s',
             );
-
             expect(termRows(results, ["s", "x", "y", "z"])).toEqual(["s=b x=3^^integer y=- z=-", "s=c x=- y=- z=-"]);
             expect(typeof results[0].x.value).toBe("string");
+
             results = await execute(
                 engine,
                 "PREFIX : <http://example/> SELECT ?s (?v / 4 AS ?x) (?v / 0 AS ?y) { ?s :p ?v } ORDER BY ?s",
             );
-
             expect(termRows(results, ["s", "x", "y"])).toEqual(["s=b x=0.5^^decimal y=-", "s=c x=- y=-"]);
+
             // error || true is true
             results = await execute(
                 engine,
                 "PREFIX : <http://example/> SELECT ?s { ?s :p ?v FILTER(?v + 1 > 2 || true) } ORDER BY ?s",
             );
-
             expect(termRows(results, ["s"])).toEqual(["s=b", "s=c"]);
         });
 
@@ -1181,27 +1161,26 @@ describe("QueryEngine", function () {
                 xsd +
                     'PREFIX : <http://example/> SELECT ?s ?x ?y { ?s :p ?v BIND(?v / "0"^^xsd:double AS ?x) BIND(?x + 1 AS ?y) FILTER(?x > 1) } ORDER BY ?s',
             );
-
             expect(termRows(results, ["s", "x", "y"])).toEqual([
                 "s=b x=INF^^double y=INF^^double",
                 "s=c x=INF^^double y=INF^^double",
             ]);
+
             // a large integer keeps its digits
             results = await execute(
                 engine,
                 "PREFIX : <http://example/> SELECT ?x ?y { :b :p ?v BIND(10000000000 * 10000000000 * 10 AS ?x) BIND(?x + ?v AS ?y) }",
             );
-
             expect(termRows(results, ["x", "y"])).toEqual([
                 "x=1000000000000000000000^^integer y=1000000000000000000000^^integer",
             ]);
+
             // the same form from an aggregate
             results = await execute(
                 engine,
                 xsd +
                     'PREFIX : <http://example/> SELECT (SUM(?v) / "0"^^xsd:double AS ?a) { ?s :p ?v } HAVING (?a > 1)',
             );
-
             expect(termRows(results, ["a"])).toEqual(["a=INF^^double"]);
         });
 
@@ -1217,13 +1196,12 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT ?o { ?s :p ?o FILTER(?o IN (:b, :c, 2)) } ORDER BY ?o",
             );
-
             expect(termRows(results, ["o"])).toEqual(["o=b", "o=c", "o=2^^integer"]);
+
             results = await execute(
                 engine,
                 "PREFIX : <http://example/> SELECT ?o { ?s :p ?o FILTER(?o not in (:b, :c)) } ORDER BY ?o",
             );
-
             expect(termRows(results, ["o"])).toEqual(["o=d", "o=2^^integer"]);
         });
 
@@ -1379,7 +1357,6 @@ describe("QueryEngine", function () {
                                     FILTER EXISTS { ?x ns:price ?p FILTER (?p = 23) } .\
                                  }";
             var result = await execute(engine, query);
-
             expect(result.length).toEqual(1);
             expect(result[0].title.value).toEqual("The Semantic Web");
         });
@@ -1410,7 +1387,6 @@ describe("QueryEngine", function () {
                                  FILTER (?p = 23 || EXISTS { ?x ns:price 42 })  .\
                               }";
             var result = await execute(engine, query);
-
             expect(result.length).toEqual(2);
         });
     });
@@ -1437,7 +1413,6 @@ describe("QueryEngine", function () {
                 "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
                                                    SELECT DISTINCT ?name WHERE { ?x foaf:name ?name }",
             );
-
             expect(results.length).toBe(1);
             expect(results[0].name.value).toBe("Alice");
         });
@@ -1463,7 +1438,6 @@ describe("QueryEngine", function () {
                 "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
                                     SELECT ?name WHERE { ?x foaf:name ?name } LIMIT 2",
             );
-
             expect(results.length).toBe(2);
             expect(results[0].name.value).toBe("Alice");
             expect(results[1].name.value).toBe("Alice");
@@ -1490,7 +1464,6 @@ describe("QueryEngine", function () {
                 "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
                                                    SELECT ?name WHERE { ?x foaf:name ?name } ORDER BY ?name",
             );
-
             expect(results.length).toBe(3);
             expect(results[0].name.value).toBe("Alice");
             expect(results[1].name.value).toBe("Bob");
@@ -1518,7 +1491,6 @@ describe("QueryEngine", function () {
                 "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
                                                    SELECT ?name WHERE { ?x foaf:name ?name } ORDER BY DESC(?name)",
             );
-
             expect(results.length).toBe(3);
             expect(results[0].name.value).toBe("Marie");
             expect(results[1].name.value).toBe("Bob");
@@ -1546,7 +1518,6 @@ describe("QueryEngine", function () {
                 "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
                                                    SELECT ?mbox WHERE { ?x foaf:mbox ?mbox } ORDER BY ASC(?mbox)",
             );
-
             expect(results.length).toBe(3);
             expect(results[0].mbox.value).toBe("mailto:alice@example.com");
             expect(results[1].mbox.value).toBe("mailto:bob@example.com");
@@ -1574,7 +1545,6 @@ describe("QueryEngine", function () {
                 "PREFIX foaf:    <http://xmlns.com/foaf/0.1/>\
                                                    SELECT ?name WHERE { ?x foaf:test1 ?test . ?x foaf:name ?name } ORDER BY ASC(?test) ASC(?name)",
             );
-
             expect(results.length).toBe(3);
             expect(results[0].name.value).toBe("Alice");
             expect(results[1].name.value).toBe("Marie");
@@ -1592,21 +1562,20 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT ?s (?v * 2 AS ?d) { ?s :p ?v } ORDER BY DESC(?d) LIMIT 2",
             );
-
             expect(termRows(results, ["s", "d"])).toEqual(["s=c d=6^^integer", "s=b d=4^^integer"]);
+
             // the effective boolean value of an IRI is an error, and so is its negation
             results = await execute(engine, "PREFIX : <http://example/> SELECT ?s { ?s :p ?v FILTER(!?v) }");
-
             expect(termRows(results, ["s"])).toEqual([]);
+
             // AVG of values that are no numbers is unbound, AVG of no values is 0
             results = await execute(
                 engine,
                 "PREFIX : <http://example/> SELECT ?s (AVG(?v) AS ?a) { ?s :p ?v } GROUP BY ?s ORDER BY ?s",
             );
-
             expect(termRows(results, ["s", "a"])).toEqual(["s=b a=2^^decimal", "s=c a=3^^decimal", "s=d a=-"]);
-            results = await execute(engine, "PREFIX : <http://example/> SELECT (AVG(?v) AS ?a) { ?s :nothing ?v }");
 
+            results = await execute(engine, "PREFIX : <http://example/> SELECT (AVG(?v) AS ?a) { ?s :nothing ?v }");
             expect(termRows(results, ["a"])).toEqual(["a=0^^integer"]);
         });
 
@@ -1647,7 +1616,6 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (?s AS ?t) {  ?s :p ?v . } GROUP BY ?s",
             );
-
             expect(results.length).toBe(2);
             expect(results[0].t.value).toBe("http://example/s1");
             expect(results[1].t.value).toBe("http://example/s2");
@@ -1670,7 +1638,6 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (MAX(?v) AS ?maxv) {  ?s ?p ?v . } GROUP BY ?s",
             );
-
             expect(results.length).toBe(2);
             expect(results[0].maxv.value).toBe("9");
             expect(results[1].maxv.value).toBe("2");
@@ -1693,7 +1660,6 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (MIN(?v) AS ?maxv) {  ?s ?p ?v . } GROUP BY ?s",
             );
-
             expect(results.length).toBe(2);
             expect(results[0].maxv.value).toBe("1");
             expect(results[1].maxv.value).toBe("0");
@@ -1717,7 +1683,6 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (COUNT(?v) AS ?count) {  ?s ?p ?v . } GROUP BY ?s",
             );
-
             expect(results.length).toBe(2);
             expect(results[0].count.value).toBe("3");
             expect(results[1].count.value).toBe("2");
@@ -1741,7 +1706,6 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (COUNT( distinct ?v) AS ?count) {  ?s ?p ?v . } GROUP BY ?s",
             );
-
             expect(results.length).toBe(2);
             expect(results[0].count.value).toBe("2");
             expect(results[1].count.value).toBe("2");
@@ -1765,7 +1729,6 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (AVG( distinct ?v) AS ?avg) {  ?s ?p ?v . } GROUP BY ?s",
             );
-
             expect(results.length).toBe(2);
             expect(results[0].avg.value).toBe("2");
             expect(results[1].avg.value).toBe("6");
@@ -1788,7 +1751,6 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (AVG(?v) AS ?avg) {  ?s ?p ?v . } GROUP BY ?s",
             );
-
             expect(results.length).toBe(2);
             expect(results[0].avg.value).toBe("2.5");
             expect(results[1].avg.value).toBe("6");
@@ -1812,7 +1774,6 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (SUM( distinct ?v) AS ?avg) {  ?s ?p ?v . } GROUP BY ?s",
             );
-
             expect(results.length).toBe(2);
             expect(results[0].avg.value).toBe("4");
             expect(results[1].avg.value).toBe("12");
@@ -1835,7 +1796,6 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (SUM(?v) AS ?avg) {  ?s ?p ?v . } GROUP BY ?s",
             );
-
             expect(results.length).toBe(2);
             expect(results[0].avg.value).toBe("5.5");
             expect(results[1].avg.value).toBe("12");
@@ -1857,8 +1817,8 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) {  ?s :p ?v . } GROUP BY STR(?v)",
             );
-
             expect(results.length).toBe(2);
+
             var counts = [results[0].count.value, results[1].count.value].sort();
             expect(counts).toEqual(["1", "2"]);
         });
@@ -1883,8 +1843,8 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) {  ?s :p ?v . } GROUP BY LANG(?v)",
             );
-
             expect(results.length).toBe(2);
+
             var counts = [results[0].count.value, results[1].count.value].sort();
             expect(counts).toEqual(["1", "2"]);
         });
@@ -1906,7 +1866,6 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) {  ?s :q ?a . ?s :r ?b . } GROUP BY STR(?a) STR(?b)",
             );
-
             expect(results.length).toBe(2);
             expect(results[0].count.value).toBe("1");
             expect(results[1].count.value).toBe("1");
@@ -1928,8 +1887,8 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT ?key (COUNT(?s) AS ?count) {  ?s :p ?v . } GROUP BY (STR(?v) AS ?key)",
             );
-
             expect(results.length).toBe(2);
+
             var counts = {};
             for (var i = 0; i < results.length; i++) {
                 counts[results[i].key.value] = results[i].count.value;
@@ -1953,7 +1912,6 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) (SUM(?v) AS ?sum) (GROUP_CONCAT(?v) AS ?all) {  ?s :p ?v . }",
             );
-
             expect(results.length).toBe(1);
             expect(results[0].count.value).toBe("3");
             expect(results[0].sum.value).toBe("6");
@@ -1964,7 +1922,6 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) (SUM(?v) AS ?sum) (AVG(?v) AS ?avg) (GROUP_CONCAT(?v) AS ?all) (MAX(?v) AS ?max) {  ?s :none ?v . }",
             );
-
             expect(results.length).toBe(1);
             expect(results[0].count.value).toBe("0");
             expect(results[0].sum.value).toBe("0");
@@ -1989,8 +1946,8 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (COUNT(?s) AS ?count) {  ?s :p ?v . } GROUP BY (STR(?v))",
             );
-
             expect(results.length).toBe(2);
+
             var counts = [results[0].count.value, results[1].count.value].sort();
             expect(counts).toEqual(["1", "2"]);
         });
@@ -2010,7 +1967,6 @@ describe("QueryEngine", function () {
             var err = await rejection(
                 execute(engine, "PREFIX : <http://example/> SELECT ?s (COUNT(?v) AS ?count) {  ?s :p ?v . }"),
             );
-
             expect(err).not.toBeNull();
             expect(err.message).toBe("Incompatible Group and Projection variables");
         });
@@ -2051,26 +2007,25 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT ?s (COUNT(?v) AS ?count) {  ?s :p ?v . } GROUP BY ?s LIMIT 1",
             );
-
             expect(results.length).toBe(1);
+
             results = await execute(
                 engine,
                 "PREFIX : <http://example/> SELECT ?s (COUNT(?v) AS ?count) {  ?s :p ?v . } GROUP BY ?s OFFSET 1",
             );
-
             expect(results.length).toBe(2);
+
             results = await execute(
                 engine,
                 "PREFIX : <http://example/> SELECT DISTINCT (COUNT(?v) AS ?count) {  ?s :p ?v . } GROUP BY ?s",
             );
-
             expect(results.length).toBe(1);
             expect(results[0].count.value).toBe("1");
+
             results = await execute(
                 engine,
                 "PREFIX : <http://example/> SELECT (COUNT(?v) AS ?count) {  ?s :p ?v . } LIMIT 0",
             );
-
             expect(results.length).toBe(0);
         });
 
@@ -2083,27 +2038,26 @@ describe("QueryEngine", function () {
             await execute(engine, groupCountData());
 
             var results = await execute(engine, select + "ORDER BY ?count");
-
             expect(classCounts(results)).toEqual(["C1=1", "C3=2", "C2=3", "C5=9", "C4=10"]);
+
             results = await execute(engine, select + "ORDER BY DESC(?count)");
-
             expect(classCounts(results)).toEqual(["C4=10", "C5=9", "C2=3", "C3=2", "C1=1"]);
-            results = await execute(engine, select + "ORDER BY DESC(?class)");
 
+            results = await execute(engine, select + "ORDER BY DESC(?class)");
             expect(classCounts(results)).toEqual(["C5=9", "C4=10", "C3=2", "C2=3", "C1=1"]);
+
             // an aggregate that is not projected
             results = await execute(
                 engine,
                 "PREFIX : <http://example/> SELECT ?class { ?s a ?class } GROUP BY ?class ORDER BY DESC(COUNT(?s))",
             );
-
             expect(
                 results.map(function (r) {
                     return r["class"].value.replace("http://example/", "");
                 }),
             ).toEqual(["C4", "C5", "C2", "C3", "C1"]);
-            results = await execute(engine, select + "ORDER BY ?count LIMIT 2");
 
+            results = await execute(engine, select + "ORDER BY ?count LIMIT 2");
             expect(classCounts(results)).toEqual(["C1=1", "C3=2"]);
         });
 
@@ -2116,28 +2070,27 @@ describe("QueryEngine", function () {
             await execute(engine, groupCountData());
 
             var results = await execute(engine, select + "HAVING (COUNT(?s) > 2) ORDER BY ?count");
-
             expect(classCounts(results)).toEqual(["C2=3", "C5=9", "C4=10"]);
+
             // the SELECT alias, several conditions, lower case
             results = await execute(engine, select + "having (?count > 1) (?count < 10) ORDER BY DESC(?count)");
-
             expect(classCounts(results)).toEqual(["C5=9", "C2=3", "C3=2"]);
+
             // a group variable
             results = await execute(engine, select + "HAVING (?class = :C3 || ?class = :C1) ORDER BY ?count LIMIT 1");
-
             expect(classCounts(results)).toEqual(["C1=1"]);
+
             // without GROUP BY: one group over all solutions
             results = await execute(
                 engine,
                 "PREFIX : <http://example/> SELECT (COUNT(*) AS ?c) { ?s a ?class } HAVING (COUNT(*) > 100)",
             );
-
             expect(results.length).toBe(0);
+
             results = await execute(
                 engine,
                 "PREFIX : <http://example/> SELECT (COUNT(*) AS ?c) { ?s a ?class } HAVING (COUNT(*) > 20)",
             );
-
             expect(results.length).toBe(1);
             expect(results[0].c.value).toBe("25");
         });
@@ -2151,14 +2104,14 @@ describe("QueryEngine", function () {
             var err = await rejection(
                 execute(engine, "PREFIX : <http://example/> SELECT * { ?s a ?class } GROUP BY ?class"),
             );
-
             expect(err.message).toBe("Incompatible Group and Projection variables");
+
             // an aggregate in ORDER BY groups the solutions, so ?class must be grouped
             err = await rejection(
                 execute(engine, "PREFIX : <http://example/> SELECT ?class { ?s a ?class } ORDER BY DESC(COUNT(?s))"),
             );
-
             expect(err.message).toBe("Incompatible Group and Projection variables");
+
             // ?s is neither grouped nor aggregated
             err = await rejection(
                 execute(
@@ -2166,33 +2119,32 @@ describe("QueryEngine", function () {
                     "PREFIX : <http://example/> SELECT ?class { ?s a ?class } GROUP BY ?class HAVING (BOUND(?s))",
                 ),
             );
-
             expect(err.message).toBe("Variable ?s is neither grouped nor aggregated");
+
             err = await rejection(
                 execute(engine, "PREFIX : <http://example/> SELECT ?class { ?s a ?class } GROUP BY ?class ORDER BY ?s"),
             );
-
             expect(err.message).toBe("Variable ?s is neither grouped nor aggregated");
+
             err = await rejection(
                 execute(engine, "PREFIX : <http://example/> SELECT (STR(?s) AS ?x) { ?s a ?class } GROUP BY ?class"),
             );
-
             expect(err.message).toBe("Variable ?s is neither grouped nor aggregated");
+
             err = await rejection(
                 execute(
                     engine,
                     "PREFIX : <http://example/> CONSTRUCT { ?class a ?class } WHERE { ?s a ?class } GROUP BY ?class HAVING (COUNT(?s) > 100)",
                 ),
             );
-
             expect(err.name).toBe("NonSupportedSparqlFeatureError");
+
             err = await rejection(
                 execute(
                     engine,
                     "PREFIX : <http://example/> CONSTRUCT { ?class a ?class } WHERE { ?s a ?class } GROUP BY ?class",
                 ),
             );
-
             expect(err.name).toBe("NonSupportedSparqlFeatureError");
         });
 
@@ -2205,7 +2157,6 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT ?class ((COUNT(?s) * 2) AS ?double) { ?s a ?class } GROUP BY ?class HAVING (COUNT(?s) * 2 > 5) ORDER BY ?double",
             );
-
             expect(
                 results.map(function (r) {
                     return r["class"].value.replace("http://example/", "") + "=" + r["double"].value;
@@ -2223,7 +2174,6 @@ describe("QueryEngine", function () {
                 engine,
                 'PREFIX : <http://example/> SELECT ?class (COUNT(?s) AS ?__aggregate0) { ?s a ?class } GROUP BY ?class HAVING (MAX(STR(?s)) != "") ORDER BY ?__aggregate0 LIMIT 2',
             );
-
             expect(
                 results.map(function (r) {
                     return r.__aggregate0.value;
@@ -2246,7 +2196,6 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (COUNT(?s)*2 AS ?double) {  ?s :p ?v . }",
             );
-
             expect(results.length).toBe(1);
             expect(results[0]["double"].value).toBe("4");
         });
@@ -2267,8 +2216,8 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT ?s (GROUP_CONCAT(?o) AS ?concat) {  ?s :p ?o . } GROUP BY ?s",
             );
-
             expect(results.length).toBe(2);
+
             var concats = {};
             for (var i = 0; i < results.length; i++) {
                 concats[results[i].s.value] = results[i].concat;
@@ -2294,15 +2243,14 @@ describe("QueryEngine", function () {
                 engine,
                 'PREFIX : <http://example/> SELECT (GROUP_CONCAT(?o ; SEPARATOR="|") AS ?concat) {  ?s :p ?o . } GROUP BY ?s',
             );
-
             expect(results.length).toBe(1);
             expect(results[0].concat.value.split("|").sort()).toEqual(["1", "22", "333"]);
+
             // keywords are case-insensitive
             results = await execute(
                 engine,
                 'PREFIX : <http://example/> SELECT (group_concat(?o ; Separator=",") AS ?concat) {  ?s :p ?o . } GROUP BY ?s',
             );
-
             expect(results[0].concat.value.split(",").sort()).toEqual(["1", "22", "333"]);
         });
 
@@ -2322,7 +2270,6 @@ describe("QueryEngine", function () {
                 engine,
                 "PREFIX : <http://example/> SELECT (GROUP_CONCAT(?o) AS ?all) (GROUP_CONCAT(DISTINCT ?o) AS ?distinct) {  ?s ?p ?o . } GROUP BY ?s",
             );
-
             expect(results.length).toBe(1);
             expect(results[0].all.value.split(" ").sort()).toEqual(["a", "a", "b"]);
             expect(results[0].distinct.value.split(" ").sort()).toEqual(["a", "b"]);
@@ -2388,7 +2335,6 @@ describe("QueryEngine", function () {
             );
 
             var result = await execute(engine, "SELECT * { ?s ?p ?o }");
-
             expect(result.length).toBe(1);
             expect(result[0]["s"].value).toBe("http://example/book3");
             expect(result[0]["p"].value).toBe("http://example.com/vocab#title");
@@ -2404,7 +2350,6 @@ describe("QueryEngine", function () {
             );
 
             var result = await execute(engine, "SELECT * { ?s ?p ?o }");
-
             expect(result.length).toBe(2);
             expect(result[0]["s"].value).toBe("http://example/book3");
             expect(result[1]["s"].value).toBe("http://example/book3");
@@ -2442,7 +2387,6 @@ describe("QueryEngine", function () {
             );
 
             var result = await execute(engine, "SELECT * { <http://example/book3> ?p ?o }");
-
             expect(result.length).toBe(2);
 
             if (result[0]["p"].value === "http://example.com/vocab#title") {
@@ -2473,7 +2417,6 @@ describe("QueryEngine", function () {
             );
 
             var result = await execute(engine, "SELECT * { ?s ?p ?o }");
-
             expect(result.length).toBe(1);
             expect(result[0]["s"].value).toBe("http://example/book3");
             expect(result[0]["p"].value).toBe("http://example.com/vocab#title");
@@ -2485,10 +2428,9 @@ describe("QueryEngine", function () {
             );
 
             result = await execute(engine, "SELECT * { ?s ?p ?o }");
-
             expect(result.length).toBe(0);
-            var count = await lexiconTermCount(engine.lexicon);
 
+            var count = await lexiconTermCount(engine.lexicon);
             expect(count).toBe(0);
         });
 
@@ -2506,14 +2448,12 @@ describe("QueryEngine", function () {
             );
 
             var result = await execute(engine, "SELECT * FROM NAMED <a> { GRAPH <a> { ?s ?p ?o } }");
-
             expect(result.length).toBe(1);
             expect(result[0]["s"].value).toBe("http://example/book3");
             expect(result[0]["p"].value).toBe("http://example.com/vocab#title");
             expect(result[0]["o"].value).toBe("http://test.com/example");
 
             result = await execute(engine, "SELECT * FROM NAMED <b> { GRAPH <b> { ?s ?p ?o } }");
-
             expect(result.length).toBe(1);
             expect(result[0]["s"].value).toBe("http://example/book3");
             expect(result[0]["p"].value).toBe("http://example.com/vocab#title");
@@ -2525,18 +2465,15 @@ describe("QueryEngine", function () {
             );
 
             result = await execute(engine, "SELECT * FROM NAMED <a> { GRAPH <a> { ?s ?p ?o } }");
-
             expect(result.length).toBe(0);
 
             result = await execute(engine, "SELECT * FROM NAMED <b> { GRAPH <b> { ?s ?p ?o } }");
-
             expect(result.length).toBe(1);
             expect(result[0]["s"].value).toBe("http://example/book3");
             expect(result[0]["p"].value).toBe("http://example.com/vocab#title");
             expect(result[0]["o"].value).toBe("http://test.com/example");
 
             var count = await lexiconTermCount(engine.lexicon);
-
             expect(count).toBe(8);
         });
 
@@ -2574,7 +2511,6 @@ describe("QueryEngine", function () {
                               GRAPH <http://example/addresses> { ?s ?p ?o } }\
                               ORDER BY ?s ?p",
             );
-
             expect(results[0].s.value).toBe("http://example/president25");
             expect(results[1].s.value).toBe("http://example/president25");
             expect(results[0].o.value).toBe("McKinley");
@@ -2621,7 +2557,6 @@ describe("QueryEngine", function () {
                               SELECT * { ?s ?p ?o }\
                               ORDER BY ?s ?p",
             );
-
             expect(results[0].s.value).toBe("http://example/president25");
             expect(results[1].s.value).toBe("http://example/president25");
             expect(results[0].o.value).toBe("McKinley");
@@ -2672,7 +2607,6 @@ describe("QueryEngine", function () {
                               { ?s ?p ?o }\
                               ORDER BY ?s ?p",
             );
-
             expect(results[0].s.value).toBe("http://example/president25");
             expect(results[0].o.value).toBe("William");
 
@@ -2717,7 +2651,6 @@ describe("QueryEngine", function () {
                               { ?s ?p ?o }\
                               ORDER BY ?s ?p",
             );
-
             expect(results.length).toBe(3);
         });
 
@@ -2749,11 +2682,9 @@ describe("QueryEngine", function () {
             await execute(engine, "CLEAR GRAPH <http://example/president27>");
 
             var results = await execute(engine, "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }");
-
             expect(results.length).toBe(0);
 
             results = await execute(engine, "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }");
-
             expect(results.length).toBe(2);
         });
 
@@ -2794,15 +2725,12 @@ describe("QueryEngine", function () {
             await execute(engine, "CLEAR DEFAULT");
 
             var results = await execute(engine, "SELECT *  { ?s ?p ?o } ");
-
             expect(results.length).toBe(0);
 
             results = await execute(engine, "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }");
-
             expect(results.length).toBe(2);
 
             results = await execute(engine, "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }");
-
             expect(results.length).toBe(2);
         });
 
@@ -2843,15 +2771,12 @@ describe("QueryEngine", function () {
             await execute(engine, "CLEAR NAMED");
 
             var results = await execute(engine, "SELECT *  { ?s ?p ?o } ");
-
             expect(results.length).toBe(2);
 
             results = await execute(engine, "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }");
-
             expect(results.length).toBe(0);
 
             results = await execute(engine, "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }");
-
             expect(results.length).toBe(0);
         });
 
@@ -2892,16 +2817,14 @@ describe("QueryEngine", function () {
             await execute(engine, "CLEAR ALL");
 
             var results = await execute(engine, "SELECT *  { ?s ?p ?o } ");
-
             expect(results.length).toBe(0);
 
             results = await execute(engine, "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }");
-
             expect(results.length).toBe(0);
 
             results = await execute(engine, "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }");
-
             expect(results.length).toBe(0);
+
             var graphs = await registeredGraphs(engine.lexicon);
             expect(graphs.length).toBe(0);
         });
@@ -2910,7 +2833,6 @@ describe("QueryEngine", function () {
             var engine = await createEngine();
 
             var result = await execute(engine, "CREATE GRAPH <a>");
-
             expect(result).toBe(true);
         });
 
@@ -2942,11 +2864,9 @@ describe("QueryEngine", function () {
             await execute(engine, "DROP GRAPH <http://example/president27>");
 
             var results = await execute(engine, "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }");
-
             expect(results.length).toBe(0);
 
             results = await execute(engine, "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }");
-
             expect(results.length).toBe(2);
         });
 
@@ -2987,15 +2907,12 @@ describe("QueryEngine", function () {
             await execute(engine, "DROP DEFAULT");
 
             var results = await execute(engine, "SELECT *  { ?s ?p ?o } ");
-
             expect(results.length).toBe(0);
 
             results = await execute(engine, "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }");
-
             expect(results.length).toBe(2);
 
             results = await execute(engine, "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }");
-
             expect(results.length).toBe(2);
         });
 
@@ -3036,15 +2953,12 @@ describe("QueryEngine", function () {
             await execute(engine, "DROP NAMED");
 
             var results = await execute(engine, "SELECT *  { ?s ?p ?o } ");
-
             expect(results.length).toBe(2);
 
             results = await execute(engine, "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }");
-
             expect(results.length).toBe(0);
 
             results = await execute(engine, "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }");
-
             expect(results.length).toBe(0);
         });
 
@@ -3085,16 +2999,14 @@ describe("QueryEngine", function () {
             await execute(engine, "DROP ALL");
 
             var results = await execute(engine, "SELECT *  { ?s ?p ?o } ");
-
             expect(results.length).toBe(0);
 
             results = await execute(engine, "SELECT * { GRAPH <http://example/president27> { ?s ?p ?o } }");
-
             expect(results.length).toBe(0);
 
             results = await execute(engine, "SELECT * { GRAPH <http://example/president25> { ?s ?p ?o } }");
-
             expect(results.length).toBe(0);
+
             var graphs = await registeredGraphs(engine.lexicon);
             expect(graphs.length).toBe(0);
         });
@@ -3129,7 +3041,6 @@ describe("QueryEngine", function () {
                               { ?s ?p ?o }\
                               ORDER BY ?s ?p",
             );
-
             expect(results.length).toBe(3);
         });
 
@@ -3168,10 +3079,9 @@ describe("QueryEngine", function () {
             await execute(engine, prefix + "INSERT { " + label + " :q ?o } WHERE { ?b :p ?o }");
 
             var result = await execute(engine, prefix + "ASK { ?b :p 1 ; :q 1 }");
-
             expect(result).toBe(false);
-            results = await execute(engine, prefix + "SELECT ?b { ?b :q 1 FILTER(isBlank(?b)) }");
 
+            results = await execute(engine, prefix + "SELECT ?b { ?b :q 1 FILTER(isBlank(?b)) }");
             expect(results.length).toBe(1);
             expect(results[0].b.value).not.toBe(label);
         });
@@ -3216,8 +3126,8 @@ describe("QueryEngine", function () {
             };
             var prefix = "PREFIX : <http://example/> ";
             await execute(engine, prefix + "DELETE DATA { GRAPH :g { :a :b :c } }");
-
             expect(await registeredGraphs(lexicon)).toEqual([]);
+
             await execute(engine, prefix + "INSERT DATA { :a :p 1 . :b :p 2 }");
             await execute(engine, prefix + "DELETE { ?x :p 1 } WHERE { ?s :p ?o BIND(BNODE() AS ?x) }");
             // a new blank node from BNODE() is in no quad, so there is nothing to delete

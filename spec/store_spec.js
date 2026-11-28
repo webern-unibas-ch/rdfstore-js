@@ -10,11 +10,11 @@ describe("Store", function () {
             );
 
             var results = await store.promises.execute("SELECT * { ?s ?p ?o }");
-
             expect(results.length).toBe(1);
             expect(results[0].s.value).toBe("http://example/book3");
             expect(results[0].p.value).toBe("http://example.com/vocab#title");
             expect(results[0].o.value).toBe("http://test.com/example");
+
             await store.promises.close();
         });
 
@@ -26,7 +26,6 @@ describe("Store", function () {
             );
 
             var results = await store.promises.execute("SELECT * { ?s ?p ?o }");
-
             expect(results.length).toBe(1);
             expect(results[0].s.value).toBe("http://example/book3");
             expect(results[0].p.value).toBe("http://example.com/vocab#title");
@@ -47,7 +46,6 @@ describe("Store", function () {
             );
 
             var results = await store.promises.execute("SELECT * { ?s ?p ?o }");
-
             expect(results.length).toBe(1);
             expect(results[0].s.value).toBe("http://example/book3");
             expect(results[0].p.value).toBe("http://example.com/vocab#title");
@@ -88,6 +86,7 @@ describe("Store", function () {
             var triples = graph.toArray();
             var triple;
             expect(triples.length).toBe(4);
+
             for (var i = 0; i < triples.length; i++) {
                 triple = triples[i];
                 if (triple.subject.interfaceName === "BlankNode") {
@@ -95,6 +94,7 @@ describe("Store", function () {
                 } else {
                     expect(triple.subject.valueOf()).toBe("http://www.example.com/resource/12645");
                     expect(triple.object.interfaceName).toBe("BlankNode");
+
                     distinctBlankSubjects[triple.object.bnodeId] = true;
                 }
             }
@@ -102,6 +102,7 @@ describe("Store", function () {
             var numDistinctBlankSujects = Object.keys(distinctBlankSubjects).length;
 
             expect(numDistinctBlankSujects).toBe(1);
+
             await store.promises.close();
         });
 
@@ -111,7 +112,6 @@ describe("Store", function () {
             await store.promises.load("text/n3", "<http://A> <http://B> <http://C>.");
 
             var results = await store.promises.execute("SELECT *  WHERE { ?x ?p ?x }");
-
             expect(results.length).toBe(0);
         });
 
@@ -125,7 +125,6 @@ describe("Store", function () {
             );
 
             var results = await store.promises.execute("SELECT *  WHERE { ?x ?p ?x }");
-
             expect(results.length).toBe(1);
         });
 
@@ -275,12 +274,11 @@ describe("Store", function () {
             await store.promises.execute(query);
 
             var graph = await store.promises.graph();
-
             expect(graph.toArray().length).toBe(0);
 
             var results = await store.promises.graph("http://example.org/people/alice");
-
             expect(results.toArray().length).toBe(4);
+
             await store.promises.close();
         });
 
@@ -309,8 +307,8 @@ describe("Store", function () {
             await store.promises.execute(query);
 
             var graph = await store.promises.node("http://example.org/people/alice");
-
             expect(graph.toArray().length).toBe(4);
+
             await store.promises.close();
         });
 
@@ -352,15 +350,14 @@ describe("Store", function () {
             await store.promises.execute(query);
 
             var graph = await store.promises.graph();
-
             expect(graph.toArray().length).toBe(0);
 
             var results = await store.promises.node(
                 "http://example.org/people/alice",
                 "http://example.org/people/alice",
             );
-
             expect(results.toArray().length).toBe(4);
+
             await store.promises.close();
         });
 
@@ -402,8 +399,8 @@ describe("Store", function () {
             await store.promises.execute(query);
 
             var graphs = await store.promises.registeredGraphs();
-
             expect(graphs.length).toBe(2);
+
             var values = [];
             for (var i = 0; i < graphs.length; i++) {
                 values.push(graphs[i].valueOf());
@@ -411,6 +408,7 @@ describe("Store", function () {
             values.sort();
             expect(values[0]).toBe("http://example.org/people/alice");
             expect(values[1]).toBe("http://example.org/people/bob");
+
             await store.promises.close();
         });
 
@@ -456,6 +454,7 @@ describe("Store", function () {
                 ["http://example.org/alice", "http://example.org/bob"],
             );
             expect(results.length).toBe(2);
+
             // no ORDER BY: the order of the rows is not defined
             results.sort(function (a, b) {
                 return a.who.value < b.who.value ? -1 : 1;
@@ -510,12 +509,11 @@ describe("Store", function () {
 
             store.setPrefix("ex", "http://example.org/people/");
             var graph = await store.promises.graph();
-
             expect(graph.toArray().length).toBe(0);
 
             var results = await store.promises.node("ex:alice", "ex:alice");
-
             expect(results.toArray().length).toBe(4);
+
             await store.promises.close();
         });
 
@@ -558,12 +556,11 @@ describe("Store", function () {
 
             store.setDefaultPrefix("http://example.org/people/");
             var graph = await store.promises.graph();
-
             expect(graph.toArray().length).toBe(0);
 
             var results = await store.promises.node(":alice", ":alice");
-
             expect(results.toArray().length).toBe(4);
+
             await store.promises.close();
         });
 
@@ -575,15 +572,14 @@ describe("Store", function () {
             );
 
             var results = await store.promises.execute("SELECT * { ?s foaf:name ?name }");
-
             expect(results.length).toBe(0);
 
             store.registerDefaultProfileNamespaces();
 
             results = await store.promises.execute("SELECT * { ?s foaf:name ?name }");
-
             expect(results.length).toBe(1);
             expect(results[0].name.value).toBe("Celia");
+
             await store.promises.close();
         });
     });
@@ -614,8 +610,8 @@ describe("Store", function () {
             await store.promises.insert(graph);
 
             graph = await store.promises.node("ex:Alice");
-
             expect(graph.toArray().length).toBe(2);
+
             await store.promises.close();
         });
 
@@ -644,8 +640,8 @@ describe("Store", function () {
             await store.promises.insert(graph, "ex:alice");
 
             graph = await store.promises.node("ex:Alice", "ex:alice");
-
             expect(graph.toArray().length).toBe(2);
+
             await store.promises.close();
         });
 
@@ -674,13 +670,13 @@ describe("Store", function () {
             await store.promises.insert(graph);
 
             graph = await store.promises.node("ex:Alice");
-
             expect(graph.toArray().length).toBe(2);
+
             await store.promises.delete(graph);
 
             graph = await store.promises.node("ex:Alice");
-
             expect(graph.toArray().length).toBe(0);
+
             await store.promises.close();
         });
 
@@ -709,13 +705,13 @@ describe("Store", function () {
             await store.promises.insert(graph, "ex:alice");
 
             graph = await store.promises.node("ex:Alice", "ex:alice");
-
             expect(graph.toArray().length).toBe(2);
+
             await store.promises.delete(graph, "ex:alice");
 
             graph = await store.promises.node("ex:Alice");
-
             expect(graph.toArray().length).toBe(0);
+
             await store.promises.close();
         });
 
@@ -744,13 +740,13 @@ describe("Store", function () {
             await store.promises.insert(graph, "ex:alice");
 
             graph = await store.promises.node("ex:Alice", "ex:alice");
-
             expect(graph.toArray().length).toBe(2);
+
             await store.promises.clear("ex:alice");
 
             graph = await store.promises.node("ex:Alice");
-
             expect(graph.toArray().length).toBe(0);
+
             await store.promises.close();
         });
     });
@@ -778,8 +774,8 @@ describe("Store", function () {
             await store.promises.load("application/json", input, "ex:test");
 
             var graph = await store.promises.node("ex:john_smith", "ex:test");
-
             expect(graph.toArray().length).toBe(3);
+
             await store.promises.close();
         });
 
@@ -805,6 +801,7 @@ describe("Store", function () {
             var counter = Object.keys(blankIds).length;
 
             expect(counter).toBe(2);
+
             await store.promises.close();
         });
 
@@ -830,6 +827,7 @@ describe("Store", function () {
             var counter = Object.keys(blankIds).length;
 
             expect(counter).toBe(2);
+
             await store.promises.close();
         });
 
@@ -853,6 +851,7 @@ describe("Store", function () {
             var counter = Object.keys(blankIds).length;
 
             expect(counter).toBe(2);
+
             await store.promises.close();
         });
 
@@ -881,6 +880,7 @@ describe("Store", function () {
             var counter = Object.keys(blankIds).length;
 
             expect(counter).toBe(2);
+
             await store.promises.close();
         });
 
@@ -893,9 +893,9 @@ describe("Store", function () {
             await store.promises.load("application/json", data);
 
             var results = await store.promises.execute("SELECT * { ?s ?p ?o }");
-
             expect(results.length).toBe(1);
             expect(results[0].s.value).toBe("http://test.com/me");
+
             await store.promises.close();
         });
 
@@ -1085,8 +1085,8 @@ describe("Store", function () {
             var results = await store.promises.execute(
                 "PREFIX test: <http://test.com/> SELECT * { ?x test:prop ?v1 . ?y test:prop ?v2 . filter(custom:my_addition(?v1,?v2)) }",
             );
-
             expect(results.length).toBe(3);
+
             for (var i = 0; i < results.length; i++) {
                 expect(parseInt(results[i].v1.value) + parseInt(results[i].v2.value)).toBeLessThan(5);
             }
@@ -1112,8 +1112,8 @@ describe("Store", function () {
             var results = await store.promises.execute(
                 "PREFIX test: <http://test.com/> SELECT * { ?x test:prop ?v1 . ?y test:prop ?v2 . filter(<http://test.com/my_addition>(?v1,?v2)) }",
             );
-
             expect(results.length).toBe(3);
+
             for (var i = 0; i < results.length; i++) {
                 expect(parseInt(results[i].v1.value) + parseInt(results[i].v2.value)).toBeLessThan(5);
             }
@@ -1139,8 +1139,8 @@ describe("Store", function () {
             var results = await store.promises.execute(
                 "PREFIX test: <http://test.com/> SELECT * { ?x test:prop ?v1 . ?y test:prop ?v2 . filter(test:my_addition2(?v1,?v2)) }",
             );
-
             expect(results.length).toBe(3);
+
             for (var i = 0; i < results.length; i++) {
                 expect(parseInt(results[i].v1.value) + parseInt(results[i].v2.value)).toBeLessThan(5);
             }
@@ -1168,8 +1168,8 @@ describe("Store", function () {
             var results = await store.promises.execute(
                 "PREFIX test: <http://test.com/> SELECT ?x (SUM(test:my_double(?v)) AS ?sum) { ?x test:prop ?v } GROUP BY ?x",
             );
-
             expect(results.length).toBe(2);
+
             var sums = {};
             for (var i = 0; i < results.length; i++) {
                 sums[results[i].x.value] = results[i].sum.value;
@@ -1200,8 +1200,8 @@ describe("Store", function () {
             var results = await store.promises.execute(
                 "PREFIX test: <http://test.com/> SELECT * { OPTIONAL { ?x test:prop ?v1 . BIND(test:my_default_value(?v1) AS ?default_value) } }",
             );
-
             expect(results.length).toBe(4);
+
             for (var i = 0; i < results.length; i++) {
                 expect(results[i].default_value.value).toBe("test_value");
             }
@@ -1235,8 +1235,8 @@ describe("Store", function () {
             );
 
             var results = await store.promises.execute(query);
-
             expect(results.length).toBe(2);
+
             var vars = {};
             for (var i = 0; i < results.length; i++) {
                 vars[results[i]["s"].value] = true;
@@ -1265,8 +1265,8 @@ describe("Store", function () {
             );
 
             var results = await store.promises.execute(query);
-
             expect(results.length).toBe(2);
+
             var vars = {};
             for (var i = 0; i < results.length; i++) {
                 vars[results[i]["s"].value] = true;
@@ -1295,8 +1295,8 @@ describe("Store", function () {
             );
 
             var results = await store.promises.execute(query);
-
             expect(results.length).toBe(3);
+
             var vars = {};
             for (var i = 0; i < results.length; i++) {
                 vars[results[i]["s"].value] = true;
@@ -1324,7 +1324,6 @@ describe("Store", function () {
              } `;
 
             var results = await store.promises.execute(query);
-
             expect(results.length).toBe(2);
         });
     });

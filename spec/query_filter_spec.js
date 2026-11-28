@@ -1,60 +1,54 @@
 var QueryFilters = require("../src/query_filters").QueryFilters;
 
 describe("QueryFilters", function () {
-    it("should run the equality function", function (done) {
+    it("should run the equality function", function () {
         var op1 = createLiteral("123");
         var op2 = createLiteral("1234");
         var result = QueryFilters.runEqualityFunction(op1, op2, {}, null, null, null);
         expect(result.value).toEqual(false);
-        done();
     });
 
-    it("should run the lt function", function (done) {
+    it("should run the lt function", function () {
         var op1 = createLiteral("1");
         var op2 = createLiteral("2");
         var result = QueryFilters.runLtFunction(op1, op2, {});
         expect(result.value).toEqual(true);
-        done();
     });
 
-    it("should run a relational filter (runRelationalFilter)", function (done) {
+    it("should run a relational filter (runRelationalFilter)", function () {
         var op1 = createLiteral("1");
         var op2 = createLiteral("2");
         var result = QueryFilters.runRelationalFilter({ operator: ">" }, op1, op2, {}, null, null, null);
         expect(result.value).toEqual(false);
-        done();
     });
 
-    it("should run a relational filter (runFilter)", function (done) {
+    it("should run a relational filter (runFilter)", function () {
         var op1 = createLiteralExpression("1");
         var op2 = createLiteralExpression("2");
         var expr = { expressionType: "relationalexpression", op1: op1, operator: ">", op2: op2 };
         var result = QueryFilters.runFilter(expr, {}, null, null, null);
         expect(result.value).toEqual(false);
-        done();
     });
 
-    it("should run the or function", function (done) {
+    it("should run the or function", function () {
         var expr = {
             expressionType: "conditionalor",
             operands: [createLiteralExpression(false), createLiteralExpression(true)],
         };
         var result = QueryFilters.runFilter(expr, {}, null, null, null);
         expect(result.value).toEqual(true);
-        done();
     });
 
-    it("should run the and function", function (done) {
+    it("should run the and function", function () {
         var expr = {
             expressionType: "conditionaland",
             operands: [createLiteralExpression(true), createLiteralExpression(false)],
         };
         var result = QueryFilters.runFilter(expr, {}, null, null, null);
         expect(result.value).toEqual(false);
-        done();
     });
 
-    it("should run addition", function (done) {
+    it("should run addition", function () {
         var expr = {
             expressionType: "additiveexpression",
             summand: createIntegerExpression(1),
@@ -62,10 +56,9 @@ describe("QueryFilters", function () {
         };
         var result = QueryFilters.runFilter(expr, {}, null, null, null);
         expect(result.value).toEqual(5);
-        done();
     });
 
-    it("should run multiplication", function (done) {
+    it("should run multiplication", function () {
         var expr = {
             expressionType: "multiplicativeexpression",
             factor: createIntegerExpression(2),
@@ -73,7 +66,6 @@ describe("QueryFilters", function () {
         };
         var result = QueryFilters.runFilter(expr, {}, null, null, null);
         expect(result.value).toEqual(6);
-        done();
     });
 
     it("should report a type error in arithmetic as an error", function () {
@@ -202,7 +194,7 @@ describe("QueryFilters", function () {
         ).toBe(true);
     });
 
-    it("should run regex filters", function (done) {
+    it("should run regex filters", function () {
         var text = {
             expressionType: "atomic",
             primaryexpression: "var",
@@ -228,10 +220,9 @@ describe("QueryFilters", function () {
             null,
         );
         expect(result.value).toEqual(true);
-        done();
     });
 
-    it("should run another relational expression", function (done) {
+    it("should run another relational expression", function () {
         var expr = {
             token: "expression",
             expressionType: "relationalexpression",
@@ -257,13 +248,11 @@ describe("QueryFilters", function () {
             null,
         );
         expect(result.value).toEqual(false);
-        done();
     });
 
-    it("should run an IRI or ref function", function (done) {
+    it("should run an IRI or ref function", function () {
         /** @todo */
         //expect("not implemented").toBe("implemented");
-        done();
     });
 });
 
