@@ -8,7 +8,7 @@ var shuffle = function (o) {
 };
 
 describe("BTree", function () {
-    it("Should be possible to find data that has been inserted in the tree as well as walk through it.", function (done) {
+    it("finds inserted data and walks through it", function (done) {
         async.seq(
             function (_, c) {
                 new btree.Tree(2, function (tree) {
@@ -56,7 +56,7 @@ describe("BTree", function () {
         });
     });
 
-    it("Should be possible to delete data inserted in the tree.", function (done) {
+    it("deletes inserted data", function (done) {
         async.seq(
             function (_, c) {
                 new btree.Tree(2, function (tree) {
@@ -174,7 +174,7 @@ describe("BTree", function () {
         });
     });
 
-    it("Should be possible to insert and delete big collections on data", function (done) {
+    it("inserts and deletes large collections", function (done) {
         var max = 1;
         var max_data = 10000;
         var i = 0;
@@ -251,7 +251,7 @@ describe("BTree", function () {
         );
     });
 
-    it("Should be possible to update a key in the tree", function (done) {
+    it("updates a key", function (done) {
         var tree;
         async.seq(
             function (c) {

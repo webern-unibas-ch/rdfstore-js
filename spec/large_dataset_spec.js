@@ -3,7 +3,7 @@ var Store = require("../src/store");
 describe("Store with a large dataset", function () {
     // Traversing large BTree ranges (e.g. a full scan) used to overflow the call stack
     // (RangeError: Maximum call stack size exceeded), see utils.whilst.
-    it("Should load and query 100000 triples", function (done) {
+    it("loads and queries 100000 triples", function (done) {
         var numTriples = 100000;
         var numPredicates = 10;
 
@@ -40,7 +40,7 @@ describe("Store with a large dataset", function () {
     }, 60000);
 
     // Guards the hash lookup in leftOuterJoinBindings: a nested loop takes about 11 s here.
-    it("Should evaluate OPTIONAL over 32000 solutions", function (done) {
+    it("evaluates OPTIONAL over 32000 solutions", function (done) {
         var numSubjects = 32000;
 
         var turtle = "@prefix ex: <http://example.org/> .\n";

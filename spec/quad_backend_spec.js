@@ -3,7 +3,7 @@ var Pattern = require("../src/quad_index").Pattern;
 var NodeKey = require("../src/quad_index").NodeKey;
 
 describe("QuadBackend", function () {
-    it("Should choose the right index for the provided pattern", function (done) {
+    it("chooses the right index for the provided pattern", function (done) {
         new QuadBackend({ treeOrder: 2 }, function (backend) {
             var comps = { subject: 1, predicate: "p", object: 3, graph: 4 };
             var pattern = new Pattern(comps);
@@ -41,7 +41,7 @@ describe("QuadBackend", function () {
         });
     });
 
-    it("Should be possible to index, retrieve and delete quads from the backend", function (done) {
+    it("indexes, retrieves and deletes quads", function (done) {
         new QuadBackend({ treeOrder: 2 }, function (backend) {
             var key = new NodeKey({ subject: 1, predicate: 2, object: 3, graph: 4 });
 

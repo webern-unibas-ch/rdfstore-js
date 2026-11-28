@@ -7,7 +7,7 @@ var makeVar = function (n) {
 var pred = { token: "uri", prefix: null, suffix: null, value: "http://test.com/named" };
 
 describe("QueryPlan#executeAndBGPsGroups", function () {
-    it("Should be possible to group BGPs sharing variables", function () {
+    it("groups BGPs sharing variables", function () {
         var dataIn = [
             { subject: makeVar("s"), predicate: pred, object: makeVar("o") },
 

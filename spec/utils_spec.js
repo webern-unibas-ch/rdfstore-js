@@ -1,21 +1,21 @@
 var Utils = require("../src/utils");
 
 describe("Utils", function () {
-    it("Should compute the size of objects", function (done) {
+    it("computes the size of objects", function (done) {
         expect(Utils.size([1, 2, 3, 4])).toBe(4);
         expect(Utils.size({ a: 1, b: 2 })).toBe(2);
         expect(Utils.size(Object.create({ a: 1 }))).toBe(1);
         done();
     });
 
-    it("Should return the values of an object", function (done) {
+    it("returns the values of an object", function (done) {
         var values = Utils.values({ a: 1, b: "c" });
         expect(values[0]).toBe(1);
         expect(values[1]).toBe("c");
         done();
     });
 
-    it("Should compute parallel computations", function (done) {
+    it("runs computations in parallel", function (done) {
         var totals = {};
         Utils.eachParallel(
             [1, 2, 3, 4],

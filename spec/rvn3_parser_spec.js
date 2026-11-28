@@ -41,7 +41,7 @@ var shouldParse = function (input, output, done, options) {
 
 describe("RVN3Parser#parse", function () {
     describe("documents and graphs", function () {
-        it("Should be able to parse N3 data with a provided graph", function (done) {
+        it("parses N3 data with a provided graph", function (done) {
             fs.readFile(path.resolve(__dirname, "data/sp2b_10k.n3"), function (err, data) {
                 if (err) return done.fail(err);
                 data = data.toString("utf8");
@@ -57,7 +57,7 @@ describe("RVN3Parser#parse", function () {
             });
         });
 
-        it("Should be able to parse N3 data with a null graph", function (done) {
+        it("parses N3 data with a null graph", function (done) {
             fs.readFile(path.resolve(__dirname, "data/sp2b_10k.n3"), function (err, data) {
                 if (err) return done.fail(err);
                 data = data.toString("utf8");
@@ -73,7 +73,7 @@ describe("RVN3Parser#parse", function () {
             });
         });
 
-        it("Should parse N3 data with comments", function (done) {
+        it("parses N3 data with comments", function (done) {
             fs.readFile(path.resolve(__dirname, "./data/with_comments.n3"), function (err, data) {
                 if (err) return done.fail(err);
                 data = data.toString("utf8");
@@ -85,15 +85,15 @@ describe("RVN3Parser#parse", function () {
             });
         });
 
-        it("Should parse an empty string", function (done) {
+        it("parses an empty string", function (done) {
             shouldParse("", [], done);
         });
 
-        it("Should parse spaces", function (done) {
+        it("parses spaces", function (done) {
             shouldParse(" \t \n  ", [], done);
         });
 
-        it("Should parse single triple", function (done) {
+        it("parses a single triple", function (done) {
             shouldParse(
                 "<a> <b> <c>.",
                 [
@@ -108,7 +108,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse document triples", function (done) {
+        it("parses document triples", function (done) {
             shouldParse(
                 "<#a> <#b> <#c>.",
                 [
@@ -124,7 +124,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse triples", function (done) {
+        it("parses triples", function (done) {
             shouldParse(
                 "<a> <b> <c>.\n<d> <e> <f>.\n<g> <h> <i>.",
                 [
@@ -153,7 +153,7 @@ describe("RVN3Parser#parse", function () {
     });
 
     describe("literals and prefixes", function () {
-        it("Should parse literals", function (done) {
+        it("parses literals", function (done) {
             shouldParse(
                 '<a> <b> "string".',
                 [
@@ -168,7 +168,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse numeric literals", function (done) {
+        it("parses numeric literals", function (done) {
             shouldParse(
                 "<a> <b> 3.0.",
                 [
@@ -183,7 +183,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse literals with lang codes", function (done) {
+        it("parses literals with language tags", function (done) {
             shouldParse(
                 '<a> <b> "string"@en.',
                 [
@@ -198,7 +198,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse literals with normalised lang", function (done) {
+        it("parses literals with normalised language tags", function (done) {
             shouldParse(
                 '<a> <b> "string"@EN.',
                 [
@@ -213,7 +213,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse literal with URI type", function (done) {
+        it("parses a literal with a URI type", function (done) {
             shouldParse(
                 '<a> <b> "string"^^<type>.',
                 [
@@ -228,7 +228,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse literal with QName type", function (done) {
+        it("parses a literal with a QName type", function (done) {
             shouldParse(
                 '@prefix x: <y#>. <a> <b> "string"^^x:z.',
                 [
@@ -243,7 +243,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse triples with SPARQL prefixes", function (done) {
+        it("parses triples with SPARQL prefixes", function (done) {
             shouldParse(
                 "PREFIX : <#>\n" + "PrEfIX a: <a#> " + ":x a:a a:b.",
                 [
@@ -260,7 +260,7 @@ describe("RVN3Parser#parse", function () {
     });
 
     describe("shared subjects and predicates", function () {
-        it("Should parse statements with shared subjects", function (done) {
+        it("parses statements with shared subjects", function (done) {
             shouldParse(
                 "<a> <b> <c>;\n<d> <e>.",
                 [
@@ -281,7 +281,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse statements with shared subjects and trailing statements", function (done) {
+        it("parses statements with shared subjects and trailing statements", function (done) {
             shouldParse(
                 "<a> <b> <c>;\n<d> <e>;\n.",
                 [
@@ -302,7 +302,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse statements with shared subjects and multiple semicolons", function (done) {
+        it("parses statements with shared subjects and multiple semicolons", function (done) {
             shouldParse(
                 "<a> <b> <c>;;\n<d> <e>.",
                 [
@@ -323,7 +323,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse statements with shared subjects and predicates", function (done) {
+        it("parses statements with shared subjects and predicates", function (done) {
             shouldParse(
                 "<a> <b> <c>, <d>.",
                 [
@@ -346,7 +346,7 @@ describe("RVN3Parser#parse", function () {
     });
 
     describe("blank nodes", function () {
-        it("Should parse statements with named blank nodes", function (done) {
+        it("parses statements with named blank nodes", function (done) {
             shouldParse(
                 "_:a <b> _:c.",
                 [
@@ -361,7 +361,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse statements with empty blank nodes", function (done) {
+        it("parses statements with empty blank nodes", function (done) {
             shouldParse(
                 "[] <b> [].",
                 [
@@ -376,7 +376,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse statements with unnamed blank nodes in subject", function (done) {
+        it("parses statements with unnamed blank nodes in the subject", function (done) {
             shouldParse(
                 "[<a> <b>] <c> <d>.",
                 [
@@ -397,7 +397,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse statements with unnamed blank nodes in object", function (done) {
+        it("parses statements with unnamed blank nodes in the object", function (done) {
             shouldParse(
                 "<a> <b> [<c> <d>].",
                 [
@@ -418,7 +418,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse statements with unnamed blank nodes with string object", function (done) {
+        it("parses statements with unnamed blank nodes with a string object", function (done) {
             shouldParse(
                 '<a> <b> [<c> "x"].',
                 [
@@ -439,7 +439,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse multi statement blank node", function (done) {
+        it("parses a blank node with several statements", function (done) {
             shouldParse(
                 "<a> <b> [ <u> <v>; <w> <z> ].",
                 [
@@ -466,7 +466,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse multi statement blank node with trailing semicolon", function (done) {
+        it("parses a blank node with several statements and a trailing semicolon", function (done) {
             shouldParse(
                 "<a> <b> [ <u> <v>; <w> <z>; ].",
                 [
@@ -493,7 +493,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse statement with nested blank nodes subject", function (done) {
+        it("parses a statement with nested blank nodes as subject", function (done) {
             shouldParse(
                 "[<a> [<x> <y>]] <c> <d>.",
                 [
@@ -520,7 +520,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse statements with nested blank nodes object", function (done) {
+        it("parses statements with nested blank nodes as object", function (done) {
             shouldParse(
                 "<a> <b> [<c> [<d> <e>]].",
                 [
@@ -549,7 +549,7 @@ describe("RVN3Parser#parse", function () {
     });
 
     describe("lists", function () {
-        it("Should parse empty list subject", function (done) {
+        it("parses an empty list as subject", function (done) {
             shouldParse(
                 "() <a> <b>.",
                 [
@@ -569,7 +569,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse empty list object", function (done) {
+        it("parses an empty list as object", function (done) {
             shouldParse(
                 "<a> <b> ().",
                 [
@@ -589,7 +589,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse single element list object", function (done) {
+        it("parses a list with one element as object", function (done) {
             shouldParse(
                 "<a> <b> (<x>).",
                 [
@@ -631,7 +631,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse single element list subject", function (done) {
+        it("parses a list with one element as subject", function (done) {
             shouldParse(
                 "(<x>) <a> <b>.",
                 [
@@ -673,7 +673,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse statements with multi element list subject", function (done) {
+        it("parses statements with a list of several elements as subject", function (done) {
             shouldParse(
                 "(<x> <y>) <a> <b>.",
                 [
@@ -737,7 +737,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse statements with multi element list object", function (done) {
+        it("parses statements with a list of several elements as object", function (done) {
             shouldParse(
                 "<a> <b> (<x> <y>).",
                 [
@@ -801,7 +801,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse blank node statements with multi element list object", function (done) {
+        it("parses blank node statements with a list of several elements as object", function (done) {
             shouldParse(
                 '("y") <a> <b>.',
                 [
@@ -843,7 +843,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse statements with nested empty list", function (done) {
+        it("parses statements with a nested empty list", function (done) {
             shouldParse(
                 "<a> <b> (<x> ()).",
                 [
@@ -912,7 +912,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse statements with nested non empty list", function (done) {
+        it("parses statements with a nested non-empty list", function (done) {
             shouldParse(
                 "<a> <b> (<x> (<y>)).",
                 [
@@ -1003,7 +1003,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse statement with list containing empty node", function (done) {
+        it("parses a statement with a list containing an empty node", function (done) {
             shouldParse(
                 "([]) <a> <b>.",
                 [
@@ -1045,7 +1045,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse statements with list containing multiple empty node", function (done) {
+        it("parses statements with a list containing several empty nodes", function (done) {
             shouldParse(
                 "([] [<x> <y>]) <a> <b>.",
                 [
@@ -1115,7 +1115,7 @@ describe("RVN3Parser#parse", function () {
             );
         });
 
-        it("Should parse statements with list containing empty node containing list", function (done) {
+        it("parses statements with a list containing an empty node that contains a list", function (done) {
             shouldParse(
                 "[<a> (<b>)] <c> <d>.",
                 [

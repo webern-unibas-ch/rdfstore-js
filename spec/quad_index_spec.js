@@ -4,7 +4,7 @@ var Pattern = require("../src/quad_index").Pattern;
 var async = require("async");
 
 describe("NodeKey", function () {
-    it("Should be possible compare NodeKey objects", function () {
+    it("compares NodeKey objects", function () {
         var order = ["subject", "predicate", "object"];
 
         var comps1 = { subject: 1, predicate: 2, object: 3, graph: 4 };
@@ -33,7 +33,7 @@ describe("NodeKey", function () {
 });
 
 describe("Pattern", function () {
-    it("Should be possible to build patterns", function () {
+    it("builds patterns", function () {
         var comps1 = { subject: 1, predicate: "p", object: 3, graph: 4 };
 
         var pattern = new Pattern(comps1);
@@ -55,7 +55,7 @@ describe("Pattern", function () {
         expect(pattern.order.length).toBe(4);
     });
 
-    it("Should be possible to build patterns with the right indexKey", function () {
+    it("builds patterns with the right indexKey", function () {
         var comps1 = { subject: 1, predicate: "p", object: 3, graph: 4 };
         var pattern = new Pattern(comps1);
 
@@ -92,7 +92,7 @@ describe("QuadIndex", function () {
         return new Pattern({ subject: s, predicate: p, object: o });
     };
 
-    it("Should be possible to run range queries over the QuadIndex", function (done) {
+    it("runs range queries over the QuadIndex", function (done) {
         new QuadIndex({ order: 2, componentOrder: ["subject", "predicate", "object"] }, function (index) {
             async.timesSeries(
                 10,
